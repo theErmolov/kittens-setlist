@@ -1,0 +1,10 @@
+[default]
+[default.global.parameters]
+stack_name = "kittens-setlist"
+region = "eu-central-1"
+confirm_changeset = false
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+s3_prefix = "kittens-setlist"

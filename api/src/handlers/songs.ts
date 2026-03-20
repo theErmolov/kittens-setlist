@@ -1,0 +1,42 @@
+import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
+import { ok, err } from '../lib/response.js';
+import type { Song } from '../lib/types.js';
+
+const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
+
+export async function songsHandler(event: APIGatewayProxyEventV2) {
+  const method = event.requestContext.http.method;
+  const id = event.pathParameters?.id;
+
+  if (!id) {
+    if (method === 'GET') {
+      const items = await dbScan<Song>(TABLE);
+      return ok(items);
+    }
+    if (method === 'POST') {
+      const body = JSON.parse(event.body ?? '{}') as Omit<Song, 'id'>;
+      const song: Song = { ...body, id: crypto.randomUUID() };
+      await dbPut(TABLE, song as unknown as Record<string, unknown>);
+      return ok(song, 201);
+    }
+    return err('Method not allowed', 405);
+  }
+
+  if (method === 'GET') {
+    const item = await dbGet<Song>(TABLE, id);
+    if (!item) return err('Not found', 404);
+    return ok(item);
+  }
+  if (method === 'PUT') {
+    const body = JSON.parse(event.body ?? '{}') as Song;
+    await dbPut(TABLE, { ...body, id } as unknown as Record<string, unknown>);
+    return ok(body);
+  }
+  if (method === 'DELETE') {
+    await dbDelete(TABLE, id);
+    return ok({ deleted: id });
+  }
+
+  return err('Method not allowed', 405);
+}
