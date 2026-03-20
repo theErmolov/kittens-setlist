@@ -36,7 +36,7 @@ Multiple musicians will share it eventually.
 - All pages fetch from API in `onMount`
 - `src/lib/poller.ts` — reusable polling utility (pause on hidden tab, resume on focus)
 - Setlist editor and stage view maintain `localEntries = $state(...)` updated from every API response
-- Polling uses smart merge: skips no-op updates, protects drag state and focused comment inputs
+- Polling uses smart merge: skips no-op updates, protects drag state; comment inputs are isolated via `CommentInput.svelte` (own `$state`) so polling can't reset in-progress typing
 - Stores (`songs.ts`, `setlists.ts`, `musicians.ts`) are now unused by pages but kept in repo
 
 **Repo:** `git@github-personal:theErmolov/kittens-setlist.git`

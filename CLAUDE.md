@@ -185,8 +185,8 @@ Every other musician column has a tinted zebra background (`--musician-alt-bg`).
 - API: `addBreakToSetlist`, `removeBreakFromSetlist` (removes by `order`)
 - **Inline meta editing** — click ✏️ in header to edit setlist name, date, startTime in place; saved via `updateSetlist`
 - **startTime** — when set, a time column appears showing per-entry approximate start times (5 min/song + break minutes); break rows also show their start time aligned to the same column
-- **Per-entry comments** — inline text input per row; saved on blur via `updateEntryComment`; polling skips update if that input is focused
-- **Polling** — fetches setlist every 3 s; smart merge skips no-ops, protects drag state and focused comment input
+- **Per-entry comments** — rendered via `CommentInput.svelte` (isolated `$state`); saved on blur via `updateEntryComment`; isolation means polling-triggered re-renders cannot reset in-progress typing
+- **Polling** — fetches setlist every 3 s; smart merge skips no-ops, protects drag state
 
 ## Stage View
 
