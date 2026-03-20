@@ -1,19 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Setlist, Song, Category, SetlistEntry } from '$lib/types';
+  import type { Setlist, Song, Category, SetlistEntry, BandMusician } from '$lib/types';
   import StageSong from './StageSong.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
   import { getSetlist, togglePlayed } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
+  import { formatDuration, addMinutes } from '$lib/utils';
 
   let {
     setlist,
-    allSongs
+    allSongs,
+    musicians = []
   }: {
     setlist: Setlist;
     allSongs: Song[];
+    musicians: BandMusician[];
   } = $props();
 
   let localEntries = $state<SetlistEntry[]>([...setlist.entries]);
@@ -79,8 +82,21 @@
   }
 
   let playedCount = $derived(localEntries.filter(e => e.songId && e.played).length);
-  let visibleCount = $derived(sortedEntries().length);
   let totalCount = $derived(localEntries.filter(e => e.songId).length);
+  let totalMinutes = $derived(totalCount * 5 + localEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+  let visibleCount = $derived(sortedEntries().length);
+
+  // Per-entry start times keyed by entry order, only when startTime is set
+  let entryTimes = $derived((): Map<number, string> => {
+    if (!setlist.startTime) return new Map();
+    const map = new Map<number, string>();
+    let offset = 0;
+    for (const e of [...localEntries].sort((a, b) => a.order - b.order)) {
+      map.set(e.order, addMinutes(setlist.startTime!, offset));
+      offset += e.breakMinutes ?? 5;
+    }
+    return map;
+  });
 </script>
 
 <div class="stage">
@@ -89,7 +105,7 @@
       <a href="/setlists/{setlist.id}" class="back-link">←</a>
       <span class="name">{setlist.name}</span>
       <span class="progress">
-        {playedCount}/{totalCount}
+        {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
       </span>
     </div>
@@ -106,9 +122,15 @@
   <div class="song-list">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
       {#if item.kind === 'song'}
-        <StageSong song={item.song} entry={item.entry} position={i + 1} ontoggle={() => handleToggle(item.entry.songId!)} />
+        <StageSong song={item.song} entry={item.entry} position={i + 1}
+          startTime={entryTimes().get(item.entry.order)}
+          {musicians}
+          ontoggle={() => handleToggle(item.entry.songId!)} />
       {:else}
-        <div class="stage-break">⏸ {item.entry.breakMinutes} мин</div>
+        <div class="stage-break">
+          ⏸ {item.entry.breakMinutes} мин
+          {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
+        </div>
       {/if}
     {/each}
     {#if sortedEntries().length === 0}
@@ -142,8 +164,10 @@
   .song-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }
   .stage-break {
-    text-align: center; padding: 6px 12px; font-size: 0.82rem;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 6px 12px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
     letter-spacing: 0.03em;
   }
+  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; }
 </style>

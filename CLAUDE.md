@@ -67,6 +67,7 @@ interface BandMusician {
   id: string
   name: string
   defaultInstrument?: Instrument  // pre-selected when adding a song; single value
+  sortOrder?: number               // roster display order; drag-to-reorder in /musicians
 }
 
 interface Song {
@@ -84,6 +85,7 @@ interface Setlist {
   id: string
   name: string
   date?: string
+  startTime?: string       // HH:MM; drives per-entry start time display in editor + stage
   entries: SetlistEntry[]  // sorted by entry.order
 }
 
@@ -92,17 +94,19 @@ interface SetlistEntry {
   breakMinutes?: number    // present for break entries (10 / 20 / 30)
   order: number
   played: boolean          // stage mode tap-to-strikethrough
+  comment?: string         // per-entry note (same song can have different comment per setlist)
 }
 ```
 
 ## Musicians
 
-Managed via `/musicians` page. Stored in `kittens_musicians` localStorage.
+Managed via `/musicians` page. Stored in DynamoDB (`kittens-musicians` table).
 Default roster: Илья (bass), Андрей (drums), iLJa (guitar), Тоня (keys), Маша (violin).
 
 Each musician has one `defaultInstrument` — pre-selected when creating/editing a song.
 In the song edit modal, all 6 instruments are always shown for every musician; they can pick any or leave themselves free.
 Musicians cannot be removed from a song — only their instrument assignment can be cleared.
+Roster order is configurable via drag-to-reorder on `/musicians`; `sortOrder` is persisted and controls column order everywhere (backlog table, setlist editor, stage view).
 
 ## Routes
 
@@ -179,18 +183,20 @@ Every other musician column has a tinted zebra background (`--musician-alt-bg`).
 - Category icon shown before song name
 - **Breaks** — "⏸ Перерыв" button in the header opens a picker (10 / 20 / 30 min); breaks are draggable rows that span musician columns; stored as `SetlistEntry` with `breakMinutes` set and no `songId`
 - API: `addBreakToSetlist`, `removeBreakFromSetlist` (removes by `order`)
+- **Inline meta editing** — click ✏️ in header to edit setlist name, date, startTime in place; saved via `updateSetlist`
+- **startTime** — when set, a time column appears showing per-entry approximate start times (5 min/song + break minutes); break rows also show their start time aligned to the same column
+- **Per-entry comments** — inline text input per row; saved on blur via `updateEntryComment`; polling skips update if that input is focused
+- **Polling** — fetches setlist every 3 s; smart merge skips no-ops, protects drag state and focused comment input
 
 ## Stage View
 
 - Compact cards: `[#] [cat icon] Title  Artist(muted)`
-- Tap any song card to toggle played (fades + strikethrough)
-- Breaks shown as dashed separator rows `⏸ 10 мин`; always visible in default order; hidden when sorting by artist/title
-- Progress counter counts only song entries (not breaks)
+- Musicians shown in a CSS grid (one column per roster member, fixed position); instrument icons + name truncated with ellipsis when space is tight; amber pill background
+- Tap any song card to toggle played (fades + strikethrough); optimistic update then confirmed from server
+- Breaks shown as dashed separator rows `⏸ 10 мин`; start time (if set) shown right-aligned in accent color
+- Progress counter counts only song entries (not breaks); duration includes break minutes
 - Sort: Default order | Artist | Title
 - Filter by category chip (multi-select) + 💬 Comment toggle
+- **startTime** — when set on the setlist, each card and break row shows its approximate start time (right-aligned, accent color)
+- **Polling** — fetches setlist every 2 s; skips update if entries are identical
 - `CategoryBadge` supports `iconOnly` prop — used in editor and stage view
-
-## Planned Backend
-
-AWS Lambda + DynamoDB. Only `src/lib/api.ts` needs to change — all functions are already async.
-Multi-user conflict resolution is deferred to that phase.

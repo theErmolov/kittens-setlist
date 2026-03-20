@@ -38,5 +38,6 @@ export interface Setlist {
   id: string;
   name: string;
   date?: string;
+  startTime?: string;
   entries: SetlistEntry[];
 }

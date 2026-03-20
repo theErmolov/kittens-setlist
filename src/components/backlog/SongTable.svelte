@@ -4,6 +4,7 @@
   import SongEditModal from './SongEditModal.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
+  import { formatDuration } from '$lib/utils';
   import { t } from '$lib/i18n';
 
   let {
@@ -49,9 +50,10 @@
     const q = search.toLowerCase();
     if (q && !s.artist.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q)) return false;
     if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
-    // AND: every selected musician must appear in the song
+    // AND: every selected musician must actively participate (instrument or vocals)
     for (const m of selectedMusicians) {
-      if (!(m in s.musicians)) return false;
+      const role = s.musicians[m];
+      if (!role || (!role.instrument && !role.vocals)) return false;
     }
     if (selectedInstruments.size > 0) {
       if (selectedMusicians.size > 0) {
@@ -114,7 +116,7 @@
   <div class="toolbar">
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-    <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)}</span>
+    <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().length * 5)})</span>
     <button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
   </div>
 

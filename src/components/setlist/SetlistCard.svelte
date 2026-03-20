@@ -1,14 +1,13 @@
 <script lang="ts">
   import type { Setlist } from '$lib/types';
   import { t } from '$lib/i18n';
+  import { formatDuration } from '$lib/utils';
 
-  let {
-    setlist,
-    ondelete
-  }: {
-    setlist: Setlist;
-    ondelete: () => void;
-  } = $props();
+  let { setlist, ondelete }: { setlist: Setlist; ondelete: () => void } = $props();
+
+  let songCount = $derived(setlist.entries.filter(e => e.songId).length);
+  let breakMins = $derived(setlist.entries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+
 </script>
 
 <div class="card">
@@ -16,7 +15,7 @@
     <div class="card-name">{setlist.name}</div>
     <div class="card-meta">
       {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
-      <span class="count">{$t.setlists.songs(setlist.entries.length)}</span>
+      <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songCount * 5 + breakMins)})</span>
     </div>
   </a>
   <div class="card-actions">

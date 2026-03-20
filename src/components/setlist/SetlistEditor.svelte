@@ -3,10 +3,11 @@
   import type { Setlist, Song, Instrument, SetlistEntry } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
-  import { getSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment } from '$lib/api';
+  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment } from '$lib/api';
   import type { BandMusician } from '$lib/types';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
+  import { formatDuration, addMinutes } from '$lib/utils';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
@@ -23,6 +24,27 @@
   } = $props();
 
   let allMusicians = $derived(musicians.map(m => m.name));
+
+  // Editable meta (name / date / startTime)
+  let editingMeta = $state(false);
+  let draftMeta = $state({ name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' });
+  let localMeta = $state({ name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' });
+  $effect(() => {
+    if (!editingMeta) {
+      localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' };
+    }
+  });
+
+  async function saveMeta() {
+    const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries });
+    localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '' };
+    editingMeta = false;
+  }
+
+  function startEditMeta() {
+    draftMeta = { ...localMeta };
+    editingMeta = true;
+  }
 
   let localEntries = $state([...setlist.entries]);
   $effect(() => { localEntries = [...setlist.entries]; });
@@ -82,8 +104,23 @@
     return list;
   });
 
-  // total columns: drag + num + cat + song + musicians + remove
-  let totalCols = $derived(allMusicians.length + 5);
+  let songCount = $derived(sortedEntries.filter(e => e.songId).length);
+  let totalMinutes = $derived(songCount * 5 + sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+
+  // Per-entry start times, keyed by entryKey. Only computed when startTime is set.
+  let entryTimes = $derived((): Map<string, string> => {
+    if (!localMeta.startTime) return new Map();
+    const map = new Map<string, string>();
+    let offset = 0;
+    for (const entry of sortedEntries) {
+      map.set(entryKey(entry), addMinutes(localMeta.startTime, offset));
+      offset += entry.breakMinutes ?? 5;
+    }
+    return map;
+  });
+
+  // total columns: drag + num + (time?) + cat + song + musicians + remove
+  let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(ids: string[]) {
     applyUpdate(await addSongsToSetlist(setlist.id, ids));
@@ -139,9 +176,25 @@
 <div class="editor">
   <div class="editor-header">
     <div class="meta">
-      <h1>{setlist.name}</h1>
-      {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
-      <span class="count">{$t.editor.songs(sortedEntries.length)}</span>
+      {#if editingMeta}
+        <div class="meta-form">
+          <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder="Название" />
+          <input class="meta-input" type="date" bind:value={draftMeta.date} />
+          <input class="meta-input" type="time" bind:value={draftMeta.startTime} />
+          <button class="btn-primary" onclick={saveMeta}>Сохранить</button>
+          <button class="btn-secondary" onclick={() => { editingMeta = false; }}>Отмена</button>
+        </div>
+      {:else}
+        <div class="meta-view">
+          <h1>{localMeta.name}</h1>
+          <div class="meta-details">
+            {#if localMeta.date}<span class="date">{localMeta.date}</span>{/if}
+            {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
+            <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes)})</span>
+          </div>
+        </div>
+        <button class="edit-meta-btn" onclick={startEditMeta} title="Редактировать">✏️</button>
+      {/if}
     </div>
     <div class="header-actions">
       <div class="break-wrap">
@@ -171,6 +224,7 @@
           <tr>
             <th class="th-drag"></th>
             <th class="th-num">#</th>
+            {#if localMeta.startTime}<th class="th-time"></th>{/if}
             <th class="th-cat"></th>
             <th class="th-song">Песня</th>
             {#each allMusicians as name}
@@ -198,6 +252,7 @@
                 >
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">{i + 1}</td>
+                  {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
                   <td class="td-song">
                     <div class="song-name">
@@ -242,7 +297,9 @@
                 ondragend={onDragEnd}
               >
                 <td class="td-drag"><span class="drag-handle">⠿</span></td>
-                <td colspan={totalCols - 2} class="td-break">
+                <td class="td-num"></td>
+                {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
+                <td colspan={totalCols - 3 - (localMeta.startTime ? 1 : 0)} class="td-break">
                   <span class="break-icon">⏸</span>
                   Перерыв — {entry.breakMinutes} мин
                 </td>
@@ -281,8 +338,16 @@
 <style>
   .editor { padding: 16px; }
   .editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .meta h1 { margin: 0 0 4px; font-size: 1.4rem; }
-  .date, .count { font-size: 0.82rem; color: var(--text-muted); margin-right: 10px; }
+  .meta { display: flex; align-items: flex-start; gap: 8px; }
+  .meta-view h1 { margin: 0 0 4px; font-size: 1.4rem; }
+  .meta-details { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .date, .count, .start-time { font-size: 0.82rem; color: var(--text-muted); }
+  .start-time { font-weight: 600; }
+  .edit-meta-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; opacity: 0.5; padding: 4px; margin-top: 2px; }
+  .edit-meta-btn:hover { opacity: 1; }
+  .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .meta-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
+  .meta-name { font-size: 1rem; font-weight: 600; min-width: 200px; }
   .header-actions { display: flex; gap: 8px; align-items: center; }
   .btn-secondary { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; color: var(--text); font-size: 0.88rem; }
   .btn-primary { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
@@ -308,6 +373,7 @@
     text-align: left; white-space: nowrap;
   }
   .th-num, .td-num { text-align: right; width: 28px; }
+  .th-time, .td-time { width: 42px; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; text-align: right; padding-right: 6px; }
   .th-cat, .td-cat { width: 32px; text-align: center; }
   .th-drag, .td-drag { width: 24px; }
   .th-musician, .td-musician { text-align: center; width: 52px; }
