@@ -58,7 +58,7 @@
   .chip.active { border-color: var(--accent); color: #fff; }
 
   .chip-all.active   { background: var(--accent); }
-  .chip-top.active   { background: #16a34a; border-color: #22c55e; }
+  .chip-top.active   { background: #b91c1c; border-color: #ef4444; }
   .chip-mid.active   { background: #7c3aed; border-color: #a78bfa; }
-  .chip-low.active   { background: #0e7490; border-color: #22d3ee; }
+  .chip-low.active   { background: #15803d; border-color: #22c55e; }
 </style>

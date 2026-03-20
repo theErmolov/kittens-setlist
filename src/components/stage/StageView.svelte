@@ -1,10 +1,12 @@
 <script lang="ts">
-  import type { Setlist, Song, Category } from '$lib/types';
+  import { onMount } from 'svelte';
+  import type { Setlist, Song, Category, SetlistEntry } from '$lib/types';
   import StageSong from './StageSong.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
-  import { togglePlayed } from '$lib/api';
+  import { getSetlist, togglePlayed } from '$lib/api';
   import { t } from '$lib/i18n';
+  import { startPolling } from '$lib/poller';
 
   let {
     setlist,
@@ -14,6 +16,22 @@
     allSongs: Song[];
   } = $props();
 
+  let localEntries = $state<SetlistEntry[]>([...setlist.entries]);
+  $effect(() => { localEntries = [...setlist.entries]; });
+
+  function applyPoll(incoming: SetlistEntry[]) {
+    const sorted = [...incoming].sort((a, b) => a.order - b.order);
+    const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
+    if (JSON.stringify(sorted) === JSON.stringify(localSorted)) return;
+    localEntries = incoming;
+  }
+
+  onMount(() => startPolling(
+    async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+    2000,
+    () => false,
+  ));
+
   let categoryFilter = $state(new Set<Category>());
   let sortKey = $state<SortKey>('default');
   let onlyWithComment = $state(false);
@@ -21,11 +39,11 @@
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
 
   type DisplayItem =
-    | { kind: 'song'; entry: typeof setlist.entries[0]; song: Song }
-    | { kind: 'break'; entry: typeof setlist.entries[0] };
+    | { kind: 'song'; entry: SetlistEntry; song: Song }
+    | { kind: 'break'; entry: SetlistEntry };
 
   let sortedEntries = $derived((): DisplayItem[] => {
-    const sorted = [...setlist.entries].sort((a, b) => a.order - b.order);
+    const sorted = [...localEntries].sort((a, b) => a.order - b.order);
 
     if (sortKey !== 'default') {
       // When sorting by name, only show songs (no breaks)
@@ -33,9 +51,9 @@
         .filter(e => e.songId)
         .map(e => ({ kind: 'song' as const, entry: e, song: songMap.get(e.songId!) }))
         .filter((x): x is { kind: 'song'; entry: typeof x.entry; song: Song } => x.song !== undefined)
-        .filter(({ song }) => {
+        .filter(({ song, entry }) => {
           if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return false;
-          if (onlyWithComment && !song.comment) return false;
+          if (onlyWithComment && !entry.comment) return false;
           return true;
         })
         .sort((a, b) => sortKey === 'artist'
@@ -48,18 +66,21 @@
       const song = e.songId ? songMap.get(e.songId) : undefined;
       if (!song) return [];
       if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return [];
-      if (onlyWithComment && !song.comment) return [];
+      if (onlyWithComment && !e.comment) return [];
       return [{ kind: 'song' as const, entry: e, song }];
     });
   });
 
   async function handleToggle(songId: string) {
-    await togglePlayed(setlist.id, songId);
+    // Optimistic update so the tap feels instant, then confirm from server
+    localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
+    const updated = await togglePlayed(setlist.id, songId);
+    applyPoll(updated.entries);
   }
 
-  let playedCount = $derived(setlist.entries.filter(e => e.songId && e.played).length);
+  let playedCount = $derived(localEntries.filter(e => e.songId && e.played).length);
   let visibleCount = $derived(sortedEntries().length);
-  let totalCount = $derived(setlist.entries.filter(e => e.songId).length);
+  let totalCount = $derived(localEntries.filter(e => e.songId).length);
 </script>
 
 <div class="stage">

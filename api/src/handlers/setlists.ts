@@ -84,6 +84,21 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
     return err('Method not allowed', 405);
   }
 
+  if (afterId === '/entry-comment') {
+    if (method === 'PATCH') {
+      const { order, comment } = JSON.parse(event.body ?? '{}') as { order: number; comment: string };
+      const setlist = await dbGet<Setlist>(TABLE, id);
+      if (!setlist) return err('Not found', 404);
+      const updated: Setlist = {
+        ...setlist,
+        entries: setlist.entries.map(e => e.order === order ? { ...e, comment } : e),
+      };
+      await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      return ok(updated);
+    }
+    return err('Method not allowed', 405);
+  }
+
   if (afterId === '/played') {
     if (method === 'POST') {
       const { songId } = JSON.parse(event.body ?? '{}') as { songId: string };

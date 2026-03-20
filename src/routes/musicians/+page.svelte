@@ -16,6 +16,9 @@
   let draftName = $state('');
   let draftInstrument = $state<Instrument | undefined>(undefined);
 
+  let dragIdx = $state<number | null>(null);
+  let dragOverIdx = $state<number | null>(null);
+
   onMount(async () => {
     musicians = await getMusicians();
   });
@@ -45,7 +48,7 @@
 
   async function handleAdd() {
     if (!draftName.trim()) return;
-    const m = await addMusician({ name: draftName.trim(), defaultInstrument: draftInstrument });
+    const m = await addMusician({ name: draftName.trim(), defaultInstrument: draftInstrument, sortOrder: musicians.length });
     musicians = [...musicians, m];
     showNew = false;
   }
@@ -61,6 +64,38 @@
     if (!confirm($t.musicians.deleteConfirm)) return;
     await deleteMusician(id);
     musicians = musicians.filter(m => m.id !== id);
+  }
+
+  function onDragStart(idx: number) {
+    dragIdx = idx;
+  }
+
+  function onDragOver(e: DragEvent, idx: number) {
+    e.preventDefault();
+    dragOverIdx = idx;
+  }
+
+  async function onDrop(e: DragEvent) {
+    e.preventDefault();
+    if (dragIdx === null || dragOverIdx === null || dragIdx === dragOverIdx) {
+      dragIdx = null;
+      dragOverIdx = null;
+      return;
+    }
+    const reordered = [...musicians];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(dragOverIdx, 0, moved);
+    // Assign new sortOrders and persist changed items
+    const updated = reordered.map((m, i) => ({ ...m, sortOrder: i }));
+    musicians = updated;
+    dragIdx = null;
+    dragOverIdx = null;
+    await Promise.all(updated.map(m => updateMusician(m)));
+  }
+
+  function onDragEnd() {
+    dragIdx = null;
+    dragOverIdx = null;
   }
 </script>
 
@@ -94,8 +129,17 @@
     <p class="empty">{$t.musicians.empty}</p>
   {:else}
     <ul class="musician-list">
-      {#each musicians as m (m.id)}
-        <li class="musician-item">
+      {#each musicians as m, i (m.id)}
+        <li
+          class="musician-item"
+          class:drag-over={dragOverIdx === i && dragIdx !== i}
+          draggable="true"
+          ondragstart={() => onDragStart(i)}
+          ondragover={(e) => onDragOver(e, i)}
+          ondrop={onDrop}
+          ondragend={onDragEnd}
+        >
+          <span class="drag-handle" title="Drag to reorder">⠿</span>
           {#if editingId === m.id}
             <div class="edit-form inline">
               <input bind:value={draftName} />
@@ -171,7 +215,16 @@
     display: flex; align-items: center; gap: 12px;
     padding: 12px 14px; border: 1px solid var(--border);
     border-radius: 10px; background: var(--surface);
+    cursor: grab; transition: border-color 0.12s, opacity 0.12s;
   }
+  .musician-item.drag-over { border-color: var(--accent); }
+
+  .drag-handle {
+    color: var(--text-muted); font-size: 1.1rem; cursor: grab;
+    flex-shrink: 0; user-select: none; opacity: 0.5;
+  }
+  .musician-item:hover .drag-handle { opacity: 1; }
+
   .musician-info { display: flex; align-items: center; gap: 10px; flex: 1; }
   .mname { font-weight: 600; font-size: 1rem; min-width: 80px; }
   .minstruments { display: flex; gap: 4px; flex-wrap: wrap; }

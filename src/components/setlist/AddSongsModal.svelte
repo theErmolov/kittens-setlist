@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Song } from '$lib/types';
+  import type { Song, Category } from '$lib/types';
+  import FilterChips from '$components/shared/FilterChips.svelte';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { t } from '$lib/i18n';
 
@@ -16,13 +17,17 @@
   } = $props();
 
   let search = $state('');
+  let categoryFilter = $state(new Set<Category>());
   let selected = $state(new Set<string>());
 
-  let filtered = $derived(songs.filter(s => {
-    if (existingIds.has(s.id)) return false;
-    const q = search.toLowerCase();
-    return !q || s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q);
-  }));
+  let filtered = $derived(songs
+    .filter(s => {
+      if (existingIds.has(s.id)) return false;
+      if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
+      const q = search.toLowerCase();
+      return !q || s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q);
+    })
+    .sort((a, b) => a.artist.localeCompare(b.artist, undefined, { sensitivity: 'base' })));
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -48,13 +53,16 @@
     <div class="search-bar">
       <input bind:value={search} placeholder={$t.addSongs.search} />
     </div>
+    <div class="filter-bar">
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+    </div>
     <div class="song-list">
       {#each filtered as song (song.id)}
         <label class="song-item" class:selected={selected.has(song.id)}>
           <input type="checkbox" checked={selected.has(song.id)} onchange={() => toggle(song.id)} />
           <span class="song-info">
+            <CategoryBadge category={song.category} iconOnly />
             <span class="song-title">{song.artist} – {song.title}</span>
-            <CategoryBadge category={song.category} />
           </span>
         </label>
       {/each}
@@ -80,11 +88,12 @@
   .close-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); }
   .search-bar { padding: 10px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
   .search-bar input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.88rem; box-sizing: border-box; }
+  .filter-bar { padding: 8px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
   .song-list { flex: 1; overflow-y: auto; padding: 8px 0; }
   .song-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; transition: background 0.12s; }
   .song-item:hover, .song-item.selected { background: var(--row-hover); }
-  .song-info { display: flex; align-items: center; gap: 8px; flex: 1; }
-  .song-title { font-size: 0.88rem; }
+  .song-info { display: flex; align-items: center; gap: 6px; flex: 1; }
+.song-title { font-size: 0.88rem; }
   .empty { text-align: center; color: var(--text-muted); padding: 24px; }
   .modal-footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
   .sel-count { flex: 1; font-size: 0.82rem; color: var(--text-muted); }

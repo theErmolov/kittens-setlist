@@ -12,6 +12,7 @@ export interface BandMusician {
   id: string;
   name: string;
   defaultInstrument?: Instrument;
+  sortOrder?: number;
 }
 
 export interface Song {
@@ -30,6 +31,7 @@ export interface SetlistEntry {
   breakMinutes?: number;
   order: number;
   played: boolean;
+  comment?: string;
 }
 
 export interface Setlist {

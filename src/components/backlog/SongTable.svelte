@@ -28,7 +28,7 @@
   let vocalsFilter = $state(false);
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
-  let sortCol = $state<'artist' | 'title' | null>(null);
+  let sortCol = $state<'artist' | 'title'>('artist');
   let sortDir = $state<1 | -1>(1);
 
   const instrumentIcons: Record<Instrument, string> = {
@@ -40,7 +40,7 @@
   let allMusicians = $derived(() => musicians.map(m => m.name));
 
   function toggleSort(col: 'artist' | 'title') {
-    if (sortCol === col) sortDir = sortDir === 1 ? -1 : 1;
+    if (sortCol === col) sortDir = (sortDir === 1 ? -1 : 1);
     else { sortCol = col; sortDir = 1; }
   }
 
@@ -76,8 +76,7 @@
     }
     return true;
     });
-    if (!sortCol) return f;
-    return [...f].sort((a, b) => a[sortCol!].localeCompare(b[sortCol!], undefined, { sensitivity: 'base' }) * sortDir);
+    return [...f].sort((a, b) => a[sortCol].localeCompare(b[sortCol], undefined, { sensitivity: 'base' }) * sortDir);
   });
 
   function toggleMusician(name: string) {
@@ -159,7 +158,6 @@
             {$t.backlog.cols.title}{sortCol === 'title' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
           </th>
           <th>{$t.backlog.cols.cat}</th>
-          <th>{$t.backlog.cols.comment}</th>
           {#each allMusicians() as name, i}
             <th class="th-musician" class:musician-alt={i % 2 === 1}>{name}</th>
           {/each}
@@ -177,7 +175,7 @@
           />
         {/each}
         {#if filtered().length === 0}
-          <tr><td colspan={5 + allMusicians().length} class="empty">{$t.backlog.empty}</td></tr>
+          <tr><td colspan={4 + allMusicians().length} class="empty">{$t.backlog.empty}</td></tr>
         {/if}
       </tbody>
     </table>

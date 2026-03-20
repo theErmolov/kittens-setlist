@@ -39,8 +39,8 @@
         <span class="extra">{song.extraMusicians}</span>
       {/if}
     </div>
-    {#if song.comment}
-      <div class="comment">{song.comment}</div>
+    {#if entry.comment}
+      <div class="comment">{entry.comment}</div>
     {/if}
   </div>
 </button>

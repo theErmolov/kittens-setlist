@@ -26,7 +26,6 @@
   <td class="td-artist">{song.artist}</td>
   <td class="td-title">{song.title}</td>
   <td class="td-cat"><CategoryBadge category={song.category} /></td>
-  <td class="td-comment">{song.comment ?? ''}</td>
   {#each allMusicians as name, i}
     {@const role = song.musicians[name]}
     <td class="td-musician" class:musician-alt={i % 2 === 1}>
@@ -50,8 +49,6 @@
   td { padding: 8px 12px; font-size: 0.88rem; vertical-align: middle; }
   .td-artist { font-weight: 500; white-space: nowrap; }
   .td-cat { white-space: nowrap; }
-  .td-comment { color: var(--text-muted); font-size: 0.82rem; max-width: 140px; }
-
   .td-musician { text-align: left; white-space: nowrap; }
   .musician-alt { background: var(--musician-alt-bg); }
   .role-cell { font-size: 1rem; display: inline-flex; align-items: center; }

@@ -46,7 +46,7 @@ const strings = {
     backlog: {
       search: 'Search artist or title…',
       addSong: '+ Add Song',
-      cols: { artist: 'Artist', title: 'Title', cat: 'Cat', comment: 'Comment', musicians: 'Musicians' },
+      cols: { artist: 'Artist', title: 'Title', cat: 'Cat', musicians: 'Musicians' },
       empty: 'No songs found',
       shown: (n: number, total: number) =>
         n === total ? `${n} song${n !== 1 ? 's' : ''}` : `${n} / ${total} songs`,
@@ -62,8 +62,6 @@ const strings = {
       artist: 'Artist',
       title: 'Title',
       category: 'Category',
-      comment: 'Comment',
-      commentPlaceholder: 'Optional notes',
       musicians: 'Musicians',
       extraMusicians: 'Extra musicians',
       extraPlaceholder: 'e.g. Саша (перкуссия)',
@@ -156,7 +154,7 @@ const strings = {
     backlog: {
       search: 'Поиск по исполнителю или названию…',
       addSong: '+ Добавить',
-      cols: { artist: 'Исполнитель', title: 'Название', cat: 'Кат', comment: 'Комментарий', musicians: 'Музыканты' },
+      cols: { artist: 'Исполнитель', title: 'Название', cat: 'Категория', musicians: 'Музыканты' },
       empty: 'Ничего не найдено',
       shown: (n: number, total: number) => {
         const word = ruPlural(total, 'песня', 'песни', 'песен');
@@ -174,8 +172,6 @@ const strings = {
       artist: 'Исполнитель',
       title: 'Название',
       category: 'Категория',
-      comment: 'Комментарий',
-      commentPlaceholder: 'Заметки',
       musicians: 'Музыканты',
       extraMusicians: 'Доп. музыканты',
       extraPlaceholder: 'напр. Саша (перкуссия)',

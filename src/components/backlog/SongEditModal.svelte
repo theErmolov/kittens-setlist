@@ -97,20 +97,16 @@
       </div>
       <div class="field">
         <label>{$t.song.category}</label>
-        <div class="radio-group">
+        <div class="cat-chips">
           {#each (['top', 'mid', 'low'] as Category[]) as cat}
-            <label class="radio-label">
-              <input type="radio" bind:group={draft.category} value={cat} />
-              {$t.filter[cat]}
-            </label>
+            <button
+              class="cat-chip cat-chip-{cat}"
+              class:active={draft.category === cat}
+              onclick={() => { draft.category = cat; }}
+            >{$t.filter[cat]}</button>
           {/each}
         </div>
       </div>
-      <div class="field">
-        <label>{$t.song.comment}</label>
-        <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
-      </div>
-
       <div class="field">
         <label>{$t.song.musicians}</label>
         <div class="musician-roster">
@@ -177,8 +173,16 @@
     padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--bg); color: var(--text); font-size: 0.9rem; width: 100%; box-sizing: border-box;
   }
-  .radio-group { display: flex; gap: 16px; }
-  .radio-label { display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer; }
+  .cat-chips { display: flex; gap: 6px; }
+  .cat-chip {
+    padding: 5px 16px; border-radius: 20px; border: 1px solid var(--border);
+    background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .cat-chip-top.active { background: #b91c1c; border-color: #ef4444; color: #fff; }
+  .cat-chip-mid.active { background: #7c3aed; border-color: #a78bfa; color: #fff; }
+  .cat-chip-low.active { background: #15803d; border-color: #22c55e; color: #fff; }
+  .cat-chip:not(.active):hover { border-color: var(--accent); color: var(--accent); }
 
   .musician-roster { display: flex; flex-direction: column; gap: 4px; }
 

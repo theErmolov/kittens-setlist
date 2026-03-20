@@ -1,10 +1,12 @@
 <script lang="ts">
-  import type { Setlist, Song, Instrument } from '$lib/types';
+  import { onMount } from 'svelte';
+  import type { Setlist, Song, Instrument, SetlistEntry } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
-  import { addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist } from '$lib/api';
+  import { getSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment } from '$lib/api';
   import type { BandMusician } from '$lib/types';
   import { t } from '$lib/i18n';
+  import { startPolling } from '$lib/poller';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
@@ -22,14 +24,55 @@
 
   let allMusicians = $derived(musicians.map(m => m.name));
 
+  let localEntries = $state([...setlist.entries]);
+  $effect(() => { localEntries = [...setlist.entries]; });
+
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
+  let focusedCommentOrder = $state<number | null>(null);
+
+  // Full replace after own mutations — always authoritative
+  function applyUpdate(updated: Setlist) {
+    localEntries = [...updated.entries];
+  }
+
+  // Smart merge for poll updates — preserve drag state and focused comment input
+  function applyPoll(incoming: SetlistEntry[]) {
+    const sorted = [...incoming].sort((a, b) => a.order - b.order);
+    const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
+
+    // Skip if nothing changed
+    if (JSON.stringify(sorted) === JSON.stringify(localSorted)) return;
+
+    if (dragIndex !== null) {
+      // During drag: only update per-entry fields, keep structure intact
+      localEntries = localEntries.map(e => {
+        const fresh = incoming.find(i => i.songId === e.songId && (!e.songId || i.songId === e.songId) && i.order === e.order);
+        if (!fresh) return e;
+        return { ...fresh, comment: focusedCommentOrder === e.order ? e.comment : fresh.comment };
+      });
+    } else {
+      // No drag: full structural update, protect focused comment input
+      localEntries = incoming.map(e => ({
+        ...e,
+        comment: focusedCommentOrder === e.order
+          ? (localEntries.find(c => c.order === e.order)?.comment ?? e.comment)
+          : e.comment,
+      }));
+    }
+  }
+
+  onMount(() => startPolling(
+    async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+    3000,
+    () => false,
+  ));
 
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
-  let sortedEntries = $derived([...setlist.entries].sort((a, b) => a.order - b.order));
-  let existingIds = $derived(new Set(setlist.entries.map(e => e.songId).filter(Boolean)));
+  let sortedEntries = $derived([...localEntries].sort((a, b) => a.order - b.order));
+  let existingIds = $derived(new Set(localEntries.map(e => e.songId).filter((id): id is string => !!id)));
 
   let displayEntries = $derived(() => {
     if (dragIndex === null || overIndex === null || dragIndex === overIndex) return sortedEntries;
@@ -43,21 +86,21 @@
   let totalCols = $derived(allMusicians.length + 5);
 
   async function handleAdd(ids: string[]) {
-    await addSongsToSetlist(setlist.id, ids);
+    applyUpdate(await addSongsToSetlist(setlist.id, ids));
     showAddModal = false;
   }
 
   async function handleAddBreak(minutes: number) {
-    await addBreakToSetlist(setlist.id, minutes);
+    applyUpdate(await addBreakToSetlist(setlist.id, minutes));
     showBreakPicker = false;
   }
 
   async function handleRemove(songId: string) {
-    await removeSongFromSetlist(setlist.id, songId);
+    applyUpdate(await removeSongFromSetlist(setlist.id, songId));
   }
 
   async function handleRemoveBreak(order: number) {
-    await removeBreakFromSetlist(setlist.id, order);
+    applyUpdate(await removeBreakFromSetlist(setlist.id, order));
   }
 
   function entryKey(entry: typeof sortedEntries[0]) {
@@ -80,10 +123,17 @@
     list.splice(overIndex, 0, item);
     const reordered = list.map((e, i) => ({ ...e, order: i }));
     dragIndex = null; overIndex = null;
-    await reorderEntries(setlist.id, reordered);
+    applyUpdate(await reorderEntries(setlist.id, reordered));
   }
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
+
+  async function handleCommentBlur(entry: typeof sortedEntries[0], value: string) {
+    focusedCommentOrder = null;
+    if (value !== (entry.comment ?? '')) {
+      applyUpdate(await updateEntryComment(setlist.id, entry.order, value));
+    }
+  }
 </script>
 
 <div class="editor">
@@ -150,9 +200,22 @@
                   <td class="td-num">{i + 1}</td>
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
                   <td class="td-song">
-                    <span class="artist">{song.artist}</span>
-                    <span class="sep">–</span>
-                    <span class="title">{song.title}</span>
+                    <div class="song-name">
+                      <span class="artist">{song.artist}</span>
+                      <span class="sep">–</span>
+                      <span class="title">{song.title}</span>
+                    </div>
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <input
+                      class="comment-input"
+                      value={entry.comment ?? ''}
+                      placeholder="комментарий..."
+                      onclick={(e) => e.stopPropagation()}
+                      ondragstart={(e) => e.stopPropagation()}
+                      onfocus={() => { focusedCommentOrder = entry.order; }}
+                      onblur={(e) => handleCommentBlur(entry, e.currentTarget.value)}
+                    />
                   </td>
                   {#each allMusicians as name}
                     {@const role = song.musicians[name]}
@@ -276,9 +339,20 @@
 
   .td-num { font-size: 0.82rem; color: var(--text-muted); }
   .td-song { white-space: nowrap; }
+  .song-name { display: flex; align-items: center; }
   .artist { font-weight: 600; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
   .title { font-size: 0.9rem; }
+  .comment-input {
+    display: block; width: 100%; margin-top: 2px;
+    background: transparent; border: none; border-bottom: 1px dashed transparent;
+    font-size: 0.75rem; color: var(--text-muted); font-style: italic;
+    padding: 1px 0; outline: none; cursor: text; white-space: nowrap;
+    transition: border-color 0.15s;
+  }
+  .comment-input:focus { border-bottom-color: var(--accent); }
+  .comment-input::placeholder { opacity: 0; }
+  .song-row:hover .comment-input::placeholder { opacity: 0.5; }
 
   .td-musician { font-size: 1rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; }

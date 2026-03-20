@@ -19,7 +19,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 // ─── Musicians ────────────────────────────────────────────────────────────────
 
 export async function getMusicians(): Promise<BandMusician[]> {
-  return req('/musicians');
+  const items = await req<BandMusician[]>('/musicians');
+  return items.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
 
 export async function addMusician(m: Omit<BandMusician, 'id'>): Promise<BandMusician> {
@@ -74,26 +75,30 @@ export async function deleteSetlist(id: string): Promise<void> {
   await req(`/setlists/${id}`, { method: 'DELETE' });
 }
 
-export async function addBreakToSetlist(setlistId: string, minutes: number): Promise<void> {
-  await req(`/setlists/${setlistId}/breaks`, { method: 'POST', body: JSON.stringify({ minutes }) });
+export async function addBreakToSetlist(setlistId: string, minutes: number): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/breaks`, { method: 'POST', body: JSON.stringify({ minutes }) });
 }
 
-export async function removeBreakFromSetlist(setlistId: string, order: number): Promise<void> {
-  await req(`/setlists/${setlistId}/breaks/${order}`, { method: 'DELETE' });
+export async function removeBreakFromSetlist(setlistId: string, order: number): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/breaks/${order}`, { method: 'DELETE' });
 }
 
-export async function addSongsToSetlist(setlistId: string, songIds: string[]): Promise<void> {
-  await req(`/setlists/${setlistId}/songs`, { method: 'POST', body: JSON.stringify({ songIds }) });
+export async function addSongsToSetlist(setlistId: string, songIds: string[]): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/songs`, { method: 'POST', body: JSON.stringify({ songIds }) });
 }
 
-export async function removeSongFromSetlist(setlistId: string, songId: string): Promise<void> {
-  await req(`/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
+export async function removeSongFromSetlist(setlistId: string, songId: string): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
 }
 
-export async function togglePlayed(setlistId: string, songId: string): Promise<void> {
-  await req(`/setlists/${setlistId}/played`, { method: 'POST', body: JSON.stringify({ songId }) });
+export async function togglePlayed(setlistId: string, songId: string): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/played`, { method: 'POST', body: JSON.stringify({ songId }) });
 }
 
-export async function reorderEntries(setlistId: string, entries: SetlistEntry[]): Promise<void> {
-  await req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify({ entries }) });
+export async function updateEntryComment(setlistId: string, order: number, comment: string): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/entry-comment`, { method: 'PATCH', body: JSON.stringify({ order, comment }) });
+}
+
+export async function reorderEntries(setlistId: string, entries: SetlistEntry[]): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify({ entries }) });
 }
