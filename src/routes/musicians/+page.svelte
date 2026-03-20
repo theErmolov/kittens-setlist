@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { musiciansStore } from '$lib/stores/musicians';
-  import { addMusician, updateMusician, deleteMusician } from '$lib/api';
+  import { onMount } from 'svelte';
+  import { addMusician, updateMusician, deleteMusician, getMusicians } from '$lib/api';
   import { t } from '$lib/i18n';
   import type { BandMusician, Instrument } from '$lib/types';
 
@@ -9,13 +9,16 @@
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
   };
 
-  let musicians = $derived($musiciansStore);
+  let musicians = $state<BandMusician[]>([]);
   let editingId = $state<string | null>(null);
   let showNew = $state(false);
 
-  // draft for add/edit
   let draftName = $state('');
   let draftInstrument = $state<Instrument | undefined>(undefined);
+
+  onMount(async () => {
+    musicians = await getMusicians();
+  });
 
   function startAdd() {
     draftName = '';
@@ -37,25 +40,27 @@
   }
 
   function selectDraftInstrument(inst: Instrument) {
-    // clicking the active one deselects it (free); clicking another selects it
     draftInstrument = draftInstrument === inst ? undefined : inst;
   }
 
   async function handleAdd() {
     if (!draftName.trim()) return;
-    await addMusician({ name: draftName.trim(), defaultInstrument: draftInstrument });
+    const m = await addMusician({ name: draftName.trim(), defaultInstrument: draftInstrument });
+    musicians = [...musicians, m];
     showNew = false;
   }
 
   async function handleSave(m: BandMusician) {
     if (!draftName.trim()) return;
-    await updateMusician({ ...m, name: draftName.trim(), defaultInstrument: draftInstrument });
+    const updated = await updateMusician({ ...m, name: draftName.trim(), defaultInstrument: draftInstrument });
+    musicians = musicians.map(x => x.id === updated.id ? updated : x);
     editingId = null;
   }
 
   async function handleDelete(id: string) {
     if (!confirm($t.musicians.deleteConfirm)) return;
     await deleteMusician(id);
+    musicians = musicians.filter(m => m.id !== id);
   }
 </script>
 

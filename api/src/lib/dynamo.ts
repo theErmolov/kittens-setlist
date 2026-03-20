@@ -24,6 +24,12 @@ export async function dbDelete(table: string, id: string): Promise<void> {
 }
 
 export async function dbScan<T>(table: string): Promise<T[]> {
-  const res = await db.send(new ScanCommand({ TableName: table }));
-  return (res.Items ?? []) as T[];
+  const items: T[] = [];
+  let lastKey: Record<string, unknown> | undefined;
+  do {
+    const res = await db.send(new ScanCommand({ TableName: table, ExclusiveStartKey: lastKey }));
+    items.push(...((res.Items ?? []) as T[]));
+    lastKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+  return items;
 }

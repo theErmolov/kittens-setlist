@@ -5,10 +5,11 @@ import type { Setlist, SetlistEntry } from '../lib/types.js';
 
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
 
-export async function setlistsHandler(event: APIGatewayProxyEventV2) {
+export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPath: string) {
   const method = event.requestContext.http.method;
-  const rawPath = event.rawPath;
-  const id = event.pathParameters?.id;
+  const rawPath = strippedPath;
+  const parts = strippedPath.split('/').filter(Boolean); // ['setlists'] or ['setlists', id, ...]
+  const id = parts[1] ?? null;
 
   // /setlists — collection
   if (!id) {

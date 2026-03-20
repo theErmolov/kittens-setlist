@@ -1,7 +1,7 @@
 # Музыкальные Котятки — Setlist App
 
 Band setlist manager for "Музыкальные Котятки". Replaces a Google Sheet.
-Frontend-only now; AWS/DynamoDB backend planned later.
+Full stack: SvelteKit frontend + AWS Lambda + DynamoDB backend.
 
 ## Memory
 
@@ -12,7 +12,10 @@ Read these files at the start of every session:
 ## Tech Stack
 
 - **Svelte 5** (runes mode — `$state`, `$derived`, `$effect` everywhere, no `$:`)
-- **SvelteKit** with `@sveltejs/adapter-auto`
+- **SvelteKit** with `@sveltejs/adapter-static` (SPA mode, `fallback: '200.html'`)
+- **AWS Lambda** (Node 22, arm64) + **API Gateway HTTP API** + **DynamoDB** (3 tables)
+- API URL: `https://bw1e6cey18.execute-api.eu-central-1.amazonaws.com/prod`
+- Deploy: `sam build && sam deploy --profile personal` (SAM stack `kittens-setlist`, `eu-central-1`)
 - **TypeScript** strict mode
 - **No CSS framework** — plain scoped styles + CSS custom properties
 
@@ -28,8 +31,8 @@ npm run build     # production build
 
 ### API layer — `src/lib/api.ts`
 All components talk to this file only, never to stores directly.
-Currently reads/writes localStorage stores. When the AWS backend arrives, **only this file changes**.
-All functions are async to match the future HTTP contract.
+Makes `fetch()` calls to `PUBLIC_API_URL` (set in `.env.local` for dev, GitHub Actions var for prod).
+All functions are async.
 
 ### Stores — `src/lib/stores/`
 - `songs.ts` — writable store, persisted to localStorage key `kittens_songs`
@@ -95,7 +98,7 @@ interface SetlistEntry {
 ## Musicians
 
 Managed via `/musicians` page. Stored in `kittens_musicians` localStorage.
-Default roster: Илья (guitar), Андрей (drums), iL'Ja (guitar), Тоня (bass), Маша (violin).
+Default roster: Илья (bass), Андрей (drums), iLJa (guitar), Тоня (keys), Маша (violin).
 
 Each musician has one `defaultInstrument` — pre-selected when creating/editing a song.
 In the song edit modal, all 6 instruments are always shown for every musician; they can pick any or leave themselves free.

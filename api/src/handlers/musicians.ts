@@ -5,12 +5,13 @@ import type { BandMusician } from '../lib/types.js';
 
 const TABLE = process.env.MUSICIANS_TABLE ?? 'kittens-musicians';
 
-export async function musiciansHandler(event: APIGatewayProxyEventV2) {
+export async function musiciansHandler(event: APIGatewayProxyEventV2, path: string) {
   const method = event.requestContext.http.method;
-  // /musicians or /musicians/:id
-  const id = event.pathParameters?.id;
+  // path is already stage-stripped: /musicians or /musicians/:id
+  const parts = path.split('/').filter(Boolean); // ['musicians'] or ['musicians', 'id']
+  const id = parts[1] ?? null;
 
-  if (!id) {
+  if (!id || id === '') {
     // Collection
     if (method === 'GET') {
       const items = await dbScan<BandMusician>(TABLE);

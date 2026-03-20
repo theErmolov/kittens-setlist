@@ -3,22 +3,24 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import { addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist } from '$lib/api';
-  import { musiciansStore } from '$lib/stores/musicians';
+  import type { BandMusician } from '$lib/types';
   import { t } from '$lib/i18n';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
   };
 
-  let allMusicians = $derived($musiciansStore.map(m => m.name));
-
   let {
     setlist,
-    allSongs
+    allSongs,
+    musicians
   }: {
     setlist: Setlist;
     allSongs: Song[];
+    musicians: BandMusician[];
   } = $props();
+
+  let allMusicians = $derived(musicians.map(m => m.name));
 
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);

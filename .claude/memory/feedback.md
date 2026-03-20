@@ -1,0 +1,39 @@
+---
+name: feedback_patterns
+description: Preferences and key decisions made during development
+type: feedback
+---
+
+**Use `browser` from `$app/environment` for any localStorage access.**
+Why: SvelteKit SSR makes `localStorage` exist but throws on `.getItem()`. `typeof localStorage === 'undefined'` doesn't catch it.
+How to apply: Always `if (!browser) return fallback` before touching localStorage.
+
+**Don't summarise what you just did at the end of responses.**
+Why: User can read the diff.
+
+**Bump the relevant `DATA_VERSION` / `MUSICIANS_VERSION` when store data shape changes.**
+Why: Old localStorage data will break new code silently otherwise.
+
+**Category labels in Russian are band-specific slang — don't normalise them.**
+- top → "💩 По говну"
+- mid → "🎵 Середняк"
+- low → "🧪 Андеграунд"
+
+**Instrument filter when musicians are also selected must be scoped to those musicians.**
+Why: "Маша + 🎻" means songs where Маша plays violin, not songs where anyone plays violin.
+How to apply: See filter logic in `SongTable.svelte`.
+
+**Musicians cannot be removed from a song — only their instrument can be cleared.**
+Why: User explicitly removed the include/exclude toggle. All band members are always present in every song record.
+How to apply: No "remove from song" UI. Instrument buttons are the only per-musician control.
+
+**Each musician has exactly one default instrument (not a list).**
+Why: User said "musician can play only 1 instrument". The old `defaultInstruments: Instrument[]` was replaced with `defaultInstrument?: Instrument`.
+How to apply: `BandMusician.defaultInstrument` is a single optional value.
+
+**Vocals are mandatory per song.**
+Why: User wants to always know who sings. Saving without any vocalist assigned shows "А поёт эту хуйню кто?" and blocks the save.
+How to apply: Hard `alert()` + `return` in `handleSave`, not a skippable `confirm()`.
+
+**Error/validation copy is in Russian and colloquial, not polished.**
+Why: Band-internal tool. "А поёт эту хуйню кто?" is the exact approved wording.

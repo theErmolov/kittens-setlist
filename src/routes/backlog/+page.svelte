@@ -1,19 +1,23 @@
 <script lang="ts">
-  import { songsStore } from '$lib/stores/songs';
-  import { setlistsStore } from '$lib/stores/setlists';
+  import { onMount } from 'svelte';
   import SongTable from '$components/backlog/SongTable.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import type { Song } from '$lib/types';
-  import { addSong } from '$lib/api';
+  import type { Song, Setlist, BandMusician } from '$lib/types';
+  import { getSongs, addSong, getSetlists, getMusicians } from '$lib/api';
 
-  let songs = $derived($songsStore);
-  let setlists = $derived($setlistsStore);
-
+  let songs = $state<Song[]>([]);
+  let setlists = $state<Setlist[]>([]);
+  let musicians = $state<BandMusician[]>([]);
   let showAddModal = $state(false);
+
+  onMount(async () => {
+    [songs, setlists, musicians] = await Promise.all([getSongs(), getSetlists(), getMusicians()]);
+  });
 
   async function handleAdd(song: Song) {
     const { id: _, ...rest } = song;
-    await addSong(rest);
+    const created = await addSong(rest);
+    songs = [...songs, created];
     showAddModal = false;
   }
 </script>
@@ -21,12 +25,14 @@
 <SongTable
   {songs}
   {setlists}
+  {musicians}
   onadd={() => { showAddModal = true; }}
 />
 
 {#if showAddModal}
   <SongEditModal
     song={null}
+    {musicians}
     onclose={() => { showAddModal = false; }}
     onsave={handleAdd}
   />

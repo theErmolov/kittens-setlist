@@ -1,21 +1,25 @@
 <script lang="ts">
-  import type { Song, Setlist, Category, Instrument } from '$lib/types';
+  import type { Song, Setlist, Category, Instrument, BandMusician } from '$lib/types';
   import SongRow from './SongRow.svelte';
   import SongEditModal from './SongEditModal.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
-  import { musiciansStore } from '$lib/stores/musicians';
   import { t } from '$lib/i18n';
 
   let {
-    songs,
+    songs: songsProp,
     setlists,
+    musicians,
     onadd
   }: {
     songs: Song[];
     setlists: Setlist[];
+    musicians: BandMusician[];
     onadd: () => void;
   } = $props();
+
+  let songs = $state(songsProp);
+  $effect(() => { songs = songsProp; });
 
   let search = $state('');
   let categoryFilter = $state(new Set<Category>());
@@ -33,7 +37,7 @@
   const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
 
   // Musician columns follow the roster order; all roster members always shown
-  let allMusicians = $derived(() => $musiciansStore.map(m => m.name));
+  let allMusicians = $derived(() => musicians.map(m => m.name));
 
   function toggleSort(col: 'artist' | 'title') {
     if (sortCol === col) sortDir = sortDir === 1 ? -1 : 1;
@@ -90,12 +94,14 @@
 
   async function handleSave(updated: Song) {
     await updateSong(updated);
+    songs = songs.map(s => s.id === updated.id ? updated : s);
     editingSong = null;
   }
 
   async function handleDelete(id: string) {
     if (!confirm($t.deleteConfirm)) return;
     await deleteSong(id);
+    songs = songs.filter(s => s.id !== id);
   }
 
   async function handleAddToSetlist(setlistId: string) {
@@ -181,6 +187,7 @@
 {#if editingSong}
   <SongEditModal
     song={editingSong}
+    {musicians}
     onclose={() => { editingSong = null; }}
     onsave={handleSave}
   />

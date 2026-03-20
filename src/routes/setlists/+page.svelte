@@ -1,19 +1,24 @@
 <script lang="ts">
-  import { setlistsStore } from '$lib/stores/setlists';
+  import { onMount } from 'svelte';
   import SetlistCard from '$components/setlist/SetlistCard.svelte';
-  import { createSetlist, deleteSetlist } from '$lib/api';
+  import { createSetlist, deleteSetlist, getSetlists } from '$lib/api';
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
+  import type { Setlist } from '$lib/types';
 
-  let setlists = $derived($setlistsStore);
-
+  let setlists = $state<Setlist[]>([]);
   let showNew = $state(false);
   let newName = $state('');
   let newDate = $state('');
 
+  onMount(async () => {
+    setlists = await getSetlists();
+  });
+
   async function handleCreate() {
     if (!newName.trim()) return;
     const sl = await createSetlist(newName.trim(), newDate.trim() || undefined);
+    setlists = [...setlists, sl];
     newName = ''; newDate = ''; showNew = false;
     goto(`/setlists/${sl.id}`);
   }
@@ -21,6 +26,7 @@
   async function handleDelete(id: string) {
     if (!confirm($t.setlists.deleteConfirm)) return;
     await deleteSetlist(id);
+    setlists = setlists.filter(s => s.id !== id);
   }
 </script>
 

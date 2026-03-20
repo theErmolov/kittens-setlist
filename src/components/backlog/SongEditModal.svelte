@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { Song, Category, MusicianRole, Instrument } from '$lib/types';
-  import { musiciansStore } from '$lib/stores/musicians';
+  import type { Song, Category, MusicianRole, Instrument, BandMusician } from '$lib/types';
   import { t } from '$lib/i18n';
 
   const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
@@ -10,27 +9,27 @@
 
   let {
     song,
+    musicians,
     onclose,
     onsave
   }: {
     song: Partial<Song> | null;
+    musicians: BandMusician[];
     onclose: () => void;
     onsave: (s: Song) => void;
   } = $props();
 
-  let bandMusicians = $derived($musiciansStore);
+  let bandMusicians = $derived(musicians);
 
   // Build initial musicians map from song, filling in band roster defaults
   function buildInitialMusicians(): Record<string, MusicianRole> {
     const result: Record<string, MusicianRole> = {};
     if (song?.musicians) {
-      // Carry over existing assignments
       for (const [name, role] of Object.entries(song.musicians)) {
         result[name] = { ...role };
       }
     } else {
-      // New song: pre-populate all band musicians with their default instrument
-      for (const m of $musiciansStore) {
+      for (const m of musicians) {
         result[m.name] = {
           instrument: m.defaultInstrument,
           vocals: false

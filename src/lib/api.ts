@@ -1,126 +1,99 @@
 /**
- * API layer — mock/localStorage now, real HTTP later.
- * All functions are async to match the future backend contract.
+ * API layer — all calls go to the AWS backend via PUBLIC_API_URL.
+ * To swap the backend, only this file needs to change.
  */
-import { get } from 'svelte/store';
-import { songsStore } from '$lib/stores/songs';
-import { setlistsStore } from '$lib/stores/setlists';
-import { musiciansStore } from '$lib/stores/musicians';
+import { PUBLIC_API_URL } from '$env/static/public';
 import type { Song, Setlist, SetlistEntry, BandMusician } from '$lib/types';
+
+const BASE = PUBLIC_API_URL;
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${res.status}`);
+  return res.json() as Promise<T>;
+}
 
 // ─── Musicians ────────────────────────────────────────────────────────────────
 
 export async function getMusicians(): Promise<BandMusician[]> {
-  return get(musiciansStore);
+  return req('/musicians');
 }
 
 export async function addMusician(m: Omit<BandMusician, 'id'>): Promise<BandMusician> {
-  const musician = { ...m, id: crypto.randomUUID() };
-  musiciansStore.add(musician);
-  return musician;
+  return req('/musicians', { method: 'POST', body: JSON.stringify(m) });
 }
 
 export async function updateMusician(m: BandMusician): Promise<BandMusician> {
-  musiciansStore.update(m);
-  return m;
+  return req(`/musicians/${m.id}`, { method: 'PUT', body: JSON.stringify(m) });
 }
 
 export async function deleteMusician(id: string): Promise<void> {
-  const musician = get(musiciansStore).find(m => m.id === id);
-  if (musician) {
-    // Remove this musician from every song
-    const songs = get(songsStore);
-    for (const song of songs) {
-      if (musician.name in song.musicians) {
-        const { [musician.name]: _, ...rest } = song.musicians;
-        songsStore.updateSong({ ...song, musicians: rest });
-      }
-    }
-  }
-  musiciansStore.remove(id);
+  await req(`/musicians/${id}`, { method: 'DELETE' });
 }
 
-// ─── Songs ───────────────────────────────────────────────────────────────────
+// ─── Songs ────────────────────────────────────────────────────────────────────
 
 export async function getSongs(): Promise<Song[]> {
-  return get(songsStore);
+  return req('/songs');
 }
 
 export async function addSong(song: Omit<Song, 'id'>): Promise<Song> {
-  const newSong: Song = { ...song, id: crypto.randomUUID() };
-  songsStore.addSong(newSong);
-  return newSong;
+  return req('/songs', { method: 'POST', body: JSON.stringify(song) });
 }
 
 export async function updateSong(song: Song): Promise<Song> {
-  songsStore.updateSong(song);
-  return song;
+  return req(`/songs/${song.id}`, { method: 'PUT', body: JSON.stringify(song) });
 }
 
 export async function deleteSong(id: string): Promise<void> {
-  songsStore.deleteSong(id);
+  await req(`/songs/${id}`, { method: 'DELETE' });
 }
 
 // ─── Setlists ─────────────────────────────────────────────────────────────────
 
 export async function getSetlists(): Promise<Setlist[]> {
-  return get(setlistsStore);
+  return req('/setlists');
 }
 
 export async function getSetlist(id: string): Promise<Setlist | undefined> {
-  return get(setlistsStore).find(l => l.id === id);
+  return req(`/setlists/${id}`);
 }
 
 export async function createSetlist(name: string, date?: string): Promise<Setlist> {
-  const setlist: Setlist = { id: crypto.randomUUID(), name, date, entries: [] };
-  setlistsStore.addSetlist(setlist);
-  return setlist;
+  return req('/setlists', { method: 'POST', body: JSON.stringify({ name, date }) });
 }
 
 export async function updateSetlist(setlist: Setlist): Promise<Setlist> {
-  setlistsStore.updateSetlist(setlist);
-  return setlist;
+  return req(`/setlists/${setlist.id}`, { method: 'PUT', body: JSON.stringify(setlist) });
 }
 
 export async function deleteSetlist(id: string): Promise<void> {
-  setlistsStore.deleteSetlist(id);
+  await req(`/setlists/${id}`, { method: 'DELETE' });
 }
 
 export async function addBreakToSetlist(setlistId: string, minutes: number): Promise<void> {
-  const setlist = get(setlistsStore).find(l => l.id === setlistId);
-  if (!setlist) return;
-  const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
-  setlistsStore.updateSetlist({ ...setlist, entries: [...setlist.entries, { breakMinutes: minutes, order: maxOrder + 1, played: false }] });
+  await req(`/setlists/${setlistId}/breaks`, { method: 'POST', body: JSON.stringify({ minutes }) });
 }
 
 export async function removeBreakFromSetlist(setlistId: string, order: number): Promise<void> {
-  const setlist = get(setlistsStore).find(l => l.id === setlistId);
-  if (!setlist) return;
-  setlistsStore.updateSetlist({ ...setlist, entries: setlist.entries.filter(e => e.order !== order) });
+  await req(`/setlists/${setlistId}/breaks/${order}`, { method: 'DELETE' });
 }
 
 export async function addSongsToSetlist(setlistId: string, songIds: string[]): Promise<void> {
-  const setlist = get(setlistsStore).find(l => l.id === setlistId);
-  if (!setlist) return;
-  const existing = new Set(setlist.entries.map(e => e.songId).filter(Boolean));
-  const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
-  const newEntries: SetlistEntry[] = songIds
-    .filter(id => !existing.has(id))
-    .map((id, i) => ({ songId: id, order: maxOrder + 1 + i, played: false }));
-  setlistsStore.updateSetlist({ ...setlist, entries: [...setlist.entries, ...newEntries] });
+  await req(`/setlists/${setlistId}/songs`, { method: 'POST', body: JSON.stringify({ songIds }) });
 }
 
 export async function removeSongFromSetlist(setlistId: string, songId: string): Promise<void> {
-  const setlist = get(setlistsStore).find(l => l.id === setlistId);
-  if (!setlist) return;
-  const entries = setlist.entries.filter(e => e.songId !== songId);
-  setlistsStore.updateSetlist({ ...setlist, entries });
+  await req(`/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
 }
 
 export async function togglePlayed(setlistId: string, songId: string): Promise<void> {
-  setlistsStore.togglePlayed(setlistId, songId);
+  await req(`/setlists/${setlistId}/played`, { method: 'POST', body: JSON.stringify({ songId }) });
 }
 
 export async function reorderEntries(setlistId: string, entries: SetlistEntry[]): Promise<void> {
-  setlistsStore.reorderEntries(setlistId, entries);
+  await req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify({ entries }) });
 }

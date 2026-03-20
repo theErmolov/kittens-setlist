@@ -5,11 +5,12 @@ import type { Song } from '../lib/types.js';
 
 const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 
-export async function songsHandler(event: APIGatewayProxyEventV2) {
+export async function songsHandler(event: APIGatewayProxyEventV2, path: string) {
   const method = event.requestContext.http.method;
-  const id = event.pathParameters?.id;
+  const parts = path.split('/').filter(Boolean); // ['songs'] or ['songs', 'id']
+  const id = parts[1] ?? null;
 
-  if (!id) {
+  if (!id || id === '') {
     if (method === 'GET') {
       const items = await dbScan<Song>(TABLE);
       return ok(items);

@@ -4,7 +4,13 @@ import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
 
 export const handler = async (event: APIGatewayProxyEventV2) => {
-  const path = event.rawPath;
+  // API Gateway HTTP API prepends the stage name to rawPath (e.g. /prod/songs).
+  // Strip it so handlers can match on plain /songs, /setlists, /musicians.
+  const stage = event.requestContext.stage ?? '';
+  const rawPath = event.rawPath;
+  const path = stage && stage !== '$default' && rawPath.startsWith(`/${stage}`)
+    ? rawPath.slice(stage.length + 1) || '/'
+    : rawPath;
 
   if (event.requestContext.http.method === 'OPTIONS') {
     return {
@@ -18,9 +24,9 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     };
   }
 
-  if (path.startsWith('/musicians')) return musiciansHandler(event);
-  if (path.startsWith('/songs')) return songsHandler(event);
-  if (path.startsWith('/setlists')) return setlistsHandler(event);
+  if (path.startsWith('/musicians')) return musiciansHandler(event, path);
+  if (path.startsWith('/songs')) return songsHandler(event, path);
+  if (path.startsWith('/setlists')) return setlistsHandler(event, path);
 
   return { statusCode: 404, body: 'Not found' };
 };
