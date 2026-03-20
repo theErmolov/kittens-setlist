@@ -18,9 +18,8 @@ export interface Song {
   artist: string;
   title: string;
   category: Category;
-  comment?: string;
+  comment?: string;  // general note, copied to setlist entry on add
   musicians: Record<string, MusicianRole>;
-  extraMusicians?: string;
   sortOrder?: number;
 }
 

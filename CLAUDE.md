@@ -77,7 +77,7 @@ interface Song {
   category: Category       // top=💩 По говну, mid=🎵 Середняк, low=🧪 Андеграунд
   comment?: string
   musicians: Record<string, MusicianRole>  // keyed by musician name; all band members always included
-  extraMusicians?: string
+  comment?: string         // general note; copied to SetlistEntry.comment when song is added to a setlist
   sortOrder?: number
 }
 

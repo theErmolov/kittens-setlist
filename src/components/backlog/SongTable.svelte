@@ -3,7 +3,7 @@
   import SongRow from './SongRow.svelte';
   import SongEditModal from './SongEditModal.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
-  import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
+  import { updateSong, deleteSong, addSongsToSetlist, removeSongFromSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
   import { t } from '$lib/i18n';
 
@@ -21,6 +21,9 @@
 
   let songs = $state(songsProp);
   $effect(() => { songs = songsProp; });
+
+  let localSetlists = $state(setlists);
+  $effect(() => { localSetlists = setlists; });
 
   let search = $state('');
   let categoryFilter = $state(new Set<Category>());
@@ -105,10 +108,14 @@
     songs = songs.filter(s => s.id !== id);
   }
 
-  async function handleAddToSetlist(setlistId: string) {
+  async function handleToggleSetlist(sl: Setlist) {
     if (!addToSetlistSong) return;
-    await addSongsToSetlist(setlistId, [addToSetlistSong.id]);
-    addToSetlistSong = null;
+    const songId = addToSetlistSong.id;
+    const inSetlist = sl.entries.some(e => e.songId === songId);
+    const updated = inSetlist
+      ? await removeSongFromSetlist(sl.id, songId)
+      : await addSongsToSetlist(sl.id, [songId]);
+    localSetlists = localSetlists.map(s => s.id === sl.id ? updated : s);
   }
 </script>
 
@@ -161,7 +168,7 @@
           </th>
           <th>{$t.backlog.cols.cat}</th>
           {#each allMusicians() as name, i}
-            <th class="th-musician" class:musician-alt={i % 2 === 1}>{name}</th>
+            <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
           {/each}
           <th></th>
         </tr>
@@ -202,13 +209,17 @@
       </div>
       <div class="modal-body">
         <p class="song-name">"{addToSetlistSong.artist} – {addToSetlistSong.title}"</p>
-        {#if setlists.length === 0}
+        {#if localSetlists.length === 0}
           <p class="empty">{$t.addToSetlist.noSetlists} <a href="/setlists">{$t.addToSetlist.createLink}</a></p>
         {:else}
-          {#each setlists as sl}
-            <button class="setlist-option" onclick={() => handleAddToSetlist(sl.id)}>
+          {#each localSetlists as sl}
+            {@const inSetlist = sl.entries.some(e => e.songId === addToSetlistSong!.id)}
+            <button class="setlist-option" class:in-setlist={inSetlist} onclick={() => handleToggleSetlist(sl)}>
               <span class="sl-name">{sl.name}</span>
-              {#if sl.date}<span class="sl-date">{sl.date}</span>{/if}
+              <span class="sl-right">
+                {#if sl.date}<span class="sl-date">{sl.date}</span>{/if}
+                {#if inSetlist}<span class="sl-check">✓</span>{/if}
+              </span>
             </button>
           {/each}
         {/if}
@@ -291,9 +302,13 @@
   .setlist-option {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
-    background: transparent; cursor: pointer; text-align: left; width: 100%; transition: background 0.12s;
+    background: transparent; cursor: pointer; text-align: left; width: 100%; transition: background 0.12s, border-color 0.12s;
   }
   .setlist-option:hover { background: var(--row-hover); }
+  .setlist-option.in-setlist { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .setlist-option.in-setlist:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
   .sl-name { font-weight: 500; font-size: 0.9rem; }
+  .sl-right { display: flex; align-items: center; gap: 8px; }
   .sl-date { font-size: 0.78rem; color: var(--text-muted); }
+  .sl-check { font-size: 0.9rem; color: var(--accent); font-weight: 700; }
 </style>

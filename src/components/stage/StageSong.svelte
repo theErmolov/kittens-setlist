@@ -12,6 +12,7 @@
     position,
     startTime,
     musicians = [],
+    selectedMusician = '',
     ontoggle
   }: {
     song: Song;
@@ -19,6 +20,7 @@
     position: number;
     startTime?: string;
     musicians: BandMusician[];
+    selectedMusician?: string;
     ontoggle: () => void;
   } = $props();
 
@@ -26,7 +28,8 @@
     musicians.map(m => {
       const role = song.musicians[m.name];
       const active = role && (role.instrument || role.vocals);
-      return { name: m.name, role: role ?? null, active: !!active };
+      const highlight = !!selectedMusician && m.name === selectedMusician && !!active;
+      return { name: m.name, role: role ?? null, active: !!active, highlight };
     })
   );
 </script>
@@ -42,7 +45,7 @@
     </div>
     <div class="musicians" style="grid-template-columns: repeat({musicians.length || 1}, 1fr)">
       {#each rosterCells as cell}
-        <span class="musician" class:inactive={!cell.active}>
+        <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
           {#if cell.active}
             <span class="m-icons" class:has-name={!!cell.name}>{cell.role?.instrument ? instrumentIcons[cell.role.instrument] : ''}{#if cell.role?.vocals}🎤{/if}</span>
             <span class="m-name">{cell.name}</span>
@@ -50,8 +53,8 @@
         </span>
       {/each}
     </div>
-    {#if song.extraMusicians}
-      <div class="extra">{song.extraMusicians}</div>
+    {#if song.comment}
+      <div class="extra">{song.comment}</div>
     {/if}
     {#if entry.comment}
       <div class="comment">{entry.comment}</div>
@@ -100,15 +103,17 @@
     padding-left: calc(1.4em + 6px);
   }
   .musician {
-    display: flex; align-items: center; gap: 1px;
+    display: flex; align-items: center; gap: 4px;
     background: #fcd34d40; border-radius: 6px;
     padding: 1px 6px 1px 3px;
     min-width: 0;
     overflow: hidden;
   }
   .musician.inactive { background: none; }
-  :global([data-theme="dark"]) .musician:not(.inactive) { background: #78350f; }
-  .m-icons { flex-shrink: 0; white-space: nowrap; letter-spacing: -0.2em; }
+  .musician.highlight { background: #f59e0b; color: #1a1200; }
+  :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) { background: #78350f; }
+  :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
+  .m-icons { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.85rem; }
   .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   .extra { padding-left: calc(1.4em + 6px); font-size: 0.78rem; color: var(--text-muted); font-style: italic; margin-top: 2px; }
 

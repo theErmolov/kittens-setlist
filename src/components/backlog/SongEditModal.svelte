@@ -46,7 +46,6 @@
     category: song?.category ?? 'mid',
     comment: song?.comment ?? '',
     musicians: buildInitialMusicians(),
-    extraMusicians: song?.extraMusicians ?? '',
     sortOrder: song?.sortOrder
   });
 
@@ -140,8 +139,8 @@
       </div>
 
       <div class="field">
-        <label>{$t.song.extraMusicians}</label>
-        <input bind:value={draft.extraMusicians} placeholder={$t.song.extraPlaceholder} />
+        <label>{$t.song.comment}</label>
+        <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
       </div>
     </div>
 

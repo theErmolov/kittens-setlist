@@ -8,6 +8,7 @@
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes } from '$lib/utils';
+  import CommentInput from './CommentInput.svelte';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
@@ -53,36 +54,26 @@
   let showBreakPicker = $state(false);
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
-  let focusedCommentOrder = $state<number | null>(null);
 
   // Full replace after own mutations — always authoritative
   function applyUpdate(updated: Setlist) {
     localEntries = [...updated.entries];
   }
 
-  // Smart merge for poll updates — preserve drag state and focused comment input
+  // Smart merge for poll updates — preserve drag state
   function applyPoll(incoming: SetlistEntry[]) {
     const sorted = [...incoming].sort((a, b) => a.order - b.order);
     const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
 
-    // Skip if nothing changed
     if (JSON.stringify(sorted) === JSON.stringify(localSorted)) return;
 
     if (dragIndex !== null) {
-      // During drag: only update per-entry fields, keep structure intact
       localEntries = localEntries.map(e => {
-        const fresh = incoming.find(i => i.songId === e.songId && (!e.songId || i.songId === e.songId) && i.order === e.order);
-        if (!fresh) return e;
-        return { ...fresh, comment: focusedCommentOrder === e.order ? e.comment : fresh.comment };
+        const fresh = incoming.find(i => i.order === e.order);
+        return fresh ?? e;
       });
     } else {
-      // No drag: full structural update, protect focused comment input
-      localEntries = incoming.map(e => ({
-        ...e,
-        comment: focusedCommentOrder === e.order
-          ? (localEntries.find(c => c.order === e.order)?.comment ?? e.comment)
-          : e.comment,
-      }));
+      localEntries = incoming;
     }
   }
 
@@ -123,8 +114,19 @@
   let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(ids: string[]) {
-    applyUpdate(await addSongsToSetlist(setlist.id, ids));
+    const updated = await addSongsToSetlist(setlist.id, ids);
+    applyUpdate(updated);
     showAddModal = false;
+
+    // Copy song.comment → entry comment for newly added songs that have one
+    const songMapLocal = new Map(allSongs.map(s => [s.id, s]));
+    const toComment = updated.entries
+      .filter(e => e.songId && ids.includes(e.songId) && songMapLocal.get(e.songId)?.comment)
+      .map(e => ({ order: e.order, comment: songMapLocal.get(e.songId!)!.comment! }));
+
+    for (const { order, comment } of toComment) {
+      applyUpdate(await updateEntryComment(setlist.id, order, comment));
+    }
   }
 
   async function handleAddBreak(minutes: number) {
@@ -165,12 +167,6 @@
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
 
-  async function handleCommentBlur(entry: typeof sortedEntries[0], value: string) {
-    focusedCommentOrder = null;
-    if (value !== (entry.comment ?? '')) {
-      applyUpdate(await updateEntryComment(setlist.id, entry.order, value));
-    }
-  }
 </script>
 
 <div class="editor">
@@ -227,8 +223,8 @@
             {#if localMeta.startTime}<th class="th-time"></th>{/if}
             <th class="th-cat"></th>
             <th class="th-song">Песня</th>
-            {#each allMusicians as name}
-              <th class="th-musician">{name}</th>
+            {#each allMusicians as name, i}
+              <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
             {/each}
             <th class="th-remove"></th>
           </tr>
@@ -260,23 +256,16 @@
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
                     </div>
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <input
-                      class="comment-input"
+                    <CommentInput
                       value={entry.comment ?? ''}
-                      placeholder="комментарий..."
-                      onclick={(e) => e.stopPropagation()}
-                      ondragstart={(e) => e.stopPropagation()}
-                      onfocus={() => { focusedCommentOrder = entry.order; }}
-                      onblur={(e) => handleCommentBlur(entry, e.currentTarget.value)}
+                      onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
                     />
                   </td>
-                  {#each allMusicians as name}
+                  {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
-                    <td class="td-musician">
+                    <td class="td-musician" class:musician-alt={i % 2 === 0}>
                       {#if role}
-                        <span class="inst-slot">{role.instrument ? instrumentIcons[role.instrument] : ''}</span>{role.vocals ? '🎤' : ''}
+                        <span class="inst-slot">{role.instrument ? instrumentIcons[role.instrument] : ''}</span><span class="vocals-slot">{role.vocals ? '🎤' : ''}</span>
                       {/if}
                     </td>
                   {/each}
@@ -336,8 +325,8 @@
 {/if}
 
 <style>
-  .editor { padding: 16px; }
-  .editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .editor { display: flex; flex-direction: column; height: calc(100dvh - 56px); }
+  .editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
   .meta { display: flex; align-items: flex-start; gap: 8px; }
   .meta-view h1 { margin: 0 0 4px; font-size: 1.4rem; }
   .meta-details { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
@@ -364,19 +353,23 @@
   .break-opt { padding: 8px 16px; background: transparent; border: none; cursor: pointer; text-align: left; font-size: 0.88rem; color: var(--text); }
   .break-opt:hover { background: var(--row-hover); }
 
-  .table-wrap { overflow-x: auto; }
+  .table-wrap { overflow: auto; flex: 1; padding: 0 16px 16px; }
   table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
 
   thead th {
     padding: 4px 8px; font-size: 0.72rem; font-weight: 700;
     color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
     text-align: left; white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
+    background: var(--bg); box-shadow: 0 2px 0 var(--border);
   }
   .th-num, .td-num { text-align: right; width: 28px; }
   .th-time, .td-time { width: 42px; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; text-align: right; padding-right: 6px; }
   .th-cat, .td-cat { width: 32px; text-align: center; }
   .th-drag, .td-drag { width: 24px; }
   .th-musician, .td-musician { text-align: center; width: 52px; }
+  .th-musician.musician-alt { background: var(--musician-alt-bg); }
+  tbody tr td.musician-alt { background: var(--musician-alt-bg); }
   .th-remove, .td-remove { width: 32px; }
 
   tbody tr td { padding: 7px 8px; background: var(--surface); vertical-align: middle; }
@@ -409,19 +402,12 @@
   .artist { font-weight: 600; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
   .title { font-size: 0.9rem; }
-  .comment-input {
-    display: block; width: 100%; margin-top: 2px;
-    background: transparent; border: none; border-bottom: 1px dashed transparent;
-    font-size: 0.75rem; color: var(--text-muted); font-style: italic;
-    padding: 1px 0; outline: none; cursor: text; white-space: nowrap;
-    transition: border-color 0.15s;
-  }
-  .comment-input:focus { border-bottom-color: var(--accent); }
-  .comment-input::placeholder { opacity: 0; }
-  .song-row:hover .comment-input::placeholder { opacity: 0.5; }
+  .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
+  .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 
   .td-musician { font-size: 1rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; }
+  .vocals-slot { display: inline-block; width: 1.3em; }
 
   .td-break { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
   .break-icon { margin-right: 4px; }

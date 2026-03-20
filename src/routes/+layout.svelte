@@ -1,11 +1,13 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { page } from '$app/state';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang } from '$lib/i18n';
 
   let { children } = $props();
 
   let dark = $state(browser ? localStorage.getItem('theme') === 'dark' : false);
+  let path = $derived(page.url.pathname);
 
   function toggleTheme() {
     dark = !dark;
@@ -29,15 +31,21 @@
 
 <nav class="nav">
   <a href="/backlog" class="nav-brand">
-    <LogoCat size={50} />
+    <LogoCat size={40} />
     <span class="brand-text">
       <span class="brand-ru">Музыкальные</span>
       <span class="brand-en">Котятки</span>
     </span>
   </a>
-  <a href="/backlog" class="nav-link">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</a>
-  <a href="/setlists" class="nav-link">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</a>
-  <a href="/musicians" class="nav-link">{$lang === 'ru' ? 'Музыканты' : 'Musicians'}</a>
+  <a href="/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
+    <span class="link-icon">🎵</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
+  </a>
+  <a href="/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
+    <span class="link-icon">🎪</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
+  </a>
+  <a href="/musicians" class="nav-link" class:active={path.startsWith('/musicians')}>
+    <span class="link-icon">🎸</span><span class="link-label">{$lang === 'ru' ? 'Музыканты' : 'Musicians'}</span>
+  </a>
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
   <button class="theme-toggle" onclick={toggleTheme} title="Toggle theme">{dark ? '☀️' : '🌙'}</button>
 </nav>
@@ -86,7 +94,7 @@
     align-items: center;
     gap: 16px;
     padding: 0 16px;
-    height: 72px;
+    height: 56px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
@@ -112,7 +120,7 @@
     text-transform: uppercase;
   }
   .brand-en {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 800;
     letter-spacing: -0.01em;
     background: linear-gradient(90deg, #6c63ff, #c026d3);
@@ -122,13 +130,21 @@
   }
 
   .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     text-decoration: none;
     color: var(--text-muted);
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     font-weight: 500;
-    transition: color 0.15s;
+    padding: 0 14px;
+    align-self: stretch;
+    transition: color 0.15s, background 0.15s;
   }
-  .nav-link:hover { color: var(--text); }
+  .nav-link:hover { color: var(--text); background: var(--chip-bg); }
+  .nav-link.active { color: #fff; background: #6c63ff; }
+
+  .link-icon { font-size: 1rem; line-height: 1; }
 
   .lang-toggle {
     margin-left: auto;
@@ -157,4 +173,13 @@
     transition: border-color 0.15s;
   }
   .theme-toggle:hover { border-color: var(--accent); }
+
+  @media (max-width: 540px) {
+    .nav { gap: 0; padding: 0 10px; }
+    .brand-text { display: none; }
+    .nav-brand { margin-right: 4px; }
+    .link-label { display: none; }
+    .nav-link { padding: 0 12px; font-size: 1.2rem; }
+    .lang-toggle { margin-left: auto; padding: 4px 7px; }
+  }
 </style>

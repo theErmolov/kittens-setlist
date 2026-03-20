@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import type { Setlist, Song, Category, SetlistEntry, BandMusician } from '$lib/types';
   import StageSong from './StageSong.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
@@ -38,8 +39,20 @@
   let categoryFilter = $state(new Set<Category>());
   let sortKey = $state<SortKey>('default');
   let onlyWithComment = $state(false);
+  let selectedMusician = $state(browser ? (localStorage.getItem('kittens_stage_musician') ?? '') : '');
+  $effect(() => { if (browser) localStorage.setItem('kittens_stage_musician', selectedMusician); });
 
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
+
+  // Original position numbers (unfiltered, by setlist order)
+  let songPositions = $derived((): Map<number, number> => {
+    const map = new Map<number, number>();
+    let pos = 1;
+    for (const e of [...localEntries].sort((a, b) => a.order - b.order)) {
+      if (e.songId) map.set(e.order, pos++);
+    }
+    return map;
+  });
 
   type DisplayItem =
     | { kind: 'song'; entry: SetlistEntry; song: Song }
@@ -109,22 +122,27 @@
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
       </span>
     </div>
-    <div class="stage-controls">
-      <SortBar sort={sortKey} onchange={v => { sortKey = v; }} />
-      <label class="comment-toggle">
-        <input type="checkbox" bind:checked={onlyWithComment} />
-        {$t.stage.comment}
-      </label>
-    </div>
     <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+    {#if musicians.length > 0}
+      <div class="musician-picker">
+        {#each musicians as m}
+          <button
+            class="musician-chip"
+            class:active={selectedMusician === m.name}
+            onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
+          >{m.name}</button>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="song-list">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
       {#if item.kind === 'song'}
-        <StageSong song={item.song} entry={item.entry} position={i + 1}
+        <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
           startTime={entryTimes().get(item.entry.order)}
           {musicians}
+          {selectedMusician}
           ontoggle={() => handleToggle(item.entry.songId!)} />
       {:else}
         <div class="stage-break">
@@ -160,6 +178,15 @@
 
   .stage-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .comment-toggle { display: flex; align-items: center; gap: 4px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); }
+
+  .musician-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+  .musician-chip {
+    padding: 3px 12px; border: 1px solid var(--border); border-radius: 20px;
+    background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 500;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .musician-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .musician-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .song-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }

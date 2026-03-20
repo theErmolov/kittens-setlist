@@ -28,7 +28,7 @@
   <td class="td-cat"><CategoryBadge category={song.category} /></td>
   {#each allMusicians as name, i}
     {@const role = song.musicians[name]}
-    <td class="td-musician" class:musician-alt={i % 2 === 1}>
+    <td class="td-musician" class:musician-alt={i % 2 === 0}>
       {#if role}
         <span class="role-cell">
           <span class="inst-slot">{role.instrument ? instrumentIcons[role.instrument] : ''}</span>{role.vocals ? '🎤' : ''}
