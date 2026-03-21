@@ -8,7 +8,8 @@
   let { children } = $props();
 
   let dark = $state(browser ? localStorage.getItem('theme') === 'dark' : false);
-  let path = $derived(page.url.pathname);
+  // Strip base prefix so active checks work on both local and GitHub Pages
+  let path = $derived(page.url.pathname.slice(base.length) || '/');
 
   function toggleTheme() {
     dark = !dark;
