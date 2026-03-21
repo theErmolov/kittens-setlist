@@ -38,6 +38,9 @@ jobs:
       - name: Install API dependencies
         run: cd api && npm ci
 
+      - name: Install esbuild
+        run: npm install -g esbuild
+
       - name: SAM build
         run: sam build
 
