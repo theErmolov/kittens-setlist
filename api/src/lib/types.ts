@@ -10,7 +10,7 @@ export interface MusicianRole {
 export interface BandMusician {
   id: string;
   name: string;
-  defaultInstrument?: Instrument;
+  defaultInstruments?: Instrument[];
   sortOrder?: number;
   guest?: boolean;
 }

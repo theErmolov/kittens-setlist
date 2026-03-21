@@ -33,7 +33,7 @@
       }
     } else {
       for (const m of musicians) {
-        result[m.name] = { instruments: m.defaultInstrument ? [m.defaultInstrument] : [] };
+        result[m.name] = { instruments: m.defaultInstruments?.length ? [...m.defaultInstruments] : [] };
       }
     }
     return result;

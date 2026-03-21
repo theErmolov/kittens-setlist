@@ -8,7 +8,7 @@ export interface MusicianRole {
 export interface BandMusician {
   id: string;
   name: string;
-  defaultInstrument?: Instrument;  // their usual instrument, pre-selected in song edit
+  defaultInstruments?: Instrument[];  // pre-selected when adding a song
   sortOrder?: number;
   guest?: boolean;  // true = guest musician; not shown as table columns
 }

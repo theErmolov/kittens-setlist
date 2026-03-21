@@ -14,7 +14,7 @@
   let showNew = $state(false);
 
   let draftName = $state('');
-  let draftInstrument = $state<Instrument | undefined>(undefined);
+  let draftInstruments = $state<Instrument[]>([]);
   let dragIdx = $state<number | null>(null);
   let dragOverIdx = $state<number | null>(null);
 
@@ -24,14 +24,14 @@
 
   function startAdd() {
     draftName = '';
-    draftInstrument = undefined;
+    draftInstruments = [];
     showNew = true;
     editingId = null;
   }
 
   function startEdit(m: BandMusician) {
     draftName = m.name;
-    draftInstrument = m.defaultInstrument;
+    draftInstruments = [...(m.defaultInstruments ?? [])];
     editingId = m.id;
     showNew = false;
   }
@@ -41,20 +41,21 @@
     showNew = false;
   }
 
-  function selectDraftInstrument(inst: Instrument) {
-    draftInstrument = draftInstrument === inst ? undefined : inst;
+  function toggleDraftInstrument(inst: Instrument) {
+    const has = draftInstruments.includes(inst);
+    draftInstruments = has ? draftInstruments.filter(i => i !== inst) : [...draftInstruments, inst];
   }
 
   async function handleAdd() {
     if (!draftName.trim()) return;
-    const m = await addMusician({ name: draftName.trim(), defaultInstrument: draftInstrument, sortOrder: musicians.length });
+    const m = await addMusician({ name: draftName.trim(), defaultInstruments: draftInstruments, sortOrder: musicians.length });
     musicians = [...musicians, m];
     showNew = false;
   }
 
   async function handleSave(m: BandMusician) {
     if (!draftName.trim()) return;
-    const updated = await updateMusician({ ...m, name: draftName.trim(), defaultInstrument: draftInstrument });
+    const updated = await updateMusician({ ...m, name: draftName.trim(), defaultInstruments: draftInstruments });
     musicians = musicians.map(x => x.id === updated.id ? updated : x);
     editingId = null;
   }
@@ -111,8 +112,8 @@
         {#each allInstruments as inst}
           <button
             class="inst-btn"
-            class:active={draftInstrument === inst}
-            onclick={() => selectDraftInstrument(inst)}
+            class:active={draftInstruments.includes(inst)}
+            onclick={() => toggleDraftInstrument(inst)}
             title={$t.instrument[inst]}
           >{instrumentIcons[inst]}</button>
         {/each}
@@ -146,8 +147,8 @@
                 {#each allInstruments as inst}
                   <button
                     class="inst-btn"
-                    class:active={draftInstrument === inst}
-                    onclick={() => selectDraftInstrument(inst)}
+                    class:active={draftInstruments.includes(inst)}
+                    onclick={() => toggleDraftInstrument(inst)}
                     title={$t.instrument[inst]}
                   >{instrumentIcons[inst]}</button>
                 {/each}
@@ -161,8 +162,10 @@
             <div class="musician-info">
               <span class="mname">{m.name}</span>
               <span class="minstruments">
-                {#if m.defaultInstrument}
-                  <span class="inst-badge" title={$t.instrument[m.defaultInstrument]}>{instrumentIcons[m.defaultInstrument]}</span>
+                {#if m.defaultInstruments?.length}
+                  {#each m.defaultInstruments as inst}
+                    <span class="inst-badge" title={$t.instrument[inst]}>{instrumentIcons[inst]}</span>
+                  {/each}
                 {:else}
                   <span class="free-badge">{$t.musicians.free}</span>
                 {/if}
