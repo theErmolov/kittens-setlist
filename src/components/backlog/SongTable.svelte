@@ -29,19 +29,21 @@
   let categoryFilter = $state(new Set<Category>());
   let selectedMusicians = $state(new Set<string>());
   let selectedInstruments = $state(new Set<Instrument>());
-  let vocalsFilter = $state(false);
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
   let sortCol = $state<'artist' | 'title'>('artist');
   let sortDir = $state<1 | -1>(1);
 
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
-  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
+  const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'percussion', 'maracas'];
 
-  // Musician columns follow the roster order; all roster members always shown
-  let allMusicians = $derived(() => musicians.map(m => m.name));
+  // Column names — all registered musicians (guests are ad-hoc in song.musicians, not in roster)
+  let permanentNames = $derived(musicians.map(m => m.name));
+  // Per-musician column width so all columns sum to 100%
+  // Fixed: cat 9% + artist 18% + title 28% + actions 9% = 64% → musicians get 36%, capped at 5%
+  let musicianColPct = $derived(Math.min(5, Math.floor(36 / (permanentNames.length || 1))));
 
   function toggleSort(col: 'artist' | 'title') {
     if (sortCol === col) sortDir = (sortDir === 1 ? -1 : 1);
@@ -53,10 +55,10 @@
     const q = search.toLowerCase();
     if (q && !s.artist.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q)) return false;
     if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
-    // AND: every selected musician must actively participate (instrument or vocals)
+    // AND: every selected musician must actively participate (has an instrument)
     for (const m of selectedMusicians) {
       const role = s.musicians[m];
-      if (!role || (!role.instrument && !role.vocals)) return false;
+      if (!role || role.instruments.length === 0) return false;
     }
     if (selectedInstruments.size > 0) {
       if (selectedMusicians.size > 0) {
@@ -64,19 +66,12 @@
         // at least one selected musician plays one of the selected instruments
         const match = [...selectedMusicians].some(m => {
           const role = s.musicians[m];
-          return role && role.instrument != null && selectedInstruments.has(role.instrument);
+          return role && role.instruments.some(i => selectedInstruments.has(i));
         });
         if (!match) return false;
       } else {
         // no musician selected — any musician playing one of the instruments
-        if (!Object.values(s.musicians).some(r => r.instrument != null && selectedInstruments.has(r.instrument))) return false;
-      }
-    }
-    if (vocalsFilter) {
-      if (selectedMusicians.size > 0) {
-        if (![...selectedMusicians].some(m => s.musicians[m]?.vocals)) return false;
-      } else {
-        if (!Object.values(s.musicians).some(r => r.vocals)) return false;
+        if (!Object.values(s.musicians).some(r => r.instruments.some(i => selectedInstruments.has(i)))) return false;
       }
     }
     return true;
@@ -110,11 +105,11 @@
 
   async function handleToggleSetlist(sl: Setlist) {
     if (!addToSetlistSong) return;
-    const songId = addToSetlistSong.id;
-    const inSetlist = sl.entries.some(e => e.songId === songId);
+    const song = addToSetlistSong;
+    const inSetlist = sl.entries.some(e => e.songId === song.id);
     const updated = inSetlist
-      ? await removeSongFromSetlist(sl.id, songId)
-      : await addSongsToSetlist(sl.id, [songId]);
+      ? await removeSongFromSetlist(sl.id, song.id)
+      : await addSongsToSetlist(sl.id, [song]);
     localSetlists = localSetlists.map(s => s.id === sl.id ? updated : s);
   }
 </script>
@@ -129,7 +124,7 @@
 
   <div class="filter-bar">
     <div class="filter-group">
-      {#each allMusicians() as name}
+      {#each permanentNames as name}
         <button
           class="filter-chip"
           class:active={selectedMusicians.has(name)}
@@ -147,27 +142,30 @@
           title={$t.instrument[inst]}
         >{instrumentIcons[inst]}</button>
       {/each}
-      <button
-        class="filter-chip filter-chip-inst"
-        class:active={vocalsFilter}
-        onclick={() => { vocalsFilter = !vocalsFilter; }}
-        title="Vocals"
-      >🎤</button>
     </div>
   </div>
 
   <div class="scroll-wrap">
     <table>
+      <colgroup>
+        <col style="width: 9%">
+        <col style="width: 18%">
+        <col style="width: 28%">
+        {#each permanentNames as _}
+          <col style="width: {musicianColPct}%">
+        {/each}
+        <col style="width: 9%">
+      </colgroup>
       <thead>
         <tr>
+          <th class="th-cat">{$t.backlog.cols.cat}</th>
           <th class="th-sortable" onclick={() => toggleSort('artist')}>
             {$t.backlog.cols.artist}{sortCol === 'artist' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
           </th>
           <th class="th-sortable" onclick={() => toggleSort('title')}>
             {$t.backlog.cols.title}{sortCol === 'title' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
           </th>
-          <th>{$t.backlog.cols.cat}</th>
-          {#each allMusicians() as name, i}
+          {#each permanentNames as name, i}
             <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
           {/each}
           <th></th>
@@ -177,14 +175,14 @@
         {#each filtered() as song (song.id)}
           <SongRow
             {song}
-            allMusicians={allMusicians()}
+            allMusicians={permanentNames}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => { addToSetlistSong = song; }}
           />
         {/each}
         {#if filtered().length === 0}
-          <tr><td colspan={4 + allMusicians().length} class="empty">{$t.backlog.empty}</td></tr>
+          <tr><td colspan={4 + permanentNames.length} class="empty">{$t.backlog.empty}</td></tr>
         {/if}
       </tbody>
     </table>
@@ -275,15 +273,16 @@
   .filter-chip-inst { padding: 3px 9px; font-size: 0.95rem; }
 
   .scroll-wrap { overflow-x: auto; overflow-y: auto; flex: 1; }
-  table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
   thead tr { background: var(--surface); }
   th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
   th {
     text-align: left; padding: 8px 12px; font-size: 0.75rem; font-weight: 700;
     color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
-    white-space: nowrap; border-bottom: 1px solid var(--border);
+    white-space: nowrap; border-bottom: 1px solid var(--border); overflow: hidden;
   }
-  .th-musician { text-align: left; }
+  .th-cat { text-align: center; }
+  .th-musician { text-align: left; padding-left: 12px; }
   .musician-alt { background: var(--musician-alt-bg); }
   .th-sortable { cursor: pointer; user-select: none; }
   .th-sortable:hover { color: var(--accent); }

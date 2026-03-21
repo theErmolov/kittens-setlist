@@ -13,12 +13,12 @@
     songs: Song[];
     existingIds: Set<string>;
     onclose: () => void;
-    onadd: (ids: string[]) => void;
+    onadd: (songs: Song[]) => void;
   } = $props();
 
   let search = $state('');
   let categoryFilter = $state(new Set<Category>());
-  let selected = $state(new Set<string>());
+  let selected = $state(new Map<string, Song>());
 
   let filtered = $derived(songs
     .filter(s => {
@@ -29,13 +29,13 @@
     })
     .sort((a, b) => a.artist.localeCompare(b.artist, undefined, { sensitivity: 'base' })));
 
-  function toggle(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
+  function toggle(song: Song) {
+    const next = new Map(selected);
+    if (next.has(song.id)) next.delete(song.id); else next.set(song.id, song);
     selected = next;
   }
 
-  function handleAdd() { onadd([...selected]); }
+  function handleAdd() { onadd([...selected.values()]); }
 
   function handleBackdrop(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains('modal-backdrop')) onclose();
@@ -59,7 +59,7 @@
     <div class="song-list">
       {#each filtered as song (song.id)}
         <label class="song-item" class:selected={selected.has(song.id)}>
-          <input type="checkbox" checked={selected.has(song.id)} onchange={() => toggle(song.id)} />
+          <input type="checkbox" checked={selected.has(song.id)} onchange={() => toggle(song)} />
           <span class="song-info">
             <CategoryBadge category={song.category} iconOnly />
             <span class="song-title">{song.artist} – {song.title}</span>
@@ -89,11 +89,11 @@
   .search-bar { padding: 10px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
   .search-bar input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.88rem; box-sizing: border-box; }
   .filter-bar { padding: 8px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-  .song-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .song-list { flex: 1; overflow-y: auto; padding: 8px 0; min-height: 240px; }
   .song-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; transition: background 0.12s; }
   .song-item:hover, .song-item.selected { background: var(--row-hover); }
   .song-info { display: flex; align-items: center; gap: 6px; flex: 1; }
-.song-title { font-size: 0.88rem; }
+  .song-title { font-size: 0.88rem; }
   .empty { text-align: center; color: var(--text-muted); padding: 24px; }
   .modal-footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
   .sel-count { flex: 1; font-size: 0.82rem; color: var(--text-muted); }

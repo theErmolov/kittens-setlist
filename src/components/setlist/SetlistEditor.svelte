@@ -1,18 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Setlist, Song, Instrument, SetlistEntry } from '$lib/types';
+  import type { Setlist, Song, Instrument, SetlistEntry, BandMusician } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
-  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment } from '$lib/api';
-  import type { BandMusician } from '$lib/types';
+  import SongEditModal from '$components/backlog/SongEditModal.svelte';
+  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes } from '$lib/utils';
+  import { formatDuration, addMinutes, sortInstruments } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
 
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
 
   let {
@@ -55,6 +55,7 @@
   let showBreakPicker = $state(false);
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
+  let editingEntry = $state<SetlistEntry | null>(null);
 
   // Full replace after own mutations — always authoritative
   function applyUpdate(updated: Setlist) {
@@ -84,6 +85,7 @@
     () => false,
   ));
 
+  // songMap kept for AddSongsModal deduplication (existingIds)
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
   let sortedEntries = $derived([...localEntries].sort((a, b) => a.order - b.order));
   let existingIds = $derived(new Set(localEntries.map(e => e.songId).filter((id): id is string => !!id)));
@@ -111,19 +113,19 @@
     return map;
   });
 
-  // total columns: drag + num + (time?) + cat + song + musicians + remove
+  // total columns: drag + num + (time?) + cat + song + musicians + actions
   let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
 
-  async function handleAdd(ids: string[]) {
-    const updated = await addSongsToSetlist(setlist.id, ids);
+  async function handleAdd(songs: Song[]) {
+    const updated = await addSongsToSetlist(setlist.id, songs);
     applyUpdate(updated);
     showAddModal = false;
 
     // Copy song.comment → entry comment for newly added songs that have one
-    const songMapLocal = new Map(allSongs.map(s => [s.id, s]));
+    const addedIds = new Set(songs.map(s => s.id));
     const toComment = updated.entries
-      .filter(e => e.songId && ids.includes(e.songId) && songMapLocal.get(e.songId)?.comment)
-      .map(e => ({ order: e.order, comment: songMapLocal.get(e.songId!)!.comment! }));
+      .filter(e => e.songId && addedIds.has(e.songId) && e.song?.comment)
+      .map(e => ({ order: e.order, comment: e.song!.comment! }));
 
     for (const { order, comment } of toComment) {
       applyUpdate(await updateEntryComment(setlist.id, order, comment));
@@ -141,6 +143,14 @@
 
   async function handleRemoveBreak(order: number) {
     applyUpdate(await removeBreakFromSetlist(setlist.id, order));
+  }
+
+  async function handleEntrySave(updatedSong: Song) {
+    if (!editingEntry) return;
+    let updated = await updateEntrySong(setlist.id, editingEntry.order, updatedSong);
+    updated = await updateEntryComment(setlist.id, editingEntry.order, updatedSong.comment ?? '');
+    applyUpdate(updated);
+    editingEntry = null;
   }
 
   function entryKey(entry: typeof sortedEntries[0]) {
@@ -168,6 +178,12 @@
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
 
+  function guestTagsFor(song: Song): { name: string; icons: string }[] {
+    const permSet = new Set(allMusicians);
+    return Object.entries(song.musicians)
+      .filter(([name, role]) => !permSet.has(name) && role.instruments.length > 0)
+      .map(([name, role]) => ({ name, icons: sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('') }));
+  }
 </script>
 
 <div class="editor">
@@ -221,13 +237,13 @@
           <tr>
             <th class="th-drag"></th>
             <th class="th-num">#</th>
-            {#if localMeta.startTime}<th class="th-time"></th>{/if}
+            {#if localMeta.startTime}<th class="th-time">⏱</th>{/if}
             <th class="th-cat"></th>
             <th class="th-song">Песня</th>
             {#each allMusicians as name, i}
               <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
             {/each}
-            <th class="th-remove"></th>
+            <th class="th-actions"></th>
           </tr>
         </thead>
         <tbody>
@@ -235,8 +251,9 @@
             {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
             {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
             {#if entry.songId}
-              {@const song = songMap.get(entry.songId)}
+              {@const song = entry.song}
               {#if song}
+                {@const guestTags = guestTagsFor(song)}
                 <tr
                   class="song-row"
                   class:dragging={isDragging}
@@ -256,6 +273,9 @@
                       <span class="artist">{song.artist}</span>
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
+                      {#each guestTags as g}
+                        <span class="guest-tag">{g.icons} {g.name}</span>
+                      {/each}
                     </div>
                     <CommentInput
                       value={entry.comment ?? ''}
@@ -265,12 +285,13 @@
                   {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
                     <td class="td-musician" class:musician-alt={i % 2 === 0}>
-                      {#if role}
-                        <span class="inst-slot">{role.instrument ? instrumentIcons[role.instrument] : ''}</span><span class="vocals-slot">{role.vocals ? '🎤' : ''}</span>
+                      {#if role?.instruments?.length}
+                        <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
                       {/if}
                     </td>
                   {/each}
-                  <td class="td-remove">
+                  <td class="td-actions">
+                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
                     <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
                   </td>
                 </tr>
@@ -293,7 +314,7 @@
                   <span class="break-icon">⏸</span>
                   Перерыв — {entry.breakMinutes} мин
                 </td>
-                <td class="td-remove">
+                <td class="td-actions">
                   <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
                 </td>
               </tr>
@@ -322,6 +343,16 @@
     {existingIds}
     onclose={() => { showAddModal = false; }}
     onadd={handleAdd}
+  />
+{/if}
+
+{#if editingEntry}
+  <SongEditModal
+    song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '' } : null}
+    {musicians}
+    mode="entry"
+    onclose={() => { editingEntry = null; }}
+    onsave={handleEntrySave}
   />
 {/if}
 
@@ -368,10 +399,12 @@
   .th-time, .td-time { width: 42px; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; text-align: right; padding-right: 6px; }
   .th-cat, .td-cat { width: 32px; text-align: center; }
   .th-drag, .td-drag { width: 24px; }
-  .th-musician, .td-musician { text-align: center; width: 52px; }
+  .th-musician { text-align: center; width: 6%; min-width: 52px; }
+  .td-musician { text-align: left; width: 6%; min-width: 52px; }
   .th-musician.musician-alt { background: var(--musician-alt-bg); }
   tbody tr td.musician-alt { background: var(--musician-alt-bg); }
-  .th-remove, .td-remove { width: 32px; }
+  thead .th-musician { text-align: center; }
+  .th-actions, .td-actions { width: 56px; white-space: nowrap; text-align: right; }
 
   tbody tr td { padding: 7px 8px; background: var(--surface); vertical-align: middle; }
   tbody tr td:first-child { border-radius: 8px 0 0 8px; }
@@ -400,18 +433,32 @@
   .td-num { font-size: 0.82rem; color: var(--text-muted); }
   .td-song { white-space: nowrap; }
   .song-name { display: flex; align-items: center; }
-  .artist { font-weight: 600; font-size: 0.9rem; }
+  .artist { font-weight: 400; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
-  .title { font-size: 0.9rem; }
+  .title { font-size: 0.9rem; font-weight: 600; }
   .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
   .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 
-  .td-musician { font-size: 1rem; white-space: nowrap; }
+  .guest-tag {
+    display: inline-block;
+    background: var(--border);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 5px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; }
-  .vocals-slot { display: inline-block; width: 1.3em; }
 
   .td-break { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
   .break-icon { margin-right: 4px; }
+
+  .edit-btn { background: none; border: none; cursor: pointer; font-size: 1.17rem; padding: 2px 4px; opacity: 0.4; transition: opacity 0.12s; }
+  .edit-btn:hover { opacity: 1; }
 
   .remove-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 6px; font-size: 0.82rem; border-radius: 4px; }
   .remove-btn:hover { color: #ef4444; }

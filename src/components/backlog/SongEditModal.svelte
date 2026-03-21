@@ -2,38 +2,38 @@
   import type { Song, Category, MusicianRole, Instrument, BandMusician } from '$lib/types';
   import { t } from '$lib/i18n';
 
-  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
+  const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'percussion', 'maracas'];
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
 
   let {
     song,
     musicians,
+    mode = 'backlog',
     onclose,
     onsave
   }: {
     song: Partial<Song> | null;
     musicians: BandMusician[];
+    mode?: 'backlog' | 'entry';
     onclose: () => void;
     onsave: (s: Song) => void;
   } = $props();
 
-  let bandMusicians = $derived(musicians);
+  const permanentNames = new Set(musicians.map(m => m.name));
 
-  // Build initial musicians map from song, filling in band roster defaults
+  // ── Permanent musicians ────────────────────────────────────────────────────
+
   function buildInitialMusicians(): Record<string, MusicianRole> {
     const result: Record<string, MusicianRole> = {};
     if (song?.musicians) {
       for (const [name, role] of Object.entries(song.musicians)) {
-        result[name] = { ...role };
+        if (permanentNames.has(name)) result[name] = { instruments: [...(role.instruments ?? [])] };
       }
     } else {
       for (const m of musicians) {
-        result[m.name] = {
-          instrument: m.defaultInstrument,
-          vocals: false
-        };
+        result[m.name] = { instruments: m.defaultInstrument ? [m.defaultInstrument] : [] };
       }
     }
     return result;
@@ -50,30 +50,71 @@
   });
 
   function toggleInstrument(name: string, inst: Instrument) {
-    const role = draft.musicians[name] ?? { instrument: undefined, vocals: false };
-    // clicking the active instrument deselects it (free); clicking another selects it
-    const next: MusicianRole = {
-      ...role,
-      instrument: role.instrument === inst ? undefined : inst
-    };
-    draft.musicians = { ...draft.musicians, [name]: next };
+    const role = draft.musicians[name] ?? { instruments: [] };
+    const has = role.instruments.includes(inst);
+    const instruments = has ? role.instruments.filter(i => i !== inst) : [...role.instruments, inst];
+    draft.musicians = { ...draft.musicians, [name]: { instruments } };
   }
 
-  function toggleVocals(name: string) {
-    const role = draft.musicians[name] ?? { instrument: undefined, vocals: false };
-    draft.musicians = { ...draft.musicians, [name]: { ...role, vocals: !role.vocals } };
+  // ── Guest musicians (ad-hoc, per-song) ────────────────────────────────────
+
+  type GuestRow = { id: number; name: string; instruments: Instrument[] };
+  let _id = 0;
+  function mkGuest(name = '', instruments: Instrument[] = []): GuestRow {
+    return { id: _id++, name, instruments };
   }
+
+  function buildInitialGuests(): GuestRow[] {
+    if (!song?.musicians) return [mkGuest()];
+    const existing = Object.entries(song.musicians)
+      .filter(([name]) => !permanentNames.has(name))
+      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])]));
+    return [...existing, mkGuest()];
+  }
+
+  let guestRows = $state<GuestRow[]>(buildInitialGuests());
+
+  function onGuestInput(row: GuestRow, value: string) {
+    row.name = value;
+    if (row.id === guestRows[guestRows.length - 1].id && value.trim()) {
+      guestRows = [...guestRows, mkGuest()];
+    }
+  }
+
+  function toggleGuestInstrument(row: GuestRow, inst: Instrument) {
+    const has = row.instruments.includes(inst);
+    row.instruments = has ? row.instruments.filter(i => i !== inst) : [...row.instruments, inst];
+  }
+
+  function removeGuest(id: number) {
+    guestRows = guestRows.filter(r => r.id !== id);
+    if (!guestRows.length || guestRows[guestRows.length - 1].name.trim()) {
+      guestRows = [...guestRows, mkGuest()];
+    }
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
 
   function handleSave() {
     if (!draft.artist.trim() || !draft.title.trim()) return;
-    const hasVocals = Object.values(draft.musicians).some(r => r.vocals);
+    const allMusicians: Record<string, MusicianRole> = { ...draft.musicians };
+    for (const row of guestRows) {
+      if (row.name.trim()) allMusicians[row.name.trim()] = { instruments: row.instruments };
+    }
+    const hasVocals = Object.values(allMusicians).some(r => r.instruments.includes('vocals'));
     if (!hasVocals) { alert('А поёт эту хуйню кто?'); return; }
-    onsave(draft);
+    onsave({ ...draft, musicians: allMusicians });
   }
 
   function handleBackdrop(e: MouseEvent) {
     if ((e.target as HTMLElement).classList.contains('modal-backdrop')) onclose();
   }
+
+  let modalTitle = $derived(
+    mode === 'entry'
+      ? ($t.song.editTitle + ' (в сетлисте)')
+      : (song?.id ? $t.song.editTitle : $t.song.addTitle)
+  );
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -81,7 +122,7 @@
 <div class="modal-backdrop" onclick={handleBackdrop}>
   <div class="modal">
     <div class="modal-header">
-      <h2>{song?.id ? $t.song.editTitle : $t.song.addTitle}</h2>
+      <h2>{modalTitle}</h2>
       <button class="close-btn" onclick={onclose}>✕</button>
     </div>
 
@@ -106,35 +147,61 @@
           {/each}
         </div>
       </div>
+
       <div class="field">
         <label>{$t.song.musicians}</label>
         <div class="musician-roster">
-          {#each bandMusicians as bm}
+
+          <!-- Permanent band members -->
+          {#each musicians as bm}
             {@const role = draft.musicians[bm.name]}
             <div class="roster-row">
               <span class="roster-name">{bm.name}</span>
-
-              <div class="inst-row">
+              <div class="inst-grid">
                 {#each allInstruments as inst}
                   <button
                     class="inst-btn"
-                    class:active={role?.instrument === inst}
+                    class:active={role?.instruments?.includes(inst)}
                     onclick={() => toggleInstrument(bm.name, inst)}
-                    title={role?.instrument === inst ? $t.musicians.free : $t.instrument[inst]}
+                    title={$t.instrument[inst]}
                   >{instrumentIcons[inst]}</button>
                 {/each}
-                {#if !role?.instrument}
-                  <span class="free-label">{$t.musicians.noInstrument}</span>
-                {/if}
               </div>
-              <button
-                class="vocals-btn"
-                class:active={role?.vocals}
-                onclick={() => toggleVocals(bm.name)}
-                title="Vocals"
-              >🎤</button>
+              <span class="free-label" class:hidden={(role?.instruments?.length ?? 0) > 0}>{$t.musicians.noInstrument}</span>
             </div>
           {/each}
+
+          <!-- Ad-hoc guests — same layout, no divider -->
+          {#each guestRows as row (row.id)}
+            {@const isAdd = !row.name.trim()}
+            <div class="roster-row" class:ghost-row={isAdd}>
+              <input
+                class="roster-name guest-name"
+                value={row.name}
+                placeholder={isAdd ? '+ гость' : 'Имя'}
+                oninput={(e) => onGuestInput(row, (e.target as HTMLInputElement).value)}
+              />
+              <div class="inst-grid">
+                {#each allInstruments as inst}
+                  <button
+                    class="inst-btn"
+                    class:active={row.instruments.includes(inst)}
+                    class:invisible={isAdd}
+                    onclick={() => !isAdd && toggleGuestInstrument(row, inst)}
+                    title={$t.instrument[inst]}
+                    tabindex={isAdd ? -1 : 0}
+                  >{instrumentIcons[inst]}</button>
+                {/each}
+              </div>
+              {#if !isAdd}
+                <span class="free-label" class:hidden={row.instruments.length > 0}>{$t.musicians.noInstrument}</span>
+                <button class="remove-guest-btn" onclick={() => removeGuest(row.id)}>✕</button>
+              {:else}
+                <span class="free-label hidden"></span>
+              {/if}
+            </div>
+          {/each}
+
         </div>
       </div>
 
@@ -158,7 +225,7 @@
   }
   .modal {
     background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+    width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
   }
   .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
@@ -183,38 +250,73 @@
   .cat-chip-low.active { background: #15803d; border-color: #22c55e; color: #fff; }
   .cat-chip:not(.active):hover { border-color: var(--accent); color: var(--accent); }
 
+  /* ── Musician roster ──────────────────────────────────────────────────── */
+
   .musician-roster { display: flex; flex-direction: column; gap: 4px; }
 
   .roster-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 5px 8px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--bg);
-    transition: opacity 0.15s;
   }
-  .roster-name { font-weight: 600; font-size: 0.9rem; min-width: 64px; }
 
-  .inst-row { display: flex; gap: 4px; flex: 1; }
+  /* Fixed-width name column so inst grid aligns across all rows */
+  .roster-name {
+    font-weight: 600; font-size: 0.9rem;
+    width: 72px; flex-shrink: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Guest name as an unstyled inline input, same size */
+  .guest-name {
+    padding: 0 !important; border: none !important; background: transparent !important;
+    width: 72px !important; box-sizing: border-box !important;
+    color: var(--text);
+  }
+  .ghost-row .guest-name { font-weight: 400; color: var(--text-muted); }
+
+  /* Fixed 8-column grid — one cell per instrument, perfectly aligned */
+  .inst-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 34px);
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
   .inst-btn {
-    width: 28px; height: 28px; font-size: 0.9rem;
+    width: 34px; height: 34px; font-size: 1.35rem;
     border: 1px solid var(--border); border-radius: 6px;
     background: transparent; cursor: pointer; transition: all 0.12s;
   }
   .inst-btn:hover { border-color: var(--accent); }
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
+  .inst-btn.invisible { visibility: hidden; pointer-events: none; }
 
-  .free-label { font-size: 0.75rem; color: var(--text-muted); font-style: italic; align-self: center; }
-
-  .vocals-btn {
-    width: 28px; height: 28px; font-size: 0.9rem;
-    border: 1px solid var(--border); border-radius: 6px;
-    background: transparent; cursor: pointer; transition: all 0.12s; flex-shrink: 0;
+  .free-label {
+    font-size: 0.75rem; color: var(--text-muted); font-style: italic;
+    white-space: nowrap; flex-shrink: 0;
   }
-  .vocals-btn:hover { border-color: var(--accent); }
-  .vocals-btn.active { background: var(--accent); border-color: var(--accent); }
+  .free-label.hidden { visibility: hidden; }
+
+  .ghost-row {
+    border-style: dashed;
+    opacity: 0.55;
+  }
+  .ghost-row:focus-within {
+    opacity: 1;
+    border-style: solid;
+  }
+
+  .remove-guest-btn {
+    flex-shrink: 0; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.78rem; padding: 2px 4px;
+    border-radius: 4px; opacity: 0.5; transition: opacity 0.12s; margin-left: auto;
+  }
+  .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
 
   .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }

@@ -12,10 +12,10 @@
     onchange: (role: MusicianRole) => void;
   } = $props();
 
-  const instruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
+  const instruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'percussion', 'maracas'];
 
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
 </script>
 
@@ -26,22 +26,17 @@
       {#each instruments as inst}
         <button
           class="inst-btn"
-          class:active={role.instrument === inst}
-          onclick={() => onchange({ ...role, instrument: inst })}
+          class:active={role.instruments.includes(inst)}
+          onclick={() => {
+            const has = role.instruments.includes(inst);
+            onchange({ instruments: has ? role.instruments.filter(i => i !== inst) : [...role.instruments, inst] });
+          }}
           title={$t.instrument[inst]}
         >
           {instrumentIcons[inst]}
         </button>
       {/each}
     </div>
-    <label class="vocals-label">
-      <input
-        type="checkbox"
-        checked={role.vocals}
-        onchange={e => onchange({ ...role, vocals: (e.target as HTMLInputElement).checked })}
-      />
-      {$t.song.vocals}
-    </label>
   </div>
 </div>
 
@@ -49,7 +44,7 @@
   .picker { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
   .musician-name { min-width: 80px; font-weight: 500; font-size: 0.9rem; color: var(--text); }
   .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .instrument-btns { display: flex; gap: 4px; }
+  .instrument-btns { display: flex; gap: 4px; flex-wrap: wrap; }
   .inst-btn {
     width: 30px; height: 30px;
     border: 1px solid var(--border); border-radius: 6px;
@@ -57,5 +52,4 @@
   }
   .inst-btn:hover { border-color: var(--accent); }
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
-  .vocals-label { display: flex; align-items: center; gap: 4px; font-size: 0.82rem; cursor: pointer; color: var(--text-muted); }
 </style>

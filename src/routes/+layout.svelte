@@ -32,10 +32,11 @@
 
 <nav class="nav">
   <a href="{base}/backlog" class="nav-brand">
-    <LogoCat size={40} />
+    <LogoCat size={52} />
     <span class="brand-text">
-      <span class="brand-ru">Музыкальные</span>
-      <span class="brand-en">Котятки</span>
+      <span class="brand-ru">Центр</span>
+      <span class="brand-ru">управления</span>
+      <span class="brand-en">Котят</span>
     </span>
   </a>
   <a href="{base}/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
@@ -120,6 +121,7 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
+  .brand-ru:first-child { margin-bottom: 3px; }
   .brand-en {
     font-size: 1.1rem;
     font-weight: 800;

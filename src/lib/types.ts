@@ -1,9 +1,8 @@
 export type Category = 'top' | 'mid' | 'low';
-export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'percussion' | 'violin';
+export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'percussion' | 'violin' | 'maracas' | 'vocals';
 
 export interface MusicianRole {
-  instrument?: Instrument;  // undefined = present but "free" (no specific instrument)
-  vocals: boolean;
+  instruments: Instrument[];  // empty = present but "free" (no specific instrument)
 }
 
 export interface BandMusician {
@@ -11,6 +10,7 @@ export interface BandMusician {
   name: string;
   defaultInstrument?: Instrument;  // their usual instrument, pre-selected in song edit
   sortOrder?: number;
+  guest?: boolean;  // true = guest musician; not shown as table columns
 }
 
 export interface Song {
@@ -25,6 +25,7 @@ export interface Song {
 
 export interface SetlistEntry {
   songId?: string;        // absent for breaks
+  song?: Song;            // embedded snapshot (present for all song entries)
   breakMinutes?: number;  // present for breaks
   order: number;
   played: boolean;

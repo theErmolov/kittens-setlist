@@ -1,11 +1,10 @@
 // Mirrors src/lib/types.ts — keep in sync
 
 export type Category = 'top' | 'mid' | 'low';
-export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'percussion' | 'violin';
+export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'percussion' | 'violin' | 'maracas' | 'vocals';
 
 export interface MusicianRole {
-  instrument?: Instrument;
-  vocals: boolean;
+  instruments: Instrument[];  // empty = free
 }
 
 export interface BandMusician {
@@ -13,6 +12,7 @@ export interface BandMusician {
   name: string;
   defaultInstrument?: Instrument;
   sortOrder?: number;
+  guest?: boolean;
 }
 
 export interface Song {
@@ -27,6 +27,7 @@ export interface Song {
 
 export interface SetlistEntry {
   songId?: string;
+  song?: Song;
   breakMinutes?: number;
   order: number;
   played: boolean;

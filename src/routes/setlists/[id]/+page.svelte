@@ -13,7 +13,7 @@
 
   onMount(async () => {
     [setlist, allSongs, musicians] = await Promise.all([
-      getSetlist(id),
+      getSetlist(id!),
       getSongs(),
       getMusicians()
     ]);

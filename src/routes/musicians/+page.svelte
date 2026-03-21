@@ -4,9 +4,9 @@
   import { t } from '$lib/i18n';
   import type { BandMusician, Instrument } from '$lib/types';
 
-  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin'];
+  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'percussion', 'violin', 'maracas', 'vocals'];
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
 
   let musicians = $state<BandMusician[]>([]);
@@ -15,7 +15,6 @@
 
   let draftName = $state('');
   let draftInstrument = $state<Instrument | undefined>(undefined);
-
   let dragIdx = $state<number | null>(null);
   let dragOverIdx = $state<number | null>(null);
 
@@ -192,7 +191,7 @@
   }
   .edit-form.inline { margin: 0; border: none; padding: 4px 0; background: transparent; flex: 1; }
 
-  .edit-form input {
+  .edit-form input:not([type="checkbox"]) {
     padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--bg); color: var(--text); font-size: 0.9rem;
   }
@@ -206,6 +205,11 @@
   .inst-btn:hover { border-color: var(--accent); }
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
 
+  .guest-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.85rem; color: var(--text-muted); cursor: pointer; user-select: none;
+  }
+
   .form-actions { display: flex; gap: 8px; }
   .btn-primary { padding: 7px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 7px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
@@ -217,6 +221,7 @@
     border-radius: 10px; background: var(--surface);
     cursor: grab; transition: border-color 0.12s, opacity 0.12s;
   }
+  .musician-item.is-guest { opacity: 0.75; }
   .musician-item.drag-over { border-color: var(--accent); }
 
   .drag-handle {
@@ -227,6 +232,10 @@
 
   .musician-info { display: flex; align-items: center; gap: 10px; flex: 1; }
   .mname { font-weight: 600; font-size: 1rem; min-width: 80px; }
+  .guest-badge {
+    font-size: 0.7rem; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1px 7px; font-style: italic;
+  }
   .minstruments { display: flex; gap: 4px; flex-wrap: wrap; }
   .inst-badge { font-size: 1.1rem; }
   .free-badge { font-size: 0.8rem; color: var(--text-muted); font-style: italic; }

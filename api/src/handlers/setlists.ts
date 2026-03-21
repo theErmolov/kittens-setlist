@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { Setlist, SetlistEntry } from '../lib/types.js';
+import type { Setlist, SetlistEntry, Song } from '../lib/types.js';
 
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
 
@@ -31,14 +31,14 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
 
   if (afterId === '/songs') {
     if (method === 'POST') {
-      const { songIds } = JSON.parse(event.body ?? '{}') as { songIds: string[] };
+      const { songs } = JSON.parse(event.body ?? '{}') as { songs: Song[] };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
       const existing = new Set(setlist.entries.map(e => e.songId).filter(Boolean));
       const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
-      const newEntries: SetlistEntry[] = songIds
-        .filter(sid => !existing.has(sid))
-        .map((sid, i) => ({ songId: sid, order: maxOrder + 1 + i, played: false }));
+      const newEntries: SetlistEntry[] = songs
+        .filter(s => !existing.has(s.id))
+        .map((s, i) => ({ songId: s.id, song: s, order: maxOrder + 1 + i, played: false }));
       const updated: Setlist = { ...setlist, entries: [...setlist.entries, ...newEntries] };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       return ok(updated);
@@ -78,6 +78,21 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
       const updated: Setlist = { ...setlist, entries: setlist.entries.filter(e => e.order !== order) };
+      await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      return ok(updated);
+    }
+    return err('Method not allowed', 405);
+  }
+
+  if (afterId === '/entry-song') {
+    if (method === 'PATCH') {
+      const { order, song } = JSON.parse(event.body ?? '{}') as { order: number; song: Song };
+      const setlist = await dbGet<Setlist>(TABLE, id);
+      if (!setlist) return err('Not found', 404);
+      const updated: Setlist = {
+        ...setlist,
+        entries: setlist.entries.map(e => e.order === order ? { ...e, song } : e),
+      };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       return ok(updated);
     }

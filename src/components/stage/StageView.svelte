@@ -13,11 +13,9 @@
 
   let {
     setlist,
-    allSongs,
     musicians = []
   }: {
     setlist: Setlist;
-    allSongs: Song[];
     musicians: BandMusician[];
   } = $props();
 
@@ -41,9 +39,19 @@
   let sortKey = $state<SortKey>('default');
   let onlyWithComment = $state(false);
   let selectedMusician = $state(browser ? (localStorage.getItem('kittens_stage_musician') ?? '') : '');
-  $effect(() => { if (browser) localStorage.setItem('kittens_stage_musician', selectedMusician); });
 
-  let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
+  let permanentNames = $derived(new Set(musicians.map(m => m.name)));
+  let guestNames = $derived((): string[] => {
+    const guests = new Set<string>();
+    for (const entry of localEntries) {
+      if (!entry.song) continue;
+      for (const [name, role] of Object.entries(entry.song.musicians)) {
+        if (!permanentNames.has(name) && role.instruments.length > 0) guests.add(name);
+      }
+    }
+    return [...guests].sort();
+  });
+  $effect(() => { if (browser) localStorage.setItem('kittens_stage_musician', selectedMusician); });
 
   // Original position numbers (unfiltered, by setlist order)
   let songPositions = $derived((): Map<number, number> => {
@@ -65,9 +73,8 @@
     if (sortKey !== 'default') {
       // When sorting by name, only show songs (no breaks)
       return sorted
-        .filter(e => e.songId)
-        .map(e => ({ kind: 'song' as const, entry: e, song: songMap.get(e.songId!) }))
-        .filter((x): x is { kind: 'song'; entry: typeof x.entry; song: Song } => x.song !== undefined)
+        .filter(e => e.songId && e.song)
+        .map(e => ({ kind: 'song' as const, entry: e, song: e.song! }))
         .filter(({ song, entry }) => {
           if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return false;
           if (onlyWithComment && !entry.comment) return false;
@@ -78,13 +85,12 @@
           : a.song.title.localeCompare(b.song.title));
     }
 
-    return sorted.flatMap(e => {
-      if (e.breakMinutes) return [{ kind: 'break' as const, entry: e }];
-      const song = e.songId ? songMap.get(e.songId) : undefined;
-      if (!song) return [];
-      if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return [];
+    return sorted.flatMap((e): DisplayItem[] => {
+      if (e.breakMinutes) return [{ kind: 'break', entry: e }];
+      if (!e.song) return [];
+      if (categoryFilter.size > 0 && !categoryFilter.has(e.song.category)) return [];
       if (onlyWithComment && !e.comment) return [];
-      return [{ kind: 'song' as const, entry: e, song }];
+      return [{ kind: 'song', entry: e, song: e.song }];
     });
   });
 
@@ -124,7 +130,7 @@
       </span>
     </div>
     <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-    {#if musicians.length > 0}
+    {#if musicians.length > 0 || guestNames().length > 0}
       <div class="musician-picker">
         {#each musicians as m}
           <button
@@ -132,6 +138,13 @@
             class:active={selectedMusician === m.name}
             onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
           >{m.name}</button>
+        {/each}
+        {#each guestNames() as name}
+          <button
+            class="musician-chip guest-chip"
+            class:active={selectedMusician === name}
+            onclick={() => { selectedMusician = selectedMusician === name ? '' : name; }}
+          >{name}</button>
         {/each}
       </div>
     {/if}
@@ -188,6 +201,7 @@
   }
   .musician-chip:hover { border-color: var(--accent); color: var(--accent); }
   .musician-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .guest-chip { border-style: dashed; }
 
   .song-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }

@@ -8,6 +8,8 @@
   } = $props();
 
   let value = $state(initial);
+  let focused = $state(false);
+  $effect(() => { if (!focused) value = initial; });
 </script>
 
 <input
@@ -16,7 +18,8 @@
   placeholder="комментарий..."
   onclick={(e) => e.stopPropagation()}
   ondragstart={(e) => e.stopPropagation()}
-  onblur={() => { if (value !== (initial ?? '')) onsave(value); }}
+  onfocus={() => { focused = true; }}
+  onblur={() => { focused = false; if (value !== (initial ?? '')) onsave(value); }}
 />
 
 <style>

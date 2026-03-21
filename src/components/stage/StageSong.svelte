@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Song, SetlistEntry, BandMusician } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
+  import { sortInstruments } from '$lib/utils';
 
   const instrumentIcons: Record<string, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻', maracas: '🪇', vocals: '🎤'
   };
 
   let {
@@ -24,14 +25,23 @@
     ontoggle: () => void;
   } = $props();
 
-  let rosterCells = $derived(
-    musicians.map(m => {
+  let permanentNames = $derived(new Set(musicians.map(m => m.name)));
+
+  let rosterCells = $derived(() => {
+    const cells = musicians.map(m => {
       const role = song.musicians[m.name];
-      const active = role && (role.instrument || role.vocals);
+      const active = (role?.instruments?.length ?? 0) > 0;
       const highlight = !!selectedMusician && m.name === selectedMusician && !!active;
-      return { name: m.name, role: role ?? null, active: !!active, highlight };
-    })
-  );
+      return { name: m.name, role: role ?? null, active, highlight };
+    });
+    // append ad-hoc guests
+    for (const [name, role] of Object.entries(song.musicians)) {
+      if (!permanentNames.has(name) && role.instruments.length > 0) {
+        cells.push({ name, role, active: true, highlight: !!selectedMusician && name === selectedMusician });
+      }
+    }
+    return cells;
+  });
 </script>
 
 <button class="stage-song" class:played={entry.played} onclick={ontoggle}>
@@ -43,19 +53,16 @@
       <span class="artist">{song.artist}</span>
       {#if startTime}<span class="start-time">{startTime}</span>{/if}
     </div>
-    <div class="musicians" style="grid-template-columns: repeat({musicians.length || 1}, 1fr)">
-      {#each rosterCells as cell}
+    <div class="musicians">
+      {#each rosterCells() as cell}
         <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
           {#if cell.active}
-            <span class="m-icons" class:has-name={!!cell.name}>{cell.role?.instrument ? instrumentIcons[cell.role.instrument] : ''}{#if cell.role?.vocals}🎤{/if}</span>
+            <span class="m-icons" class:has-name={!!cell.name}>{sortInstruments(cell.role?.instruments ?? []).map(i => instrumentIcons[i]).join('')}</span>
             <span class="m-name">{cell.name}</span>
           {/if}
         </span>
       {/each}
     </div>
-    {#if song.comment}
-      <div class="extra">{song.comment}</div>
-    {/if}
     {#if entry.comment}
       <div class="comment">{entry.comment}</div>
     {/if}
@@ -96,6 +103,7 @@
 
   .musicians {
     display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 3px 4px;
     font-size: 0.82rem;
     color: var(--text-muted);
@@ -113,10 +121,8 @@
   .musician.highlight { background: #f59e0b; color: #1a1200; }
   :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) { background: #78350f; }
   :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
-  .m-icons { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.85rem; }
+  .m-icons { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 1.17rem; }
   .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
-  .extra { padding-left: calc(1.4em + 6px); font-size: 0.78rem; color: var(--text-muted); font-style: italic; margin-top: 2px; }
-
   .comment {
     margin-top: 2px;
     font-size: 0.78rem;

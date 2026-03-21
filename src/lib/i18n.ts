@@ -67,7 +67,6 @@ const strings = {
       commentPlaceholder: 'e.g. guest musician, key note…',
       musicianPlaceholder: 'Musician name',
       addMusician: '+ Add',
-      vocals: '🎤 Vocals',
       remove: 'Remove',
       cancel: 'Cancel',
       save: 'Save',
@@ -79,6 +78,8 @@ const strings = {
       keys: 'Keys',
       percussion: 'Perc',
       violin: 'Violin',
+      maracas: 'Maracas',
+      vocals: 'Vocals',
     },
     setlists: {
       title: 'Setlists',
@@ -177,7 +178,6 @@ const strings = {
       commentPlaceholder: 'напр. Саша (перкуссия), особые пожелания…',
       musicianPlaceholder: 'Имя музыканта',
       addMusician: '+ Добавить',
-      vocals: '🎤 Вокал',
       remove: 'Удалить',
       cancel: 'Отмена',
       save: 'Сохранить',
@@ -189,6 +189,8 @@ const strings = {
       keys: 'Клавиши',
       percussion: 'Перкуссия',
       violin: 'Скрипка',
+      maracas: 'Маракасы',
+      vocals: 'Вокал',
     },
     setlists: {
       title: 'Сетлисты',
