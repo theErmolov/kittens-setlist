@@ -8,6 +8,7 @@ on:
       - 'edge/**'
       - 'template.yaml'
       - 'samconfig.toml'
+  workflow_dispatch:
 
 jobs:
   deploy:
