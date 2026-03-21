@@ -7,37 +7,6 @@ import type { Song, Setlist, SetlistEntry, BandMusician } from '$lib/types';
 
 const BASE = PUBLIC_API_URL;
 
-// ─── Normalization (old data: {instrument?, vocals?} → new: {instruments[]}) ─
-
-function normalizeRole(r: any): import('$lib/types').MusicianRole {
-  if (Array.isArray(r?.instruments)) return { instruments: r.instruments };
-  const instruments: import('$lib/types').Instrument[] = [];
-  if (r?.instrument) instruments.push(r.instrument);
-  // old vocals boolean → vocals instrument
-  if (r?.vocals) instruments.push('vocals' as import('$lib/types').Instrument);
-  return { instruments };
-}
-
-function normalizeSong(s: any): import('$lib/types').Song {
-  if (!s) return s;
-  const musicians: Record<string, import('$lib/types').MusicianRole> = {};
-  for (const [name, role] of Object.entries(s.musicians ?? {})) {
-    musicians[name] = normalizeRole(role);
-  }
-  return { ...s, musicians };
-}
-
-function normalizeSetlist(sl: any): import('$lib/types').Setlist {
-  if (!sl) return sl;
-  return {
-    ...sl,
-    entries: (sl.entries ?? []).map((e: any) => ({
-      ...e,
-      song: e.song ? normalizeSong(e.song) : undefined,
-    })),
-  };
-}
-
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -69,8 +38,7 @@ export async function deleteMusician(id: string): Promise<void> {
 // ─── Songs ────────────────────────────────────────────────────────────────────
 
 export async function getSongs(): Promise<Song[]> {
-  const songs = await req<any[]>('/songs');
-  return songs.map(normalizeSong);
+  return req('/songs');
 }
 
 export async function addSong(song: Omit<Song, 'id'>): Promise<Song> {
@@ -88,13 +56,11 @@ export async function deleteSong(id: string): Promise<void> {
 // ─── Setlists ─────────────────────────────────────────────────────────────────
 
 export async function getSetlists(): Promise<Setlist[]> {
-  const lists = await req<any[]>('/setlists');
-  return lists.map(normalizeSetlist);
+  return req('/setlists');
 }
 
 export async function getSetlist(id: string): Promise<Setlist | undefined> {
-  const sl = await req<any>(`/setlists/${id}`);
-  return normalizeSetlist(sl);
+  return req(`/setlists/${id}`);
 }
 
 export async function createSetlist(name: string, date?: string): Promise<Setlist> {
