@@ -4,7 +4,7 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateEntryComment, updateEntrySong } from '$lib/api';
+  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, sortInstruments } from '$lib/utils';
@@ -53,6 +53,7 @@
 
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);
+  let editingBreakOrder = $state<number | null>(null);
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
@@ -143,6 +144,11 @@
 
   async function handleRemoveBreak(order: number) {
     applyUpdate(await removeBreakFromSetlist(setlist.id, order));
+  }
+
+  async function handleUpdateBreak(order: number, minutes: number) {
+    applyUpdate(await updateBreak(setlist.id, order, minutes));
+    editingBreakOrder = null;
   }
 
   async function handleEntrySave(updatedSong: Song) {
@@ -312,7 +318,20 @@
                 {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                 <td colspan={totalCols - 3 - (localMeta.startTime ? 1 : 0)} class="td-break">
                   <span class="break-icon">⏸</span>
-                  Перерыв — {entry.breakMinutes} мин
+                  {#if editingBreakOrder === entry.order}
+                    {#each [10, 20, 30] as min}
+                      <button
+                        class="break-opt"
+                        class:break-opt-active={entry.breakMinutes === min}
+                        onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
+                      >{min} мин</button>
+                    {/each}
+                    <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
+                  {:else}
+                    <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
+                      Перерыв — {entry.breakMinutes} мин
+                    </button>
+                  {/if}
                 </td>
                 <td class="td-actions">
                   <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
@@ -454,7 +473,22 @@
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; }
 
-  .td-break { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+  .td-break { font-size: 0.82rem; color: var(--text-muted); }
+  .break-label {
+    background: none; border: none; cursor: pointer; font-size: 0.82rem;
+    color: var(--text-muted); font-style: italic; padding: 0;
+  }
+  .break-label:hover { color: var(--accent); }
+  .break-opt {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 8px; font-size: 0.8rem; cursor: pointer; color: var(--text-muted); margin-right: 4px;
+  }
+  .break-opt:hover { border-color: var(--accent); color: var(--accent); }
+  .break-opt-active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .break-opt-cancel {
+    background: none; border: none; cursor: pointer; font-size: 0.78rem;
+    color: var(--text-muted); padding: 0 4px; margin-left: 2px;
+  }
   .break-icon { margin-right: 4px; }
 
   .edit-btn { background: none; border: none; cursor: pointer; font-size: 1.17rem; padding: 2px 4px; opacity: 0.4; transition: opacity 0.12s; }

@@ -117,6 +117,10 @@ export async function removeBreakFromSetlist(setlistId: string, order: number): 
   return req(`/setlists/${setlistId}/breaks/${order}`, { method: 'DELETE' });
 }
 
+export async function updateBreak(setlistId: string, order: number, minutes: number): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/breaks/${order}`, { method: 'PATCH', body: JSON.stringify({ minutes }) });
+}
+
 export async function addSongsToSetlist(setlistId: string, songs: Song[]): Promise<Setlist> {
   return req(`/setlists/${setlistId}/songs`, { method: 'POST', body: JSON.stringify({ songs }) });
 }

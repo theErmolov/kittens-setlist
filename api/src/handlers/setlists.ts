@@ -81,6 +81,17 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       return ok(updated);
     }
+    if (method === 'PATCH') {
+      const { minutes } = JSON.parse(event.body ?? '{}') as { minutes: number };
+      const setlist = await dbGet<Setlist>(TABLE, id);
+      if (!setlist) return err('Not found', 404);
+      const updated: Setlist = {
+        ...setlist,
+        entries: setlist.entries.map(e => e.order === order ? { ...e, breakMinutes: minutes } : e),
+      };
+      await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      return ok(updated);
+    }
     return err('Method not allowed', 405);
   }
 
