@@ -9,6 +9,7 @@
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
+  import { base } from '$app/paths';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', percussion: '🪘', violin: '🎻'
@@ -204,7 +205,7 @@
         {/if}
       </div>
       <button class="btn-secondary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongs}</button>
-      <a href="/setlists/{setlist.id}/stage" class="btn-stage">{$t.editor.stageView}</a>
+      <a href="{base}/setlists/{setlist.id}/stage" class="btn-stage">{$t.editor.stageView}</a>
     </div>
   </div>
 

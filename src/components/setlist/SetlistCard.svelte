@@ -2,6 +2,7 @@
   import type { Setlist } from '$lib/types';
   import { t } from '$lib/i18n';
   import { formatDuration } from '$lib/utils';
+  import { base } from '$app/paths';
 
   let { setlist, ondelete }: { setlist: Setlist; ondelete: () => void } = $props();
 
@@ -11,7 +12,7 @@
 </script>
 
 <div class="card">
-  <a href="/setlists/{setlist.id}" class="card-link">
+  <a href="{base}/setlists/{setlist.id}" class="card-link">
     <div class="card-name">{setlist.name}</div>
     <div class="card-meta">
       {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
@@ -19,7 +20,7 @@
     </div>
   </a>
   <div class="card-actions">
-    <a href="/setlists/{setlist.id}/stage" class="stage-link">{$t.setlists.stage}</a>
+    <a href="{base}/setlists/{setlist.id}/stage" class="stage-link">{$t.setlists.stage}</a>
     <button class="delete-btn" onclick={ondelete} title={$t.song.remove}>🗑</button>
   </div>
 </div>

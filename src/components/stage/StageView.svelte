@@ -9,6 +9,7 @@
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes } from '$lib/utils';
+  import { base } from '$app/paths';
 
   let {
     setlist,
@@ -115,7 +116,7 @@
 <div class="stage">
   <div class="stage-header">
     <div class="stage-title">
-      <a href="/setlists/{setlist.id}" class="back-link">←</a>
+      <a href="{base}/setlists/{setlist.id}" class="back-link">←</a>
       <span class="name">{setlist.name}</span>
       <span class="progress">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes)})

@@ -29,6 +29,11 @@ npm run build     # production build
 
 ## Architecture
 
+### Base path / GitHub Pages
+- `paths.base` in `svelte.config.js` is set from `process.env.BASE_PATH` (empty for local/CloudFront, `/kittens-setlist` for GitHub Pages)
+- SvelteKit does **not** auto-prepend `base` to `href` attributes — every Svelte file with absolute hrefs must `import { base } from '$app/paths'` and use `href="{base}/route"`
+- `goto()` is base-aware (no change needed); `redirect()` is not — use `` `${base}/route` ``
+
 ### API layer — `src/lib/api.ts`
 All components talk to this file only, never to stores directly.
 Makes `fetch()` calls to `PUBLIC_API_URL` (set in `.env.local` for dev, GitHub Actions var for prod).

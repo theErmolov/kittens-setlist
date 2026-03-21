@@ -37,3 +37,7 @@ How to apply: Hard `alert()` + `return` in `handleSave`, not a skippable `confir
 
 **Error/validation copy is in Russian and colloquial, not polished.**
 Why: Band-internal tool. "А поёт эту хуйню кто?" is the exact approved wording.
+
+**SvelteKit does NOT automatically prepend `paths.base` to `href` attributes — must be done manually.**
+Why: Discovered when deploying to GitHub Pages at `/kittens-setlist/` — all links skipped the base and 404'd.
+How to apply: Import `base` from `$app/paths` and write `href="{base}/route"` in every Svelte file that has absolute hrefs. Also prefix `redirect()` calls: `redirect(302, \`${base}/route\`)`. `goto()` IS base-aware and needs no change.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { page } from '$app/state';
+  import { base } from '$app/paths';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang } from '$lib/i18n';
 
@@ -30,20 +31,20 @@
 </svelte:head>
 
 <nav class="nav">
-  <a href="/backlog" class="nav-brand">
+  <a href="{base}/backlog" class="nav-brand">
     <LogoCat size={40} />
     <span class="brand-text">
       <span class="brand-ru">Музыкальные</span>
       <span class="brand-en">Котятки</span>
     </span>
   </a>
-  <a href="/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
+  <a href="{base}/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
     <span class="link-icon">🎵</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
   </a>
-  <a href="/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
+  <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
-  <a href="/musicians" class="nav-link" class:active={path.startsWith('/musicians')}>
+  <a href="{base}/musicians" class="nav-link" class:active={path.startsWith('/musicians')}>
     <span class="link-icon">🎸</span><span class="link-label">{$lang === 'ru' ? 'Музыканты' : 'Musicians'}</span>
   </a>
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
