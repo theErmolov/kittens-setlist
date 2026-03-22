@@ -155,6 +155,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: 200.html
+        WebACLId: 'arn:aws:wafv2:us-east-1:540966180378:global/webacl/CreatedByCloudFront-5792c504/b3124a50-cb90-4139-b9ca-01810377e4c6'
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
