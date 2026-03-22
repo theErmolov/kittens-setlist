@@ -38,7 +38,20 @@ npm run build     # production build
 All components talk to this file only, never to stores directly.
 Makes `fetch()` calls to `PUBLIC_API_URL` (set in `.env.local` for dev, GitHub Actions var for prod).
 All functions are async.
-**Normalization:** old DynamoDB data has `{instrument?: string, vocals?: boolean}` per role; `normalizeRole()` converts to `{instruments: Instrument[]}` transparently on every read.
+
+### Emoji — `static/emoji/` + `src/routes/+layout.svelte`
+All emoji are rendered via **Twemoji** (`@twemoji/api`) for consistent cross-platform appearance (critical for Windows). SVG files are self-hosted in `static/emoji/` — named by Unicode codepoint (e.g. `1f3b8.svg` for 🎸).
+
+A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags. The CSS rule `:global(img.emoji)` sizes them to `1em`.
+
+**To add a new emoji:**
+1. Find its Unicode codepoint — e.g. `U+1F3B8` → filename `1f3b8.svg`. For emoji with a variation selector (`U+FE0F`), try `{base}-fe0f.svg` first, then `{base}.svg` if that 404s.
+2. Download the SVG from the jdecked Twemoji fork (covers Emoji 15+):
+   ```bash
+   curl -o static/emoji/{codepoint}.svg \
+     "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/{codepoint}.svg"
+   ```
+3. No code changes needed — the observer picks it up automatically.
 
 ### i18n — `src/lib/i18n.ts`
 - `lang` writable store (`'ru' | 'en'`), default `'ru'`, persisted to `localStorage('lang')`
@@ -56,8 +69,8 @@ All functions are async.
 
 ```ts
 type Category = 'top' | 'mid' | 'low'
-// canonical display order: vocals, guitar, bass, keys, violin, drums, percussion, maracas
-type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'percussion' | 'violin' | 'maracas' | 'vocals'
+// canonical display order: vocals, guitar, bass, keys, violin, drums, cajon, percussion
+type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals'
 
 interface MusicianRole {
   instruments: Instrument[]  // empty = present in song but "free"; multiple allowed
@@ -66,16 +79,16 @@ interface MusicianRole {
 interface BandMusician {
   id: string
   name: string
-  defaultInstrument?: Instrument  // pre-selected when adding a song
-  sortOrder?: number               // roster display order; drag-to-reorder in /musicians
-  guest?: boolean                  // reserved; ad-hoc guests are used in practice (see below)
+  defaultInstruments?: Instrument[]  // pre-selected when adding a song (multiple allowed)
+  sortOrder?: number                  // roster display order; drag-to-reorder in /musicians
+  guest?: boolean                     // reserved; ad-hoc guests are used in practice (see below)
 }
 
 interface Song {
   id: string
   artist: string
   title: string
-  category: Category       // top=💩 По говну, mid=🎵 Середняк, low=🧪 Андеграунд
+  category: Category       // top=💩 По говну, mid=🎵 Середняк, low=🧪 Андеграунд (emojis rendered via Twemoji)
   comment?: string         // general note
   musicians: Record<string, MusicianRole>  // keyed by musician name
   sortOrder?: number
@@ -104,7 +117,7 @@ interface SetlistEntry {
 Managed via `/musicians` page. Stored in DynamoDB (`kittens-musicians` table).
 Default roster: Илья (bass), Андрей (drums), iLJa (guitar), Тоня (keys), Маша (violin).
 
-Each musician has one `defaultInstrument` — pre-selected when creating/editing a song.
+Each musician has `defaultInstruments[]` — pre-selected when creating/editing a song (multiple allowed).
 In the song edit modal, all 8 instruments are shown for every musician; multiple can be selected simultaneously.
 Roster order is configurable via drag-to-reorder on `/musicians`; `sortOrder` is persisted and controls column order everywhere (backlog table, setlist editor, stage view).
 
@@ -112,7 +125,7 @@ Roster order is configurable via drag-to-reorder on `/musicians`; `sortOrder` is
 Guests are **not** pre-registered in the musicians roster. They are typed inline in the song edit modal below the permanent roster rows — once a name is entered, instrument buttons appear and a new empty row is added for the next guest. Guests are stored as extra keys in `song.musicians` whose names don't match any `BandMusician`.
 
 Guest display:
-- **Backlog / setlist editor** — compact inline bubble pills after the song title: `🎤 Саша · 🪇 Вася`
+- **Backlog / setlist editor** — compact inline bubble pills after the song title: `🎙️ Саша · 🪇 Вася`
 - **Stage view** — appear in the 3-per-row musician grid after permanent members; also appear in the musician highlight picker (dashed border to distinguish from permanent)
 
 ## Routes
