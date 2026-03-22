@@ -76,9 +76,9 @@ const strings = {
       bass: 'Bass',
       drums: 'Drums',
       keys: 'Keys',
-      percussion: 'Perc',
+      cajon: 'Cajón',
       violin: 'Violin',
-      maracas: 'Maracas',
+      percussion: 'Perc',
       vocals: 'Vocals',
     },
     setlists: {
@@ -187,9 +187,9 @@ const strings = {
       bass: 'Бас',
       drums: 'Ударные',
       keys: 'Клавиши',
-      percussion: 'Перкуссия',
+      cajon: 'Кахон',
       violin: 'Скрипка',
-      maracas: 'Маракасы',
+      percussion: 'Перкуссия',
       vocals: 'Вокал',
     },
     setlists: {

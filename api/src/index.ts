@@ -1,3 +1,4 @@
+// Kittens Setlist API — Lambda entry point
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { musiciansHandler } from './handlers/musicians.js';
 import { songsHandler } from './handlers/songs.js';
