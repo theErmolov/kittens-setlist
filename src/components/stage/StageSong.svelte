@@ -121,7 +121,7 @@
   .musician.highlight { background: #f59e0b; color: #1a1200; }
   :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) { background: #78350f; }
   :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
-  .m-icons { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 1.17rem; }
+  .m-icons { flex-shrink: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 1px; line-height: 1.1; font-size: 1.17rem; }
   .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   .comment {
     margin-top: 2px;
