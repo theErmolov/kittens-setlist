@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -q 'git commit' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Before committing: review whether CLAUDE.md, any files in .claude/memory/, or other project docs need updating to reflect architectural, data model, workflow, or configuration changes in this commit. Update them first if needed.\"}}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
