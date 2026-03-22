@@ -45,11 +45,11 @@ All emoji are rendered via **Twemoji** (`@twemoji/api`) for consistent cross-pla
 A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags. The CSS rule `:global(img.emoji)` sizes them to `1em`.
 
 **To add a new emoji:**
-1. Find its Unicode codepoint — e.g. `U+1F3B8` → filename `1f3b8.svg`. For emoji with a variation selector (`U+FE0F`), try `{base}-fe0f.svg` first, then `{base}.svg` if that 404s.
-2. Download the SVG from the jdecked Twemoji fork (covers Emoji 15+):
+1. Find its Unicode codepoint — e.g. `U+1F3B8` → filename `1f3b8.svg`. Drop any variation selector (`U+FE0F`) from the filename.
+2. Download the SVG from Noto Color Emoji (covers Emoji 15+):
    ```bash
    curl -o static/emoji/{codepoint}.svg \
-     "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/{codepoint}.svg"
+     "https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u{codepoint}.svg"
    ```
 3. No code changes needed — the observer picks it up automatically.
 
