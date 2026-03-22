@@ -4,7 +4,7 @@
   import { sortInstruments } from '$lib/utils';
 
   const instrumentIcons: Record<string, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎙️'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
   };
 
   let {

@@ -125,7 +125,7 @@ Roster order is configurable via drag-to-reorder on `/musicians`; `sortOrder` is
 Guests are **not** pre-registered in the musicians roster. They are typed inline in the song edit modal below the permanent roster rows — once a name is entered, instrument buttons appear and a new empty row is added for the next guest. Guests are stored as extra keys in `song.musicians` whose names don't match any `BandMusician`.
 
 Guest display:
-- **Backlog / setlist editor** — compact inline bubble pills after the song title: `🎙️ Саша · 🪇 Вася`
+- **Backlog / setlist editor** — compact inline bubble pills after the song title: `🎤 Саша · 🪇 Вася`
 - **Stage view** — appear in the 3-per-row musician grid after permanent members; also appear in the musician highlight picker (dashed border to distinguish from permanent)
 
 ## Routes
