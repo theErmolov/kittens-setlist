@@ -18,8 +18,8 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       return ok(items);
     }
     if (method === 'POST') {
-      const { name, date } = JSON.parse(event.body ?? '{}') as { name: string; date?: string };
-      const setlist: Setlist = { id: crypto.randomUUID(), name, date, entries: [] };
+      const { name, date, startTime } = JSON.parse(event.body ?? '{}') as { name: string; date?: string; startTime?: string };
+      const setlist: Setlist = { id: crypto.randomUUID(), name, date, startTime, entries: [] };
       await dbPut(TABLE, setlist as unknown as Record<string, unknown>);
       return ok(setlist, 201);
     }

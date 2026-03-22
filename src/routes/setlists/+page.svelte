@@ -10,6 +10,7 @@
   let showNew = $state(false);
   let newName = $state('');
   let newDate = $state('');
+  let newStartTime = $state('');
 
   onMount(async () => {
     setlists = await getSetlists();
@@ -17,9 +18,9 @@
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined);
+    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined);
     setlists = [...setlists, sl];
-    newName = ''; newDate = ''; showNew = false;
+    newName = ''; newDate = ''; newStartTime = ''; showNew = false;
     goto(`/setlists/${sl.id}`);
   }
 
@@ -39,9 +40,14 @@
   {#if showNew}
     <div class="new-form">
       <input bind:value={newName} placeholder={$t.setlists.namePlaceholder} />
-      <input type="date" bind:value={newDate} />
-      <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
-      <button class="btn-secondary" onclick={() => { showNew = false; }}>{$t.setlists.cancel}</button>
+      <div class="new-form-row">
+        <input type="date" bind:value={newDate} />
+        <input type="time" bind:value={newStartTime} />
+        <div class="new-form-actions">
+          <button class="btn-secondary" onclick={() => { showNew = false; }}>{$t.setlists.cancel}</button>
+          <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -65,8 +71,11 @@
   .page { padding: 20px 16px; max-width: 640px; margin: 0 auto; }
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
   .page-header h1 { font-size: 1.4rem; }
-  .new-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-  .new-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; flex: 1; min-width: 160px; }
+  .new-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  .new-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
+  .new-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .new-form-row input { flex: 1; min-width: 120px; }
+  .new-form-actions { display: flex; gap: 8px; margin-left: auto; }
   .cards { display: flex; flex-direction: column; gap: 10px; }
   .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .empty p { margin-bottom: 12px; }

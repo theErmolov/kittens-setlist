@@ -63,8 +63,8 @@ export async function getSetlist(id: string): Promise<Setlist | undefined> {
   return req(`/setlists/${id}`);
 }
 
-export async function createSetlist(name: string, date?: string): Promise<Setlist> {
-  return req('/setlists', { method: 'POST', body: JSON.stringify({ name, date }) });
+export async function createSetlist(name: string, date?: string, startTime?: string): Promise<Setlist> {
+  return req('/setlists', { method: 'POST', body: JSON.stringify({ name, date, startTime }) });
 }
 
 export async function updateSetlist(setlist: Setlist): Promise<Setlist> {

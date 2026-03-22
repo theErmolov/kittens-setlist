@@ -16,6 +16,7 @@
     <div class="card-name">{setlist.name}</div>
     <div class="card-meta">
       {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
+      {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}
       <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songCount * 5 + breakMins)})</span>
     </div>
   </a>
