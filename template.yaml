@@ -154,7 +154,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        DefaultRootObject: index.html
+        DefaultRootObject: 200.html
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName

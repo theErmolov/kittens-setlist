@@ -4,7 +4,7 @@ import adapter from '@sveltejs/adapter-static';
 const config = {
 	kit: {
 		adapter: adapter({
-			fallback: '404.html'  // SPA mode — GitHub Pages / CloudFront serve this for unknown paths
+			fallback: '200.html'  // SPA mode — CloudFront serves this for unknown paths (200 status)
 		}),
 		paths: {
 			base: process.env.BASE_PATH ?? ''
