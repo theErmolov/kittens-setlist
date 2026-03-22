@@ -177,7 +177,7 @@ Resources:
             ResponseCode: 200
             ResponsePagePath: /200.html
             ErrorCachingMinTTL: 0
-        PriceClass: PriceClass_100  # US, Canada, Europe only
+
 
 Outputs:
   ApiUrl:
