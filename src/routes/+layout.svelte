@@ -2,12 +2,29 @@
   import { browser } from '$app/environment';
   import { page } from '$app/state';
   import { base } from '$app/paths';
+  import { onMount } from 'svelte';
+  import twemoji from '@twemoji/api';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang } from '$lib/i18n';
 
   let { children } = $props();
 
   let dark = $state(browser ? localStorage.getItem('theme') === 'dark' : false);
+
+  onMount(() => {
+    const opts = { base: `${base}/emoji/`, folder: '.', ext: '.svg' };
+    const parse = (node: Element) => twemoji.parse(node as HTMLElement, opts);
+    parse(document.body);
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) parse(node as Element);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  });
   // Strip base prefix so active checks work on both local and GitHub Pages
   let path = $derived(page.url.pathname.slice(base.length) || '/');
 
@@ -82,6 +99,13 @@
     --chip-bg: #23263a;
     --musician-alt-bg: #1e2133;
     color-scheme: dark;
+  }
+
+  :global(img.emoji) {
+    height: 1em;
+    width: 1em;
+    vertical-align: -0.1em;
+    display: inline-block;
   }
 
   :global(body) {
