@@ -13,9 +13,9 @@ Read these files at the start of every session:
 
 - **Svelte 5** (runes mode — `$state`, `$derived`, `$effect` everywhere, no `$:`)
 - **SvelteKit** with `@sveltejs/adapter-static` (SPA mode, `fallback: '200.html'`)
-- **AWS Lambda** (Node 22, arm64) + **API Gateway HTTP API** + **DynamoDB** (3 tables)
+- **AWS Lambda** (Node 22, arm64) + **API Gateway HTTP API** + **DynamoDB** (5 tables)
 - API URL: `https://bw1e6cey18.execute-api.eu-central-1.amazonaws.com/prod`
-- Deploy: `sam build && sam deploy --profile personal` (SAM stack `kittens-setlist`, `eu-central-1`)
+- Deploy: `sam build && sam deploy --profile personal --parameter-overrides TelegramBotToken=... SuperadminTelegramId=...` (SAM stack `kittens-setlist`, `eu-central-1`)
 - **TypeScript** strict mode
 - **No CSS framework** — plain scoped styles + CSS custom properties
 
@@ -33,6 +33,17 @@ npm run build     # production build
 - `paths.base` in `svelte.config.js` is set from `process.env.BASE_PATH` (empty for local/CloudFront, `/kittens-setlist` for GitHub Pages)
 - SvelteKit does **not** auto-prepend `base` to `href` attributes — every Svelte file with absolute hrefs must `import { base } from '$app/paths'` and use `href="{base}/route"`
 - `goto()` is base-aware (no change needed); `redirect()` is not — use `` `${base}/route` ``
+
+### Auth — `src/lib/auth.ts`
+- `currentUser` writable store (`KittensUser | null`), `authLoading` writable store
+- `initAuth()` — called once in layout `onMount`; reads token from localStorage, hits `GET /auth/me`, populates `currentUser`
+- `getToken()` / `setToken()` / `clearToken()` — localStorage helpers
+- `logout()` — calls `DELETE /auth/logout`, clears token and store
+- Auth guard in `+layout.svelte` `$effect`: redirects to `/login` unless on `/login` or a `/stage` route
+- Telegram Login Widget on `/login` page — bot `@kittens_control_center_bot`, `PUBLIC_TELEGRAM_BOT_USERNAME` env var
+- New users → `pending` until superadmin approves via `/admin`; superadmin ID from `SUPERADMIN_TELEGRAM_ID` Lambda env var (GitHub secret)
+- All API routes protected except `GET /setlists/:id`; `POST /setlists/:id/played` requires auth
+- Sessions: DynamoDB `kittens-sessions`, 180-day TTL; users: `kittens-users`
 
 ### API layer — `src/lib/api.ts`
 All components talk to this file only, never to stores directly.
@@ -132,10 +143,13 @@ Guest display:
 
 ```
 /                          → redirect to /backlog
+/login                     → Telegram Login Widget; pending/rejected states
+/admin                     → superadmin only: approve/reject users, map to musician
 /backlog                   → song catalog with table, filters, add/edit/delete
 /setlists                  → list of setlists
 /setlists/[id]             → setlist editor (drag-to-reorder)
-/setlists/[id]/stage       → stage view (mobile-first, tap to mark played)
+/setlists/[id]/stage       → stage view (public; tap-to-mark disabled when unauthenticated)
+/musicians                 → band roster management
 ```
 
 ## File Structure
@@ -143,13 +157,11 @@ Guest display:
 ```
 src/
   lib/
-    api.ts                 ← all backend calls; normalization of old data formats
+    api.ts                 ← all backend calls; Bearer token injected from auth store
+    auth.ts                ← currentUser + authLoading stores, initAuth, logout, getToken
     types.ts
     i18n.ts                ← all UI strings (ru + en)
     utils.ts               ← formatDuration, addMinutes, sortInstruments, INSTRUMENT_ORDER
-    stores/songs.ts
-    stores/setlists.ts
-    stores/musicians.ts
   components/
     backlog/
       SongTable.svelte     ← toolbar, filter bar (category + musician + instrument), table
@@ -171,8 +183,10 @@ src/
       SortBar.svelte
       TopBar.svelte
   routes/
-    +layout.svelte          ← nav ("Центр управления / Котят"), theme toggle, lang toggle, global CSS vars
+    +layout.svelte          ← nav, theme/lang toggle, auth guard, logout button, admin link
     +page.server.ts         ← redirect / → /backlog
+    login/+page.svelte      ← Telegram Login Widget, pending/rejected states
+    admin/+page.svelte      ← user approval, musician mapping (admin only)
     backlog/+page.svelte
     setlists/+page.svelte
     setlists/[id]/+page.svelte
