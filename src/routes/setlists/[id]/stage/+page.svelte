@@ -14,7 +14,7 @@
 
   let canMark = $derived($currentUser?.status === 'approved');
   // Authenticated users poll every 2s; unauthenticated every 10s
-  let pollInterval = $derived(canMark ? 2000 : 10000);
+  let pollInterval = $derived(canMark ? 2000 : 30000);
 
   onMount(async () => {
     setlist = await getSetlist(id!);
