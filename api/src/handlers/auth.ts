@@ -54,6 +54,9 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
       return err('Invalid JSON', 400);
     }
 
+    // Telegram widget passes id as a number — coerce to string for DynamoDB key
+    data = { ...data, id: String(data.id) };
+
     if (!data.id || !data.hash || !data.auth_date || !data.first_name) {
       return err('Missing required Telegram auth fields', 400);
     }
