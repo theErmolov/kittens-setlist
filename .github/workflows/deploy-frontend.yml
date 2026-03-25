@@ -32,6 +32,7 @@ jobs:
       - run: npm run build
         env:
           PUBLIC_API_URL: ${{ vars.API_URL }}
+          PUBLIC_TELEGRAM_BOT_USERNAME: kittens_control_center_bot
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:

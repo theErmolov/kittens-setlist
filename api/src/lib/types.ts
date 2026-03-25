@@ -41,3 +41,24 @@ export interface Setlist {
   startTime?: string;
   entries: SetlistEntry[];
 }
+
+export type UserStatus = 'pending' | 'approved' | 'rejected';
+
+export interface KittensUser {
+  telegramId: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+  status: UserStatus;
+  musicianId?: string;
+  isAdmin?: boolean;
+  createdAt: string;
+  approvedAt?: string;
+}
+
+export interface KittensSession {
+  token: string;
+  telegramId: string;
+  expiresAt: number;  // Unix seconds
+}

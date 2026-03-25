@@ -13,10 +13,14 @@
 
   let {
     setlist,
-    musicians = []
+    musicians = [],
+    canMark = true,
+    pollInterval = 2000,
   }: {
     setlist: Setlist;
     musicians: BandMusician[];
+    canMark?: boolean;
+    pollInterval?: number;
   } = $props();
 
   let localEntries = $state<SetlistEntry[]>([...setlist.entries]);
@@ -31,7 +35,7 @@
 
   onMount(() => startPolling(
     async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
-    2000,
+    pollInterval,
     () => false,
   ));
 
@@ -95,6 +99,7 @@
   });
 
   async function handleToggle(songId: string) {
+    if (!canMark) return;
     // Optimistic update so the tap feels instant, then confirm from server
     localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
     const updated = await togglePlayed(setlist.id, songId);
@@ -129,6 +134,9 @@
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
       </span>
     </div>
+    {#if !canMark}
+      <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
+    {/if}
     <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
     {#if musicians.length > 0 || guestNames().length > 0}
       <div class="musician-picker">
@@ -157,6 +165,7 @@
           startTime={entryTimes().get(item.entry.order)}
           {musicians}
           {selectedMusician}
+          {canMark}
           ontoggle={() => handleToggle(item.entry.songId!)} />
       {:else}
         <div class="stage-break">
@@ -212,4 +221,12 @@
     letter-spacing: 0.03em;
   }
   .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; }
+
+  .login-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    text-align: center;
+  }
+  .login-hint:hover { color: var(--accent); }
 </style>

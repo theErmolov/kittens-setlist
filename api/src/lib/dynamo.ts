@@ -23,6 +23,15 @@ export async function dbDelete(table: string, id: string): Promise<void> {
   await db.send(new DeleteCommand({ TableName: table, Key: { id } }));
 }
 
+export async function dbGetByKey<T>(table: string, key: Record<string, unknown>): Promise<T | undefined> {
+  const res = await db.send(new GetCommand({ TableName: table, Key: key }));
+  return res.Item as T | undefined;
+}
+
+export async function dbDeleteByKey(table: string, key: Record<string, unknown>): Promise<void> {
+  await db.send(new DeleteCommand({ TableName: table, Key: key }));
+}
+
 export async function dbScan<T>(table: string): Promise<T[]> {
   const items: T[] = [];
   let lastKey: Record<string, unknown> | undefined;

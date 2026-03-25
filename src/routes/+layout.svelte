@@ -3,9 +3,11 @@
   import { page } from '$app/state';
   import { base } from '$app/paths';
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import twemoji from '@twemoji/api';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang } from '$lib/i18n';
+  import { currentUser, authLoading, initAuth, logout } from '$lib/auth';
 
   let { children } = $props();
 
@@ -23,10 +25,22 @@
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    initAuth(); // fire-and-forget; authLoading store signals completion
     return () => observer.disconnect();
   });
+
   // Strip base prefix so active checks work on both local and GitHub Pages
   let path = $derived(page.url.pathname.slice(base.length) || '/');
+
+  // Auth guard: redirect to /login unless on login page or stage view
+  $effect(() => {
+    if (!browser || $authLoading) return;
+    const isLoginPage = path.startsWith('/login');
+    const isStage = path.includes('/stage');
+    if (!isLoginPage && !isStage && $currentUser === null) {
+      goto(`${base}/login`);
+    }
+  });
 
   function toggleTheme() {
     dark = !dark;
@@ -35,6 +49,11 @@
 
   function toggleLang() {
     $lang = $lang === 'ru' ? 'en' : 'ru';
+  }
+
+  async function handleLogout() {
+    await logout();
+    goto(`${base}/login`);
   }
 
   $effect(() => {
@@ -66,8 +85,16 @@
   <a href="{base}/musicians" class="nav-link" class:active={path.startsWith('/musicians')}>
     <span class="link-icon">🎸</span><span class="link-label">{$lang === 'ru' ? 'Музыканты' : 'Musicians'}</span>
   </a>
+  {#if $currentUser?.isAdmin}
+    <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
+      <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
+    </a>
+  {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
   <button class="theme-toggle" onclick={toggleTheme} title="Toggle theme">{dark ? '☀️' : '🌙'}</button>
+  {#if $currentUser}
+    <button class="logout-btn" onclick={handleLogout} title="Log out">⬡</button>
+  {/if}
 </nav>
 
 {@render children()}
@@ -201,6 +228,19 @@
     transition: border-color 0.15s;
   }
   .theme-toggle:hover { border-color: var(--accent); }
+
+  .logout-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--text-muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .logout-btn:hover { border-color: #e05252; color: #e05252; }
 
   @media (max-width: 540px) {
     .nav { gap: 0; padding: 0 10px; }

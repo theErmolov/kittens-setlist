@@ -14,6 +14,7 @@
     startTime,
     musicians = [],
     selectedMusician = '',
+    canMark = true,
     ontoggle
   }: {
     song: Song;
@@ -22,6 +23,7 @@
     startTime?: string;
     musicians: BandMusician[];
     selectedMusician?: string;
+    canMark?: boolean;
     ontoggle: () => void;
   } = $props();
 
@@ -44,7 +46,7 @@
   });
 </script>
 
-<button class="stage-song" class:played={entry.played} onclick={ontoggle}>
+<button class="stage-song" class:played={entry.played} class:no-mark={!canMark} onclick={ontoggle}>
   <div class="song-main">
     <div class="song-top">
       <span class="position">{position}</span>
@@ -84,6 +86,8 @@
     gap: 8px;
   }
   .stage-song:hover { background: var(--row-hover); }
+  .stage-song.no-mark { cursor: default; }
+  .stage-song.no-mark:hover { background: var(--surface); }
   .stage-song.played { opacity: 0.45; }
   .stage-song.played .song-top { text-decoration: line-through; }
 

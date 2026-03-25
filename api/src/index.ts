@@ -3,6 +3,8 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { musiciansHandler } from './handlers/musicians.js';
 import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
+import { authHandler, resolveAuth } from './handlers/auth.js';
+import { err } from './lib/response.js';
 
 export const handler = async (event: APIGatewayProxyEventV2) => {
   // API Gateway HTTP API prepends the stage name to rawPath (e.g. /prod/songs).
@@ -23,6 +25,21 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
       },
       body: '',
     };
+  }
+
+  // Auth routes — public (no token required, handler enforces its own checks)
+  if (path.startsWith('/auth')) return authHandler(event, path);
+
+  // Stage view polling — GET /setlists/:id is public (no auth required)
+  const isPublicSetlistGet =
+    event.requestContext.http.method === 'GET' &&
+    /^\/setlists\/[^/]+$/.test(path);
+
+  if (!isPublicSetlistGet) {
+    // All other routes require an authenticated, approved user
+    const user = await resolveAuth(event);
+    if (!user) return err('Unauthorized', 401);
+    if (user.status !== 'approved') return err('Your account is pending approval', 403);
   }
 
   if (path.startsWith('/musicians')) return musiciansHandler(event, path);

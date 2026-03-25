@@ -3,14 +3,20 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, BandMusician } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser } from '$lib/types';
+import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${res.status}`);
   return res.json() as Promise<T>;
@@ -109,4 +115,14 @@ export async function updateEntryComment(setlistId: string, order: number, comme
 
 export async function reorderEntries(setlistId: string, entries: SetlistEntry[]): Promise<Setlist> {
   return req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify({ entries }) });
+}
+
+// ─── Auth (admin) ──────────────────────────────────────────────────────────────
+
+export async function getUsers(): Promise<KittensUser[]> {
+  return req('/auth/users');
+}
+
+export async function patchUser(telegramId: string, patch: { status?: string; musicianId?: string | null }): Promise<KittensUser> {
+  return req(`/auth/users/${telegramId}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }

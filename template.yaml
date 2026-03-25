@@ -13,11 +13,22 @@ Globals:
         SONGS_TABLE: !Ref SongsTable
         SETLISTS_TABLE: !Ref SetlistsTable
         MUSICIANS_TABLE: !Ref MusiciansTable
+        USERS_TABLE: !Ref UsersTable
+        SESSIONS_TABLE: !Ref SessionsTable
+        TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+        SUPERADMIN_TELEGRAM_ID: !Ref SuperadminTelegramId
 
 Parameters:
   StageName:
     Type: String
     Default: prod
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+    Description: Telegram bot token from BotFather
+  SuperadminTelegramId:
+    Type: String
+    Description: Telegram user ID of the superadmin
 
 Resources:
 
@@ -57,6 +68,10 @@ Resources:
             TableName: !Ref SetlistsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref MusiciansTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
       Events:
         ApiRoot:
           Type: HttpApi
@@ -113,82 +128,43 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
-  # ─── Frontend (S3 + CloudFront) ────────────────────────────────────────────
-
-  FrontendBucket:
-    Type: AWS::S3::Bucket
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
     Properties:
-      BucketName: !Sub 'kittens-setlist-frontend-${AWS::AccountId}'
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+      TableName: kittens-users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: telegramId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: telegramId
+          KeyType: HASH
 
-  FrontendBucketPolicy:
-    Type: AWS::S3::BucketPolicy
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
     Properties:
-      Bucket: !Ref FrontendBucket
-      PolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Action: s3:GetObject
-            Resource: !Sub '${FrontendBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}'
-
-  FrontendOAC:
-    Type: AWS::CloudFront::OriginAccessControl
-    Properties:
-      OriginAccessControlConfig:
-        Name: kittens-setlist-oac
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
-  FrontendDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
+      TableName: kittens-sessions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
         Enabled: true
-        DefaultRootObject: 200.html
-        WebACLId: 'arn:aws:wafv2:us-east-1:540966180378:global/webacl/CreatedByCloudFront-5792c504/b3124a50-cb90-4139-b9ca-01810377e4c6'
-        Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt FrontendBucket.RegionalDomainName
-            OriginAccessControlId: !GetAtt FrontendOAC.Id
-            S3OriginConfig: {}
-        DefaultCacheBehavior:
-          TargetOriginId: S3Origin
-          ViewerProtocolPolicy: redirect-to-https
-          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized managed policy
-          AllowedMethods: [GET, HEAD, OPTIONS]
-          CachedMethods: [GET, HEAD]
-          Compress: true
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /200.html  # SvelteKit SPA fallback
-            ErrorCachingMinTTL: 0
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /200.html
-            ErrorCachingMinTTL: 0
+
+  # Frontend (S3 + CloudFront) is managed outside this template.
+  # Bucket: kittens-setlist-frontend-540966180378
+  # Distribution: E3D2LL7A33NW5T  (duw1m60ftrw00.cloudfront.net, kittens.band)
+  # OAC: E2YJDR89JNCOPU (kittens-setlist-oac)
+  # Deploy workflow: .github/workflows/deploy-frontend.yml
 
 
 Outputs:
   ApiUrl:
     Description: API Gateway invoke URL
     Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}'
-  FrontendBucketName:
-    Description: S3 bucket for frontend assets
-    Value: !Ref FrontendBucket
-  CloudFrontDistributionId:
-    Description: CloudFront distribution ID (set as CF_DIST_ID GitHub var)
-    Value: !Ref FrontendDistribution
-  CloudFrontDomain:
-    Description: CloudFront domain name
-    Value: !GetAtt FrontendDistribution.DomainName
