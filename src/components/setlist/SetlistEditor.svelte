@@ -57,6 +57,13 @@
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
+  let selectedMusicians = $state(new Set<string>());
+
+  function toggleMusician(name: string) {
+    const next = new Set(selectedMusicians);
+    next.has(name) ? next.delete(name) : next.add(name);
+    selectedMusicians = next;
+  }
 
   // Full replace after own mutations — always authoritative
   function applyUpdate(updated: Setlist) {
@@ -91,12 +98,29 @@
   let sortedEntries = $derived([...localEntries].sort((a, b) => a.order - b.order));
   let existingIds = $derived(new Set(localEntries.map(e => e.songId).filter((id): id is string => !!id)));
 
+  let filteredEntries = $derived(() => {
+    if (selectedMusicians.size === 0) return sortedEntries;
+    return sortedEntries.filter(e => {
+      if (!e.song) return false; // hide breaks when filter active
+      for (const m of selectedMusicians) {
+        const role = e.song.musicians[m];
+        if (!role || role.instruments.length === 0) return false;
+      }
+      return true;
+    });
+  });
+
+  let isFiltered = $derived(selectedMusicians.size > 0);
+
   let displayEntries = $derived(() => {
-    if (dragIndex === null || overIndex === null || dragIndex === overIndex) return sortedEntries;
-    const list = [...sortedEntries];
-    const [item] = list.splice(dragIndex, 1);
-    list.splice(overIndex, 0, item);
-    return list;
+    const base = filteredEntries();
+    if (!isFiltered && dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
+      const list = [...base];
+      const [item] = list.splice(dragIndex, 1);
+      list.splice(overIndex, 0, item);
+      return list;
+    }
+    return base;
   });
 
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
@@ -231,6 +255,18 @@
     </div>
   </div>
 
+  {#if allMusicians.length > 0}
+    <div class="filter-bar">
+      {#each allMusicians as name}
+        <button
+          class="filter-chip"
+          class:active={selectedMusicians.has(name)}
+          onclick={() => toggleMusician(name)}
+        >{name}</button>
+      {/each}
+    </div>
+  {/if}
+
   {#if sortedEntries.length === 0}
     <div class="empty">
       <p>{$t.editor.empty}</p>
@@ -264,11 +300,11 @@
                   class="song-row"
                   class:dragging={isDragging}
                   class:drag-over={isOver}
-                  draggable="true"
-                  ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
-                  ondragover={e => onDragOver(e, i)}
-                  ondrop={onDrop}
-                  ondragend={onDragEnd}
+                  draggable={!isFiltered}
+                  ondragstart={!isFiltered ? () => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))) : undefined}
+                  ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
+                  ondrop={!isFiltered ? onDrop : undefined}
+                  ondragend={!isFiltered ? onDragEnd : undefined}
                 >
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">{i + 1}</td>
@@ -394,6 +430,18 @@
   .btn-stage { padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.88rem; }
   .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .empty p { margin-bottom: 12px; }
+
+  .filter-bar {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .filter-chip {
+    padding: 3px 12px; border: 1px solid var(--border); border-radius: 20px;
+    background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 500;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .break-wrap { position: relative; }
   .break-picker {
