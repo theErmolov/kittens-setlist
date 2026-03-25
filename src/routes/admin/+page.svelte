@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import { t } from '$lib/i18n';
-  import { currentUser } from '$lib/auth';
+  import { currentUser, authLoading } from '$lib/auth';
   import { getUsers, patchUser, getMusicians } from '$lib/api';
   import type { KittensUser, BandMusician } from '$lib/types';
 
@@ -15,13 +14,18 @@
   // Map of telegramId → selected musicianId (local edit state)
   let musicianSelections = $state<Record<string, string>>({});
 
-  onMount(async () => {
+  let dataLoaded = $state(false);
+
+  $effect(() => {
+    if ($authLoading || dataLoaded) return;
     if (!$currentUser?.isAdmin) { goto(`${base}/backlog`); return; }
-    [users, musicians] = await Promise.all([getUsers(), getMusicians()]);
-    for (const u of users) {
-      musicianSelections[u.telegramId] = u.musicianId ?? '';
-    }
-    loading = false;
+    dataLoaded = true;
+    Promise.all([getUsers(), getMusicians()]).then(([u, m]) => {
+      users = u;
+      musicians = m;
+      for (const user of u) musicianSelections[user.telegramId] = user.musicianId ?? '';
+      loading = false;
+    });
   });
 
   async function setStatus(user: KittensUser, status: 'approved' | 'rejected') {
