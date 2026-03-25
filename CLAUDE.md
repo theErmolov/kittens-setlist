@@ -227,6 +227,7 @@ Every other musician column has a tinted zebra background (`--musician-alt-bg`).
 - Drag-to-reorder via HTML5 DnD; drop zone at the bottom handles items past the last row
 - Rendered as a proper `<table>` with one column per musician — instrument icons align across all rows
 - Category icon shown before song name; guest bubble tags shown inline after title
+- **Musician filter bar** — multi-select AND chips above the table (same logic as backlog); breaks hidden while a filter is active; drag-to-reorder disabled while filtered
 - **Song snapshots** — `entry.song` is a full copy of the song at add time; backlog edits never affect it
 - **Per-entry edit** — ✏️ button opens `SongEditModal` in `mode="entry"`; saves via `updateEntrySong` + `updateEntryComment`; `entry.comment` is the single source of truth shown both inline and in the modal
 - **Breaks** — "⏸ Перерыв" button in the header opens a picker (10 / 20 / 30 min); breaks are draggable rows that span musician columns; stored as `SetlistEntry` with `breakMinutes` set and no `songId`

@@ -13,7 +13,7 @@ Band setlist manager for "Музыкальные Котятки". Replaces a Goo
 ## What's built
 
 - Backlog with musician/instrument/category filters and musician-column table
-- Setlist manager with drag-to-reorder; per-entry comments
+- Setlist manager with drag-to-reorder; per-entry comments; musician filter bar (multi-select AND)
 - Stage view (mobile-first, tap to mark played, sort/filter)
 - Real-time polling: stage 2s (auth) / 10s (unauth), setlist editor 3s
 - Light/dark theme + RU/EN language toggle (localStorage)
