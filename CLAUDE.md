@@ -27,6 +27,16 @@ npm run check     # type check (svelte-check)
 npm run build     # production build
 ```
 
+### Local dev + auth
+
+The Telegram Login Widget only works on `kittens.band` (registered domain), so you can't log in via the widget on localhost. The workaround — copy your session token from prod:
+
+1. Log in on `kittens.band` → DevTools → Application → Local Storage → copy `auth_token`
+2. Open `localhost:5173` → DevTools → Application → Local Storage → set `auth_token` to that value
+3. Reload — local dev now hits the prod API as an authenticated user
+
+The token is valid for 180 days so this only needs doing occasionally.
+
 ## Architecture
 
 ### Base path / GitHub Pages
