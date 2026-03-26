@@ -44,10 +44,10 @@ export async function initAuth(): Promise<void> {
     } else {
       clearToken();
     }
-  } catch {
-    // network error — keep token, don't log out
-  } finally {
     authLoading.set(false);
+  } catch {
+    // network error — keep token, leave authLoading=true so the guard never
+    // redirects to login; the app stays in loading state until the user refreshes
   }
 }
 

@@ -5,11 +5,17 @@
   import { base } from '$app/paths';
   import { PUBLIC_API_URL, PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
   import { t } from '$lib/i18n';
-  import { currentUser, setToken } from '$lib/auth';
+  import { currentUser, authLoading, setToken } from '$lib/auth';
   import type { KittensUser } from '$lib/types';
   import LogoCat from '$components/shared/LogoCat.svelte';
 
   let status: 'idle' | 'loading' | 'pending' | 'rejected' | 'error' = $state('idle');
+
+  // Redirect away if already authenticated
+  $effect(() => {
+    if ($authLoading) return;
+    if ($currentUser?.status === 'approved') goto(`${base}/backlog`);
+  });
 
   // Called by Telegram widget via global callback
   async function onTelegramAuth(data: Record<string, string>) {

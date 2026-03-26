@@ -65,6 +65,8 @@ All emoji are rendered via **Twemoji** (`@twemoji/api`) for consistent cross-pla
 
 A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags. The CSS rule `:global(img.emoji)` sizes them to `1em`.
 
+> **IMPORTANT — MANDATORY RULE:** Every emoji used anywhere in the UI **must** have its SVG pre-downloaded into `static/emoji/`. Missing SVGs produce 404s. Whenever you add or change an emoji in any `.svelte` or `.ts` file, you MUST immediately run the curl command below to download the corresponding SVG. Do not skip this step.
+
 **To add a new emoji:**
 1. Find its Unicode codepoint — e.g. `U+1F3B8` → filename `1f3b8.svg`. Drop any variation selector (`U+FE0F`) from the filename.
 2. Download the SVG from Noto Color Emoji (covers Emoji 15+):
