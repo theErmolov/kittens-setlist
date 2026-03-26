@@ -265,7 +265,7 @@ const strings = {
     },
     progress: {
       nothing:    'Не начато',
-      queue:      'В очереди',
+      queue:      'В очередь',
       structure:  'Структура',
       mastering:  'Пальцы',
       ready:      'Готово',

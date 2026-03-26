@@ -135,11 +135,22 @@
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
   let totalMinutes = $derived(songCount * 5 + sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
 
+  const STAGE_IDX: Record<LearningStage, number> = { nothing: 0, queue: 0, structure: 1, mastering: 2, ready: 3 };
+
   let readyCount = $derived(
     sortedEntries.filter(e =>
       e.song && songReadiness(e.song.musicians, e.progress ?? {}, new Set()) === 'ready'
     ).length
   );
+
+  function entryProgressPct(entry: SetlistEntry): number {
+    if (!entry.song) return 0;
+    const participating = Object.entries(entry.song.musicians).filter(([, r]) => r.instruments.length > 0);
+    if (!participating.length) return 100;
+    const max = participating.length * 3;
+    const total = participating.reduce((s, [name]) => s + STAGE_IDX[(entry.progress?.[name] ?? 'nothing') as LearningStage], 0);
+    return Math.round(total / max * 100);
+  }
 
   // Per-entry start times, keyed by entryKey. Only computed when startTime is set.
   let entryTimes = $derived((): Map<string, string> => {
@@ -206,10 +217,11 @@
         ...e, progress: { ...(e.progress ?? {}), [name]: next }
       }
     );
-    await updateEntryProgress(
+    const updated = await updateEntryProgress(
       setlist.id, entry.order, name, next,
       entry.songId!, permanentNamesSet.has(name)
     );
+    applyUpdate(updated);
   }
 
   function entryKey(entry: typeof sortedEntries[0]) {
@@ -341,6 +353,7 @@
                   <td class="td-num">
                     <span class="readiness-dot" style="background: {READINESS_COLOR[readiness]}" title={$t.progress[readiness]}></span>
                     {i + 1}
+                    <span class="entry-pct">{entryProgressPct(entry)}%</span>
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
@@ -540,6 +553,7 @@
   .song-row:hover .drag-handle, .break-row:hover .drag-handle { opacity: 1; }
 
   .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+  .entry-pct { display: block; font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; text-align: right; }
   .readiness-dot {
     display: inline-block; width: 6px; height: 6px; border-radius: 50%;
     margin-right: 2px; vertical-align: middle;

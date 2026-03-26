@@ -66,8 +66,8 @@
     </td>
   {/each}
   <td class="td-actions">
-    <button class="action-btn" onclick={onaddtosetlist} title={$t.addToSetlist.title}>📋</button>
     <button class="action-btn" onclick={onedit} title={$t.song.editTitle}>✏️</button>
+    <button class="action-btn" onclick={onaddtosetlist} title={$t.addToSetlist.title}>📋</button>
     <button class="action-btn danger" onclick={ondelete} title={$t.song.remove}>🗑</button>
   </td>
 </tr>
@@ -76,7 +76,7 @@
   .song-row { border-bottom: 1px solid var(--border); }
   .song-row:hover { background: var(--row-hover); }
   td { padding: 8px 12px; font-size: 0.88rem; vertical-align: middle; overflow: hidden; }
-  .td-cat { text-align: center; white-space: nowrap; }
+  .td-cat { text-align: left; white-space: nowrap; }
   .td-artist { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .td-title { white-space: normal; }
   .title-text { vertical-align: middle; }

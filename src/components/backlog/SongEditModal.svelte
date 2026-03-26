@@ -7,10 +7,13 @@
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
   };
 
+  // Stages that appear as progress bar segments (in order)
+  const PROGRESS_SEGS: LearningStage[] = ['structure', 'mastering', 'ready'];
   const STAGE_ORDER: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
-  const STAGE_LABEL: Record<LearningStage, string> = { nothing: 'N', queue: 'Q', structure: 'S', mastering: 'M', ready: 'R' };
-  const STAGE_COLOR: Record<LearningStage, string> = {
-    nothing: '#94a3b8', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
+  const BAR_COLOR: Partial<Record<LearningStage, string>> = {
+    structure: '#c0504d',
+    mastering: '#3b82f6',
+    ready:     '#22c55e',
   };
 
   let {
@@ -171,6 +174,8 @@
           {#each musicians as bm}
             {@const role = draft.musicians[bm.name]}
             {@const curStage = (draft.progress?.[bm.name] ?? 'nothing') as LearningStage}
+            {@const hasInst = (role?.instruments?.length ?? 0) > 0}
+            {@const isQueued = curStage !== 'nothing'}
             <div class="roster-row">
               <span class="roster-name">{bm.name}</span>
               <div class="inst-grid">
@@ -183,23 +188,34 @@
                   >{instrumentIcons[inst]}</button>
                 {/each}
               </div>
-              <div class="stage-pills">
-                {#each STAGE_ORDER as stage}
-                  <button
-                    class="stage-pill"
-                    class:active={curStage === stage}
-                    style="--stage-color: {STAGE_COLOR[stage]}"
-                    onclick={() => setProgress(bm.name, stage)}
-                    title={$t.progress[stage]}
-                  >{STAGE_LABEL[stage]}</button>
-                {/each}
-              </div>
+              {#if hasInst}
+                {#if !isQueued}
+                  <button class="queue-btn" onclick={() => setProgress(bm.name, 'queue')}>
+                    {$t.progress.queue}
+                  </button>
+                {:else}
+                  <div class="prog-wrap">
+                    <div class="prog-bar" style="--fill: {BAR_COLOR[curStage] ?? 'var(--border)'}">
+                      {#each PROGRESS_SEGS as seg}
+                        <button
+                          class="prog-seg"
+                          class:filled={STAGE_ORDER.indexOf(curStage) >= STAGE_ORDER.indexOf(seg)}
+                          onclick={() => setProgress(bm.name, curStage === seg ? 'queue' : seg)}
+                          title={$t.progress[seg]}
+                        ></button>
+                      {/each}
+                    </div>
+                    <button class="dequeue-btn" onclick={() => setProgress(bm.name, 'nothing')} title="Убрать из очереди">×</button>
+                  </div>
+                {/if}
+              {/if}
             </div>
           {/each}
 
           <!-- Ad-hoc guests — same layout, no divider -->
           {#each guestRows as row (row.id)}
             {@const isAdd = !row.name.trim()}
+            {@const isQueued = row.progress !== 'nothing'}
             <div class="roster-row" class:ghost-row={isAdd}>
               <input
                 class="roster-name guest-name"
@@ -219,21 +235,27 @@
                   >{instrumentIcons[inst]}</button>
                 {/each}
               </div>
-              {#if !isAdd}
-                <div class="stage-pills">
-                  {#each STAGE_ORDER as stage}
-                    <button
-                      class="stage-pill"
-                      class:active={row.progress === stage}
-                      style="--stage-color: {STAGE_COLOR[stage]}"
-                      onclick={() => { row.progress = stage; }}
-                      title={$t.progress[stage]}
-                    >{STAGE_LABEL[stage]}</button>
-                  {/each}
-                </div>
+              {#if !isAdd && row.instruments.length > 0}
+                {#if !isQueued}
+                  <button class="queue-btn" onclick={() => { row.progress = 'queue'; }}>
+                    {$t.progress.queue}
+                  </button>
+                {:else}
+                  <div class="prog-wrap">
+                    <div class="prog-bar" style="--fill: {BAR_COLOR[row.progress] ?? 'var(--border)'}">
+                      {#each PROGRESS_SEGS as seg}
+                        <button
+                          class="prog-seg"
+                          class:filled={STAGE_ORDER.indexOf(row.progress) >= STAGE_ORDER.indexOf(seg)}
+                          onclick={() => { row.progress = row.progress === seg ? 'queue' : seg; }}
+                          title={$t.progress[seg]}
+                        ></button>
+                      {/each}
+                    </div>
+                    <button class="dequeue-btn" onclick={() => { row.progress = 'nothing'; }} title="Убрать из очереди">×</button>
+                  </div>
+                {/if}
                 <button class="remove-guest-btn" onclick={() => removeGuest(row.id)}>✕</button>
-              {:else}
-                <div class="stage-pills invisible"></div>
               {/if}
             </div>
           {/each}
@@ -332,35 +354,44 @@
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
   .inst-btn.invisible { visibility: hidden; pointer-events: none; }
 
-  /* ── Stage progress pills ─────────────────────────────────────────────── */
+  /* ── Queue button (not yet queued) ───────────────────────────────────── */
 
-  .stage-pills {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
+  .queue-btn {
+    margin-left: auto; flex-shrink: 0;
+    padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px;
+    background: transparent; cursor: pointer; font-size: 0.75rem;
+    color: var(--text-muted); transition: all 0.12s; white-space: nowrap;
   }
-  .stage-pills.invisible { visibility: hidden; }
+  .queue-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  .stage-pill {
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    border: 1.5px solid var(--stage-color);
-    background: transparent;
-    color: var(--stage-color);
-    font-size: 0.62rem;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.12s;
-    padding: 0;
+  /* ── Progress bar (queued) ────────────────────────────────────────────── */
+
+  .prog-wrap {
+    margin-left: auto; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
   }
-  .stage-pill.active {
-    background: var(--stage-color);
-    color: #fff;
+
+  .prog-bar {
+    display: flex; gap: 2px;
   }
-  .stage-pill:hover:not(.active) {
-    opacity: 0.7;
+
+  .prog-seg {
+    width: 36px; height: 10px;
+    border: none; cursor: pointer; padding: 0;
+    background: var(--border);
+    transition: background 0.15s;
   }
+  .prog-seg:first-child { border-radius: 5px 0 0 5px; }
+  .prog-seg:last-child { border-radius: 0 5px 5px 0; }
+  .prog-seg.filled { background: var(--fill, var(--accent)); }
+  .prog-seg:hover { opacity: 0.75; }
+
+  .dequeue-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.82rem; padding: 0 2px;
+    opacity: 0.5; transition: opacity 0.12s; line-height: 1;
+  }
+  .dequeue-btn:hover { opacity: 1; color: #ef4444; }
 
   .ghost-row {
     border-style: dashed;
@@ -374,7 +405,7 @@
   .remove-guest-btn {
     flex-shrink: 0; background: none; border: none; cursor: pointer;
     color: var(--text-muted); font-size: 0.78rem; padding: 2px 4px;
-    border-radius: 4px; opacity: 0.5; transition: opacity 0.12s; margin-left: auto;
+    border-radius: 4px; opacity: 0.5; transition: opacity 0.12s;
   }
   .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
 
