@@ -1,18 +1,26 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Setlist, Song, Instrument, SetlistEntry, BandMusician } from '$lib/types';
+  import type { Setlist, Song, Instrument, SetlistEntry, BandMusician, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
+  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong, updateEntryProgress } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes, sortInstruments } from '$lib/utils';
+  import { formatDuration, addMinutes, sortInstruments, songReadiness } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
+  };
+
+  const STAGE_ORDER_ARR: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
+  const STAGE_COLOR: Record<LearningStage, string> = {
+    nothing: '#94a3b8', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
+  };
+  const READINESS_COLOR: Record<LearningStage, string> = {
+    nothing: '#ef4444', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
   };
 
   let {
@@ -26,6 +34,7 @@
   } = $props();
 
   let allMusicians = $derived(musicians.map(m => m.name));
+  let permanentNamesSet = $derived(new Set(allMusicians));
 
   // Editable meta (name / date / startTime)
   let editingMeta = $state(false);
@@ -126,6 +135,12 @@
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
   let totalMinutes = $derived(songCount * 5 + sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
 
+  let readyCount = $derived(
+    sortedEntries.filter(e =>
+      e.song && songReadiness(e.song.musicians, e.progress ?? {}, new Set()) === 'ready'
+    ).length
+  );
+
   // Per-entry start times, keyed by entryKey. Only computed when startTime is set.
   let entryTimes = $derived((): Map<string, string> => {
     if (!localMeta.startTime) return new Map();
@@ -183,6 +198,20 @@
     editingEntry = null;
   }
 
+  async function cycleProgress(entry: SetlistEntry, name: string, cur: LearningStage) {
+    const next = STAGE_ORDER_ARR[(STAGE_ORDER_ARR.indexOf(cur) + 1) % STAGE_ORDER_ARR.length];
+    // Optimistic update
+    localEntries = localEntries.map(e =>
+      e.order !== entry.order ? e : {
+        ...e, progress: { ...(e.progress ?? {}), [name]: next }
+      }
+    );
+    await updateEntryProgress(
+      setlist.id, entry.order, name, next,
+      entry.songId!, permanentNamesSet.has(name)
+    );
+  }
+
   function entryKey(entry: typeof sortedEntries[0]) {
     return entry.songId ?? `break-${entry.order}`;
   }
@@ -234,6 +263,7 @@
             {#if localMeta.date}<span class="date">{localMeta.date}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
             <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes)})</span>
+            {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}
           </div>
         </div>
         <button class="edit-meta-btn" onclick={startEditMeta} title="Редактировать">✏️</button>
@@ -296,6 +326,7 @@
               {@const song = entry.song}
               {#if song}
                 {@const guestTags = guestTagsFor(song)}
+                {@const readiness = songReadiness(song.musicians, entry.progress ?? {}, selectedMusicians)}
                 <tr
                   class="song-row"
                   class:dragging={isDragging}
@@ -307,7 +338,10 @@
                   ondragend={!isFiltered ? onDragEnd : undefined}
                 >
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
-                  <td class="td-num">{i + 1}</td>
+                  <td class="td-num">
+                    <span class="readiness-dot" style="background: {READINESS_COLOR[readiness]}" title={$t.progress[readiness]}></span>
+                    {i + 1}
+                  </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
                   <td class="td-song">
@@ -326,7 +360,14 @@
                   </td>
                   {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
+                    {@const prog = (entry.progress?.[name] ?? 'nothing') as LearningStage}
                     <td class="td-musician" class:musician-alt={i % 2 === 0}>
+                      <button
+                        class="prog-dot"
+                        style="background: {STAGE_COLOR[prog]}"
+                        onclick={() => cycleProgress(entry, name, prog)}
+                        title={$t.progress[prog]}
+                      ></button>
                       {#if role?.instruments?.length}
                         <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
                       {/if}
@@ -419,6 +460,7 @@
   .meta-details { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
   .date, .count, .start-time { font-size: 0.82rem; color: var(--text-muted); }
   .start-time { font-weight: 600; }
+  .ready-count { font-size: 0.82rem; font-weight: 600; color: #22c55e; }
   .edit-meta-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; opacity: 0.5; padding: 4px; margin-top: 2px; }
   .edit-meta-btn:hover { opacity: 1; }
   .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -497,7 +539,12 @@
   .drag-handle { color: var(--text-muted); font-size: 1rem; cursor: grab; opacity: 0.4; display: block; text-align: center; }
   .song-row:hover .drag-handle, .break-row:hover .drag-handle { opacity: 1; }
 
-  .td-num { font-size: 0.82rem; color: var(--text-muted); }
+  .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+  .readiness-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 2px; vertical-align: middle;
+  }
+
   .td-song { white-space: nowrap; }
   .song-name { display: flex; align-items: center; }
   .artist { font-weight: 400; font-size: 0.9rem; }
@@ -519,7 +566,14 @@
   }
 
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
-  .inst-slot { display: inline-block; width: 1.3em; }
+  .inst-slot { display: inline-block; width: 1.3em; vertical-align: middle; }
+
+  .prog-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    border: none; cursor: pointer; padding: 0; vertical-align: middle;
+    margin-right: 2px; flex-shrink: 0; transition: transform 0.1s;
+  }
+  .prog-dot:hover { transform: scale(1.4); }
 
   .td-break { font-size: 0.82rem; color: var(--text-muted); }
   .break-label {

@@ -1,10 +1,16 @@
 <script lang="ts">
-  import type { Song, Category, MusicianRole, Instrument, BandMusician } from '$lib/types';
+  import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
   import { t } from '$lib/i18n';
 
   const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
+  };
+
+  const STAGE_ORDER: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
+  const STAGE_LABEL: Record<LearningStage, string> = { nothing: 'N', queue: 'Q', structure: 'S', mastering: 'M', ready: 'R' };
+  const STAGE_COLOR: Record<LearningStage, string> = {
+    nothing: '#94a3b8', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
   };
 
   let {
@@ -46,7 +52,8 @@
     category: song?.category ?? 'mid',
     comment: song?.comment ?? '',
     musicians: buildInitialMusicians(),
-    sortOrder: song?.sortOrder
+    sortOrder: song?.sortOrder,
+    progress: { ...(song?.progress ?? {}) },
   });
 
   function toggleInstrument(name: string, inst: Instrument) {
@@ -56,19 +63,23 @@
     draft.musicians = { ...draft.musicians, [name]: { instruments } };
   }
 
+  function setProgress(name: string, stage: LearningStage) {
+    draft.progress = { ...(draft.progress ?? {}), [name]: stage };
+  }
+
   // ── Guest musicians (ad-hoc, per-song) ────────────────────────────────────
 
-  type GuestRow = { id: number; name: string; instruments: Instrument[] };
+  type GuestRow = { id: number; name: string; instruments: Instrument[]; progress: LearningStage };
   let _id = 0;
-  function mkGuest(name = '', instruments: Instrument[] = []): GuestRow {
-    return { id: _id++, name, instruments };
+  function mkGuest(name = '', instruments: Instrument[] = [], progress: LearningStage = 'nothing'): GuestRow {
+    return { id: _id++, name, instruments, progress };
   }
 
   function buildInitialGuests(): GuestRow[] {
     if (!song?.musicians) return [mkGuest()];
     const existing = Object.entries(song.musicians)
       .filter(([name]) => !permanentNames.has(name))
-      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])]));
+      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])], song?.progress?.[name] ?? 'nothing'));
     return [...existing, mkGuest()];
   }
 
@@ -98,12 +109,16 @@
   function handleSave() {
     if (!draft.artist.trim() || !draft.title.trim()) return;
     const allMusicians: Record<string, MusicianRole> = { ...draft.musicians };
+    const allProgress: Record<string, LearningStage> = { ...(draft.progress ?? {}) };
     for (const row of guestRows) {
-      if (row.name.trim()) allMusicians[row.name.trim()] = { instruments: row.instruments };
+      if (row.name.trim()) {
+        allMusicians[row.name.trim()] = { instruments: row.instruments };
+        allProgress[row.name.trim()] = row.progress;
+      }
     }
     const hasVocals = Object.values(allMusicians).some(r => r.instruments.includes('vocals'));
     if (!hasVocals) { alert('А поёт эту хуйню кто?'); return; }
-    onsave({ ...draft, musicians: allMusicians });
+    onsave({ ...draft, musicians: allMusicians, progress: allProgress });
   }
 
   function handleBackdrop(e: MouseEvent) {
@@ -155,6 +170,7 @@
           <!-- Permanent band members -->
           {#each musicians as bm}
             {@const role = draft.musicians[bm.name]}
+            {@const curStage = (draft.progress?.[bm.name] ?? 'nothing') as LearningStage}
             <div class="roster-row">
               <span class="roster-name">{bm.name}</span>
               <div class="inst-grid">
@@ -167,7 +183,17 @@
                   >{instrumentIcons[inst]}</button>
                 {/each}
               </div>
-              <span class="free-label" class:hidden={(role?.instruments?.length ?? 0) > 0}>{$t.musicians.noInstrument}</span>
+              <div class="stage-pills">
+                {#each STAGE_ORDER as stage}
+                  <button
+                    class="stage-pill"
+                    class:active={curStage === stage}
+                    style="--stage-color: {STAGE_COLOR[stage]}"
+                    onclick={() => setProgress(bm.name, stage)}
+                    title={$t.progress[stage]}
+                  >{STAGE_LABEL[stage]}</button>
+                {/each}
+              </div>
             </div>
           {/each}
 
@@ -194,10 +220,20 @@
                 {/each}
               </div>
               {#if !isAdd}
-                <span class="free-label" class:hidden={row.instruments.length > 0}>{$t.musicians.noInstrument}</span>
+                <div class="stage-pills">
+                  {#each STAGE_ORDER as stage}
+                    <button
+                      class="stage-pill"
+                      class:active={row.progress === stage}
+                      style="--stage-color: {STAGE_COLOR[stage]}"
+                      onclick={() => { row.progress = stage; }}
+                      title={$t.progress[stage]}
+                    >{STAGE_LABEL[stage]}</button>
+                  {/each}
+                </div>
                 <button class="remove-guest-btn" onclick={() => removeGuest(row.id)}>✕</button>
               {:else}
-                <span class="free-label hidden"></span>
+                <div class="stage-pills invisible"></div>
               {/if}
             </div>
           {/each}
@@ -296,11 +332,35 @@
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
   .inst-btn.invisible { visibility: hidden; pointer-events: none; }
 
-  .free-label {
-    font-size: 0.75rem; color: var(--text-muted); font-style: italic;
-    white-space: nowrap; flex-shrink: 0;
+  /* ── Stage progress pills ─────────────────────────────────────────────── */
+
+  .stage-pills {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
   }
-  .free-label.hidden { visibility: hidden; }
+  .stage-pills.invisible { visibility: hidden; }
+
+  .stage-pill {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--stage-color);
+    background: transparent;
+    color: var(--stage-color);
+    font-size: 0.62rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+    padding: 0;
+  }
+  .stage-pill.active {
+    background: var(--stage-color);
+    color: #fff;
+  }
+  .stage-pill:hover:not(.active) {
+    opacity: 0.7;
+  }
 
   .ghost-row {
     border-style: dashed;

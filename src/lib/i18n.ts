@@ -119,6 +119,14 @@ const strings = {
       back: '← Back',
       backToSetlists: '← Back to setlists',
     },
+    progress: {
+      nothing:    'Not started',
+      queue:      'In queue',
+      structure:  'Structure',
+      mastering:  'Mastering',
+      ready:      'Ready',
+      readyCount: (n: number, total: number) => `${n}/${total} ready`,
+    },
     deleteConfirm: 'Delete this song?',
     login: {
       title: 'Музыкальные Котятки',
@@ -254,6 +262,14 @@ const strings = {
       message: 'Сетлист не найден.',
       back: '← Назад',
       backToSetlists: '← К сетлистам',
+    },
+    progress: {
+      nothing:    'Не начато',
+      queue:      'В очереди',
+      structure:  'Структура',
+      mastering:  'Пальцы',
+      ready:      'Готово',
+      readyCount: (n: number, total: number) => `${n}/${total} готово`,
     },
     deleteConfirm: 'Удалить песню?',
     login: {

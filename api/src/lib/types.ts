@@ -2,6 +2,7 @@
 
 export type Category = 'top' | 'mid' | 'low';
 export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals';
+export type LearningStage = 'nothing' | 'queue' | 'structure' | 'mastering' | 'ready';
 
 export interface MusicianRole {
   instruments: Instrument[];  // empty = free
@@ -23,6 +24,7 @@ export interface Song {
   comment?: string;  // general note, copied to setlist entry on add
   musicians: Record<string, MusicianRole>;
   sortOrder?: number;
+  progress?: Record<string, LearningStage>;
 }
 
 export interface SetlistEntry {
@@ -32,6 +34,7 @@ export interface SetlistEntry {
   order: number;
   played: boolean;
   comment?: string;
+  progress?: Record<string, LearningStage>;
 }
 
 export interface Setlist {

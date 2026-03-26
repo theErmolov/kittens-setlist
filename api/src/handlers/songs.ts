@@ -39,5 +39,15 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string) 
     return ok({ deleted: id });
   }
 
+  if (parts[2] === 'progress' && method === 'PATCH') {
+    const { musicianName, stage } = JSON.parse(event.body ?? '{}') as { musicianName: string; stage: string };
+    const song = await dbGet<Song>(TABLE, id);
+    if (!song) return err('Not found', 404);
+    const progress = { ...(song.progress ?? {}), [musicianName]: stage };
+    const updated = { ...song, progress };
+    await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+    return ok(updated);
+  }
+
   return err('Method not allowed', 405);
 }

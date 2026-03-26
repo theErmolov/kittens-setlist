@@ -1,7 +1,9 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { Setlist, SetlistEntry, Song } from '../lib/types.js';
+import type { Setlist, SetlistEntry, Song, LearningStage } from '../lib/types.js';
+
+const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
 
@@ -38,7 +40,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
       const newEntries: SetlistEntry[] = songs
         .filter(s => !existing.has(s.id))
-        .map((s, i) => ({ songId: s.id, song: s, order: maxOrder + 1 + i, played: false }));
+        .map((s, i) => ({ songId: s.id, song: s, order: maxOrder + 1 + i, played: false, ...(s.progress ? { progress: s.progress } : {}) }));
       const updated: Setlist = { ...setlist, entries: [...setlist.entries, ...newEntries] };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       return ok(updated);
@@ -105,6 +107,38 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         entries: setlist.entries.map(e => e.order === order ? { ...e, song } : e),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      return ok(updated);
+    }
+    return err('Method not allowed', 405);
+  }
+
+  if (afterId === '/entry-progress') {
+    if (method === 'PATCH') {
+      const { order, musicianName, stage, songId, isPermanent } = JSON.parse(event.body ?? '{}') as {
+        order: number; musicianName: string; stage: LearningStage;
+        songId?: string; isPermanent?: boolean;
+      };
+      const setlist = await dbGet<Setlist>(TABLE, id);
+      if (!setlist) return err('Not found', 404);
+      const updated: Setlist = {
+        ...setlist,
+        entries: setlist.entries.map(e =>
+          e.order === order
+            ? { ...e, progress: { ...(e.progress ?? {}), [musicianName]: stage } }
+            : e
+        ),
+      };
+      await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      // Sync permanent musician progress back to the canonical song
+      if (isPermanent && songId) {
+        const song = await dbGet<Song>(SONGS_TABLE, songId);
+        if (song) {
+          await dbPut(SONGS_TABLE, {
+            ...song,
+            progress: { ...(song.progress ?? {}), [musicianName]: stage },
+          } as unknown as Record<string, unknown>);
+        }
+      }
       return ok(updated);
     }
     return err('Method not allowed', 405);

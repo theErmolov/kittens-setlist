@@ -1,4 +1,4 @@
-import type { Instrument } from '$lib/types';
+import type { Instrument, LearningStage, MusicianRole } from '$lib/types';
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
 
@@ -12,6 +12,28 @@ export function formatDuration(minutes: number): string {
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+const STAGE_ORDER: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
+
+/** Returns the worst (lowest) learning stage across participating musicians.
+ *  If selectedMusicians is non-empty, only those musicians are considered. */
+export function songReadiness(
+  musicians: Record<string, MusicianRole>,
+  progress: Record<string, LearningStage>,
+  selectedMusicians: Set<string>,
+): LearningStage {
+  const names = Object.keys(musicians).filter(
+    n => (musicians[n].instruments?.length ?? 0) > 0
+      && (selectedMusicians.size === 0 || selectedMusicians.has(n))
+  );
+  if (names.length === 0) return 'ready';
+  return names
+    .map(n => progress[n] ?? 'nothing')
+    .reduce((worst, s) =>
+      STAGE_ORDER.indexOf(s) < STAGE_ORDER.indexOf(worst) ? s : worst,
+      'ready' as LearningStage
+    );
 }
 
 /** Add `minutes` to a "HH:MM" time string, wrapping at midnight. */

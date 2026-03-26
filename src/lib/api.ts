@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -57,6 +57,20 @@ export async function updateSong(song: Song): Promise<Song> {
 
 export async function deleteSong(id: string): Promise<void> {
   await req(`/songs/${id}`, { method: 'DELETE' });
+}
+
+export async function updateSongProgress(songId: string, musicianName: string, stage: LearningStage): Promise<Song> {
+  return req(`/songs/${songId}/progress`, { method: 'PATCH', body: JSON.stringify({ musicianName, stage }) });
+}
+
+export async function updateEntryProgress(
+  setlistId: string, order: number, musicianName: string,
+  stage: LearningStage, songId: string, isPermanent: boolean
+): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/entry-progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ order, musicianName, stage, songId, isPermanent }),
+  });
 }
 
 // ─── Setlists ─────────────────────────────────────────────────────────────────

@@ -176,6 +176,7 @@
           <SongRow
             {song}
             allMusicians={permanentNames}
+            {selectedMusicians}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => { addToSetlistSong = song; }}
