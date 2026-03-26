@@ -60,7 +60,7 @@ Resources:
     Properties:
       CodeUri: api/
       Handler: dist/index.handler
-      ReservedConcurrentExecutions: 3
+      ReservedConcurrentExecutions: 10
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref SongsTable
