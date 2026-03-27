@@ -74,7 +74,7 @@
 
   type GuestRow = { id: number; name: string; instruments: Instrument[]; progress: LearningStage };
   let _id = 0;
-  function mkGuest(name = '', instruments: Instrument[] = [], progress: LearningStage = 'nothing'): GuestRow {
+  function mkGuest(name = '', instruments: Instrument[] = [], progress: LearningStage = 'queue'): GuestRow {
     return { id: _id++, name, instruments, progress };
   }
 
@@ -82,22 +82,22 @@
     if (!song?.musicians) return [mkGuest()];
     const existing = Object.entries(song.musicians)
       .filter(([name]) => !permanentNames.has(name))
-      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])], song?.progress?.[name] ?? 'nothing'));
+      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])], song?.progress?.[name] ?? 'queue'));
     return [...existing, mkGuest()];
   }
 
   let guestRows = $state<GuestRow[]>(buildInitialGuests());
 
   function onGuestInput(row: GuestRow, value: string) {
-    row.name = value;
-    if (row.id === guestRows[guestRows.length - 1].id && value.trim()) {
-      guestRows = [...guestRows, mkGuest()];
-    }
+    const isLast = row.id === guestRows[guestRows.length - 1].id;
+    guestRows = guestRows.map(r => r.id === row.id ? { ...r, name: value } : r);
+    if (isLast && value.trim()) guestRows = [...guestRows, mkGuest()];
   }
 
   function toggleGuestInstrument(row: GuestRow, inst: Instrument) {
     const has = row.instruments.includes(inst);
-    row.instruments = has ? row.instruments.filter(i => i !== inst) : [...row.instruments, inst];
+    const instruments = has ? row.instruments.filter(i => i !== inst) : [...row.instruments, inst];
+    guestRows = guestRows.map(r => r.id === row.id ? { ...r, instruments } : r);
   }
 
   function removeGuest(id: number) {
@@ -175,7 +175,7 @@
           <!-- Permanent band members -->
           {#each musicians as bm}
             {@const role = draft.musicians[bm.name]}
-            {@const curStage = (draft.progress?.[bm.name] ?? 'nothing') as LearningStage}
+            {@const curStage = (draft.progress?.[bm.name] ?? 'queue') as LearningStage}
             {@const hasInst = (role?.instruments?.length ?? 0) > 0}
             <div class="roster-row">
               <span class="roster-name">{bm.name}</span>
@@ -197,7 +197,7 @@
                       <button
                         class="prog-seg"
                         class:filled={STAGE_ORDER.indexOf(curStage) >= STAGE_ORDER.indexOf(seg)}
-                        onclick={() => setProgress(bm.name, curStage === seg ? 'nothing' : seg)}
+                        onclick={() => setProgress(bm.name, curStage === seg ? 'queue' : seg)}
                         title={$t.progress[seg]}
                       ></button>
                     {/each}
@@ -237,7 +237,7 @@
                       <button
                         class="prog-seg"
                         class:filled={STAGE_ORDER.indexOf(row.progress) >= STAGE_ORDER.indexOf(seg)}
-                        onclick={() => { row.progress = row.progress === seg ? 'nothing' : seg; }}
+                        onclick={() => { guestRows = guestRows.map(r => r.id === row.id ? { ...r, progress: r.progress === seg ? 'queue' : seg } : r); }}
                         title={$t.progress[seg]}
                       ></button>
                     {/each}
