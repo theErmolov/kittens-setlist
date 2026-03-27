@@ -67,4 +67,3 @@ Band setlist manager for "Музыкальные Котятки". Replaces a Goo
 
 - Old setlist entries without `.song` snapshot show nothing in stage/editor until re-added
 - Vocals needs re-entry for all existing songs (data loss from earlier refactor)
-- `edge/basic-auth.ts` — superseded by Telegram auth, can be deleted

@@ -19,15 +19,7 @@ Read these files at the start of every session:
 - **TypeScript** strict mode
 - **No CSS framework** — plain scoped styles + CSS custom properties
 
-## Running
-
-```bash
-npm run dev       # dev server at localhost:5173
-npm run check     # type check (svelte-check)
-npm run build     # production build
-```
-
-### Local dev + auth
+## Local dev + auth
 
 The Telegram Login Widget only works on `kittens.band` (registered domain), so you can't log in via the widget on localhost. The workaround — copy your session token from prod:
 
@@ -45,10 +37,7 @@ The token is valid for 180 days so this only needs doing occasionally.
 - `goto()` is base-aware (no change needed); `redirect()` is not — use `` `${base}/route` ``
 
 ### Auth — `src/lib/auth.ts`
-- `currentUser` writable store (`KittensUser | null`), `authLoading` writable store
-- `initAuth()` — called once in layout `onMount`; reads token from localStorage, hits `GET /auth/me`, populates `currentUser`
-- `getToken()` / `setToken()` / `clearToken()` — localStorage helpers
-- `logout()` — calls `DELETE /auth/logout`, clears token and store
+- `currentUser` store (`KittensUser | null`), populated on init by hitting `GET /auth/me` with token from localStorage
 - Auth guard in `+layout.svelte` `$effect`: redirects to `/login` unless on `/login` or a `/stage` route
 - Telegram Login Widget on `/login` page — bot `@kittens_control_center_bot`, `PUBLIC_TELEGRAM_BOT_USERNAME` env var
 - New users → `pending` until superadmin approves via `/admin`; superadmin ID from `SUPERADMIN_TELEGRAM_ID` Lambda env var (GitHub secret)
@@ -56,14 +45,12 @@ The token is valid for 180 days so this only needs doing occasionally.
 - Sessions: DynamoDB `kittens-sessions`, 180-day TTL; users: `kittens-users`
 
 ### API layer — `src/lib/api.ts`
-All components talk to this file only, never to stores directly.
-Makes `fetch()` calls to `PUBLIC_API_URL` (set in `.env.local` for dev, GitHub Actions var for prod).
-All functions are async.
+All components talk to this file only. Makes `fetch()` calls to `PUBLIC_API_URL` (`.env.local` for dev, GitHub Actions var for prod). Bearer token injected automatically.
 
 ### Emoji — `static/emoji/` + `src/routes/+layout.svelte`
 All emoji are rendered via **Twemoji** (`@twemoji/api`) for consistent cross-platform appearance (critical for Windows). SVG files are self-hosted in `static/emoji/` — named by Unicode codepoint (e.g. `1f3b8.svg` for 🎸).
 
-A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags. The CSS rule `:global(img.emoji)` sizes them to `1em`.
+A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags.
 
 > **IMPORTANT — MANDATORY RULE:** Every emoji used anywhere in the UI **must** have its SVG pre-downloaded into `static/emoji/`. Missing SVGs produce 404s. Whenever you add or change an emoji in any `.svelte` or `.ts` file, you MUST immediately run the curl command below to download the corresponding SVG. Do not skip this step.
 
@@ -77,16 +64,14 @@ A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM ch
 3. No code changes needed — the observer picks it up automatically.
 
 ### i18n — `src/lib/i18n.ts`
-- `lang` writable store (`'ru' | 'en'`), default `'ru'`, persisted to `localStorage('lang')`
+- `lang` store (`'ru' | 'en'`), default `'ru'`, persisted to `localStorage('lang')`
 - `t` derived store — import and use as `$t.section.key` in any component
 - Russian has proper plural forms via `ruPlural()` helper
-- To add a string: add to both `en` and `ru` objects (TypeScript will error if they diverge)
+- To add a string: add to both `en` and `ru` objects
 
-### Theme — `src/routes/+layout.svelte`
-- `dark` state, persisted to `localStorage('theme')`
-- Applied as `data-theme="dark|light"` on `<html>`
-- CSS vars defined in `:root` (light) and `[data-theme="dark"]` blocks
-- **Always use `browser` from `$app/environment`** to guard any localStorage access — SvelteKit SSR makes `localStorage` exist but non-functional
+### Theme
+- `dark` state in `+layout.svelte`, persisted to `localStorage('theme')`, applied as `data-theme="dark|light"` on `<html>`
+- **Always use `browser` from `$app/environment`** to guard any localStorage access
 
 ## Data Model — `src/lib/types.ts`
 
@@ -154,62 +139,6 @@ Guest display:
 - **Backlog / setlist editor** — compact inline bubble pills after the song title: `🎤 Саша · 🪇 Вася`
 - **Stage view** — appear in the 3-per-row musician grid after permanent members; also appear in the musician highlight picker (dashed border to distinguish from permanent)
 
-## Routes
-
-```
-/                          → redirect to /backlog
-/login                     → Telegram Login Widget; pending/rejected states
-/admin                     → superadmin only: approve/reject users, map to musician
-/backlog                   → song catalog with table, filters, add/edit/delete
-/setlists                  → list of setlists
-/setlists/[id]             → setlist editor (drag-to-reorder)
-/setlists/[id]/stage       → stage view (public; tap-to-mark disabled when unauthenticated)
-/musicians                 → band roster management
-```
-
-## File Structure
-
-```
-src/
-  lib/
-    api.ts                 ← all backend calls; Bearer token injected from auth store
-    auth.ts                ← currentUser + authLoading stores, initAuth, logout, getToken
-    types.ts
-    i18n.ts                ← all UI strings (ru + en)
-    utils.ts               ← formatDuration, addMinutes, sortInstruments, songReadiness, INSTRUMENT_ORDER
-    poller.ts              ← startPolling helper; skips when tab hidden or paused; returns cleanup fn
-  components/
-    backlog/
-      SongTable.svelte     ← toolbar, filter bar (category + musician + instrument), table
-      SongRow.svelte        ← one row; musician columns + guest bubble tags inline
-      SongEditModal.svelte  ← permanent musicians + ad-hoc guest rows; multi-instrument toggle grid
-      InstrumentPicker.svelte
-    setlist/
-      SetlistCard.svelte
-      SetlistEditor.svelte  ← drag-to-reorder via HTML5 DnD; per-entry song edit modal
-      AddSongsModal.svelte
-      CommentInput.svelte   ← isolated $state; syncs from prop when not focused
-    stage/
-      StageView.svelte      ← sort + category filters, musician highlight picker, played counter
-      StageSong.svelte      ← tap to toggle played; 3-per-row musician grid incl. guests
-    shared/
-      LogoCat.svelte        ← inline SVG cat logo
-      CategoryBadge.svelte
-      FilterChips.svelte
-      SortBar.svelte
-      TopBar.svelte
-  routes/
-    +layout.svelte          ← nav, theme/lang toggle, auth guard, logout button, admin link
-    +page.server.ts         ← redirect / → /backlog
-    login/+page.svelte      ← Telegram Login Widget, pending/rejected states
-    admin/+page.svelte      ← user approval, musician mapping (admin only)
-    backlog/+page.svelte
-    setlists/+page.svelte
-    setlists/[id]/+page.svelte
-    setlists/[id]/stage/+page.svelte
-    musicians/+page.svelte  ← add/edit/delete band roster, set default instrument
-```
-
 ## Backlog Filter Logic
 
 - **Category** — multi-select (All resets to none; any combination of top/mid/low)
@@ -235,12 +164,11 @@ Every other musician column has a tinted zebra background (`--musician-alt-bg`).
 - Category icon shown before song name; guest bubble tags shown inline after title
 - **Musician filter bar** — multi-select AND chips above the table (same logic as backlog); breaks hidden while a filter is active; drag-to-reorder disabled while filtered
 - **Song snapshots** — `entry.song` is a full copy of the song at add time; backlog edits never affect it
-- **Per-entry edit** — ✏️ button opens `SongEditModal` in `mode="entry"`; saves via `updateEntrySong` + `updateEntryComment`; `entry.comment` is the single source of truth shown both inline and in the modal
+- **Per-entry edit** — ✏️ button opens `SongEditModal` in entry mode; saves song snapshot + comment separately
 - **Breaks** — "⏸ Перерыв" button in the header opens a picker (10 / 20 / 30 min); breaks are draggable rows that span musician columns; stored as `SetlistEntry` with `breakMinutes` set and no `songId`
-- API: `addBreakToSetlist`, `removeBreakFromSetlist` (removes by `order`)
-- **Inline meta editing** — click ✏️ in header to edit setlist name, date, startTime in place; saved via `updateSetlist`
+- **Inline meta editing** — click ✏️ in header to edit setlist name, date, startTime in place
 - **startTime** — when set, a ⏱ time column appears showing per-entry approximate start times (5 min/song + break minutes)
-- **Per-entry comments** — rendered via `CommentInput.svelte`; saved on blur via `updateEntryComment`; syncs from prop when input is not focused (so modal saves reflect immediately)
+- **Per-entry comments** — `CommentInput.svelte` saves on blur; syncs from prop when not focused (so modal saves reflect immediately)
 - **Polling** — fetches setlist every 3 s; smart merge skips no-ops, protects drag state
 
 ## Stage View
@@ -250,9 +178,8 @@ Every other musician column has a tinted zebra background (`--musician-alt-bg`).
 - Tap any song card to toggle played (fades + strikethrough); optimistic update then confirmed from server
 - Breaks shown as dashed separator rows `⏸ 10 мин`; start time (if set) shown right-aligned in accent color
 - Progress counter counts only song entries (not breaks); duration includes break minutes
-- Sort: Default order | Artist | Title
-- Filter by category chip (multi-select)
+- Sort: Default order | Artist | Title; filter by category (multi-select)
 - **Musician highlight picker** — selects one musician; their pill is highlighted amber across all cards; guests from the setlist appear with dashed border
-- **startTime** — when set on the setlist, each card and break row shows its approximate start time (right-aligned, accent color)
+- **startTime** — when set, each card and break row shows its approximate start time (right-aligned, accent color)
 - **Polling** — fetches setlist every 2 s; skips update if entries are identical
 - `CategoryBadge` supports `iconOnly` prop — used in editor and stage view
