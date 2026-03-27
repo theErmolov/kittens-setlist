@@ -11,6 +11,7 @@
   let id = $derived(page.params.id);
   let setlist = $state<Setlist | undefined>(undefined);
   let musicians = $state<BandMusician[]>([]);
+  let loading = $state(true);
 
   let canMark = $derived($currentUser?.status === 'approved');
   // Authenticated users poll every 2s; unauthenticated every 10s
@@ -18,6 +19,7 @@
 
   onMount(async () => {
     setlist = await getSetlist(id!);
+    loading = false;
     if ($currentUser?.status === 'approved') {
       try { musicians = await getMusicians(); } catch { /* ignore */ }
     }
@@ -32,7 +34,9 @@
   });
 </script>
 
-{#if setlist}
+{#if loading}
+  <div class="not-found"><p>…</p></div>
+{:else if setlist}
   <StageView {setlist} {musicians} {canMark} {pollInterval} />
 {:else}
   <div class="not-found">

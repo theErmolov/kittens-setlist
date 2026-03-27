@@ -11,6 +11,10 @@ How to apply: Always `if (!browser) return fallback` before touching localStorag
 **Don't summarise what you just did at the end of responses.**
 Why: User can read the diff.
 
+**Never commit or push unless explicitly told to in the current message.**
+Why: User wants full control over when code leaves local. "commit and push" from a previous session does not carry over.
+How to apply: Only run `git commit` or `git push` when the user says so in the current conversation turn.
+
 **Bump the relevant `DATA_VERSION` / `MUSICIANS_VERSION` when store data shape changes.**
 Why: Old localStorage data will break new code silently otherwise.
 
@@ -31,12 +35,6 @@ How to apply: No "remove from song" UI. Instrument buttons are the only per-musi
 Why: User said "musician can play only 1 instrument". The old `defaultInstruments: Instrument[]` was replaced with `defaultInstrument?: Instrument`.
 How to apply: `BandMusician.defaultInstrument` is a single optional value.
 
-**Vocals are mandatory per song.**
-Why: User wants to always know who sings. Saving without any vocalist assigned shows "А поёт эту хуйню кто?" and blocks the save.
-How to apply: Hard `alert()` + `return` in `handleSave`, not a skippable `confirm()`.
-
-**Error/validation copy is in Russian and colloquial, not polished.**
-Why: Band-internal tool. "А поёт эту хуйню кто?" is the exact approved wording.
 
 **SvelteKit does NOT automatically prepend `paths.base` to `href` attributes — must be done manually.**
 Why: Discovered when deploying to GitHub Pages at `/kittens-setlist/` — all links skipped the base and 404'd.

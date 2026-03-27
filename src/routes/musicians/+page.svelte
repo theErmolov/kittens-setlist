@@ -12,6 +12,7 @@
   let musicians = $state<BandMusician[]>([]);
   let editingId = $state<string | null>(null);
   let showNew = $state(false);
+  let loading = $state(true);
 
   let draftName = $state('');
   let draftInstruments = $state<Instrument[]>([]);
@@ -20,6 +21,7 @@
 
   onMount(async () => {
     musicians = await getMusicians();
+    loading = false;
   });
 
   function startAdd() {
@@ -125,7 +127,9 @@
     </div>
   {/if}
 
-  {#if musicians.length === 0 && !showNew}
+  {#if loading}
+    <p class="loading">…</p>
+  {:else if musicians.length === 0 && !showNew}
     <p class="empty">{$t.musicians.empty}</p>
   {:else}
     <ul class="musician-list">
@@ -248,5 +252,5 @@
   .edit-btn:hover, .del-btn:hover { opacity: 1; }
   .del-btn:hover { color: #ef4444; }
 
-  .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+  .empty, .loading { text-align: center; padding: 40px; color: var(--text-muted); }
 </style>

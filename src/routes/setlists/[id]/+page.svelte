@@ -10,6 +10,7 @@
   let setlist = $state<Setlist | undefined>(undefined);
   let allSongs = $state<Song[]>([]);
   let musicians = $state<BandMusician[]>([]);
+  let loading = $state(true);
 
   onMount(async () => {
     [setlist, allSongs, musicians] = await Promise.all([
@@ -17,10 +18,13 @@
       getSongs(),
       getMusicians()
     ]);
+    loading = false;
   });
 </script>
 
-{#if setlist}
+{#if loading}
+  <div class="not-found"><p>…</p></div>
+{:else if setlist}
   <SetlistEditor {setlist} {allSongs} {musicians} />
 {:else}
   <div class="not-found">

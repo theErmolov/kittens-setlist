@@ -8,10 +8,12 @@
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang } from '$lib/i18n';
   import { currentUser, authLoading, initAuth, logout } from '$lib/auth';
+  import { getUsers } from '$lib/api';
 
   let { children } = $props();
 
   let dark = $state(browser ? localStorage.getItem('theme') === 'dark' : false);
+  let hasPending = $state(false);
 
   onMount(() => {
     const opts = { base: `${base}/emoji/`, folder: '.', ext: '.svg' };
@@ -25,7 +27,11 @@
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    initAuth(); // fire-and-forget; authLoading store signals completion
+    initAuth().then(() => {
+      if ($currentUser?.isAdmin) {
+        getUsers().then(users => { hasPending = users.some(u => u.status === 'pending'); });
+      }
+    });
     return () => observer.disconnect();
   });
 
@@ -88,6 +94,7 @@
   {#if $currentUser?.isAdmin}
     <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
       <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
+      {#if hasPending}<span class="pending-dot"></span>{/if}
     </a>
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
@@ -200,6 +207,19 @@
   .nav-link.active { color: #fff; background: #6c63ff; }
 
   .link-icon { font-size: 1rem; line-height: 1; }
+
+  .pending-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ef4444;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 0 #ef444480;
+    animation: pending-pulse 1.6s ease-out infinite;
+  }
+  @keyframes pending-pulse {
+    0%   { box-shadow: 0 0 0 0 #ef444480; }
+    70%  { box-shadow: 0 0 0 6px #ef444400; }
+    100% { box-shadow: 0 0 0 0 #ef444400; }
+  }
 
   .lang-toggle {
     margin-left: auto;

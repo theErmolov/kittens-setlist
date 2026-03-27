@@ -11,9 +11,11 @@
   let newName = $state('');
   let newDate = $state('');
   let newStartTime = $state('');
+  let loading = $state(true);
 
   onMount(async () => {
     setlists = await getSetlists();
+    loading = false;
   });
 
   async function handleCreate() {
@@ -51,7 +53,9 @@
     </div>
   {/if}
 
-  {#if setlists.length === 0}
+  {#if loading}
+    <p class="loading">…</p>
+  {:else if setlists.length === 0}
     <div class="empty">
       <p>{$t.setlists.empty}</p>
       {#if !showNew}
@@ -77,7 +81,7 @@
   .new-form-row input { flex: 1; min-width: 120px; }
   .new-form-actions { display: flex; gap: 8px; margin-left: auto; }
   .cards { display: flex; flex-direction: column; gap: 10px; }
-  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty, .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .empty p { margin-bottom: 12px; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }

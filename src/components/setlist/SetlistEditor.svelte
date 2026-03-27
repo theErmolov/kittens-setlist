@@ -4,7 +4,7 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong, updateEntryProgress } from '$lib/api';
+  import { getSetlist, updateSetlist, updateSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, sortInstruments, songReadiness } from '$lib/utils';
@@ -15,13 +15,6 @@
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
   };
 
-  const STAGE_ORDER_ARR: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
-  const STAGE_COLOR: Record<LearningStage, string> = {
-    nothing: '#94a3b8', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
-  };
-  const READINESS_COLOR: Record<LearningStage, string> = {
-    nothing: '#ef4444', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
-  };
 
   let {
     setlist,
@@ -206,22 +199,12 @@
     let updated = await updateEntrySong(setlist.id, editingEntry.order, updatedSong);
     updated = await updateEntryComment(setlist.id, editingEntry.order, updatedSong.comment ?? '');
     applyUpdate(updated);
+    // Sync progress back to the canonical backlog song
+    if (editingEntry.songId && updatedSong.progress) {
+      const canonical = allSongs.find(s => s.id === editingEntry!.songId);
+      if (canonical) await updateSong({ ...canonical, progress: updatedSong.progress });
+    }
     editingEntry = null;
-  }
-
-  async function cycleProgress(entry: SetlistEntry, name: string, cur: LearningStage) {
-    const next = STAGE_ORDER_ARR[(STAGE_ORDER_ARR.indexOf(cur) + 1) % STAGE_ORDER_ARR.length];
-    // Optimistic update
-    localEntries = localEntries.map(e =>
-      e.order !== entry.order ? e : {
-        ...e, progress: { ...(e.progress ?? {}), [name]: next }
-      }
-    );
-    const updated = await updateEntryProgress(
-      setlist.id, entry.order, name, next,
-      entry.songId!, permanentNamesSet.has(name)
-    );
-    applyUpdate(updated);
   }
 
   function entryKey(entry: typeof sortedEntries[0]) {
@@ -334,11 +317,11 @@
           {#each displayEntries() as entry, i (entryKey(entry))}
             {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
             {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
+            {@const songNum = displayEntries().slice(0, i + 1).filter(e => e.songId).length}
             {#if entry.songId}
               {@const song = entry.song}
               {#if song}
                 {@const guestTags = guestTagsFor(song)}
-                {@const readiness = songReadiness(song.musicians, entry.progress ?? {}, selectedMusicians)}
                 <tr
                   class="song-row"
                   class:dragging={isDragging}
@@ -351,8 +334,7 @@
                 >
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
-                    <span class="readiness-dot" style="background: {READINESS_COLOR[readiness]}" title={$t.progress[readiness]}></span>
-                    {i + 1}
+                    {songNum}
                     <span class="entry-pct">{entryProgressPct(entry)}%</span>
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
@@ -373,14 +355,7 @@
                   </td>
                   {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
-                    {@const prog = (entry.progress?.[name] ?? 'nothing') as LearningStage}
                     <td class="td-musician" class:musician-alt={i % 2 === 0}>
-                      <button
-                        class="prog-dot"
-                        style="background: {STAGE_COLOR[prog]}"
-                        onclick={() => cycleProgress(entry, name, prog)}
-                        title={$t.progress[prog]}
-                      ></button>
                       {#if role?.instruments?.length}
                         <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
                       {/if}
@@ -554,10 +529,7 @@
 
   .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
   .entry-pct { display: block; font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; text-align: right; }
-  .readiness-dot {
-    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-    margin-right: 2px; vertical-align: middle;
-  }
+
 
   .td-song { white-space: nowrap; }
   .song-name { display: flex; align-items: center; }
@@ -581,13 +553,6 @@
 
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; vertical-align: middle; }
-
-  .prog-dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    border: none; cursor: pointer; padding: 0; vertical-align: middle;
-    margin-right: 2px; flex-shrink: 0; transition: transform 0.1s;
-  }
-  .prog-dot:hover { transform: scale(1.4); }
 
   .td-break { font-size: 0.82rem; color: var(--text-muted); }
   .break-label {

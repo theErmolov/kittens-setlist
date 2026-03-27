@@ -10,10 +10,11 @@
   let setlists = $state<Setlist[]>([]);
   let musicians = $state<BandMusician[]>([]);
   let showAddModal = $state(false);
+  let loading = $state(true);
 
   onMount(() => {
     Promise.all([getSongs(), getSetlists(), getMusicians()]).then(([s, sl, m]) => {
-      songs = s; setlists = sl; musicians = m;
+      songs = s; setlists = sl; musicians = m; loading = false;
     });
     return startPolling(async () => { songs = await getSongs(); }, 10000, () => false);
   });
@@ -30,6 +31,7 @@
   {songs}
   {setlists}
   {musicians}
+  {loading}
   onadd={() => { showAddModal = true; }}
 />
 

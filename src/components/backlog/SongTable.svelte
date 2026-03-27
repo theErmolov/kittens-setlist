@@ -11,11 +11,13 @@
     songs: songsProp,
     setlists,
     musicians,
+    loading = false,
     onadd
   }: {
     songs: Song[];
     setlists: Setlist[];
     musicians: BandMusician[];
+    loading?: boolean;
     onadd: () => void;
   } = $props();
 
@@ -182,7 +184,9 @@
             onaddtosetlist={() => { addToSetlistSong = song; }}
           />
         {/each}
-        {#if filtered().length === 0}
+        {#if loading}
+          <tr><td colspan={4 + permanentNames.length} class="empty">…</td></tr>
+        {:else if filtered().length === 0}
           <tr><td colspan={4 + permanentNames.length} class="empty">{$t.backlog.empty}</td></tr>
         {/if}
       </tbody>

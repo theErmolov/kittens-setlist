@@ -119,8 +119,6 @@
         allProgress[row.name.trim()] = row.progress;
       }
     }
-    const hasVocals = Object.values(allMusicians).some(r => r.instruments.includes('vocals'));
-    if (!hasVocals) { alert('А поёт эту хуйню кто?'); return; }
     onsave({ ...draft, musicians: allMusicians, progress: allProgress });
   }
 
@@ -145,39 +143,43 @@
     </div>
 
     <div class="modal-body">
-      <div class="field">
-        <label>{$t.song.artist}</label>
-        <input bind:value={draft.artist} placeholder={$t.song.artist} />
-      </div>
-      <div class="field">
-        <label>{$t.song.title}</label>
-        <input bind:value={draft.title} placeholder={$t.song.title} />
-      </div>
-      <div class="field">
-        <label>{$t.song.category}</label>
-        <div class="cat-chips">
-          {#each (['top', 'mid', 'low'] as Category[]) as cat}
-            <button
-              class="cat-chip cat-chip-{cat}"
-              class:active={draft.category === cat}
-              onclick={() => { draft.category = cat; }}
-            >{$t.filter[cat]}</button>
-          {/each}
+      <div class="fields-row">
+        <div class="field">
+          <label>{$t.song.artist}</label>
+          <input bind:value={draft.artist} placeholder={$t.song.artist} />
+        </div>
+        <div class="field">
+          <label>{$t.song.title}</label>
+          <input bind:value={draft.title} placeholder={$t.song.title} />
         </div>
       </div>
+      <div class="cat-chips">
+        {#each (['top', 'mid', 'low'] as Category[]) as cat}
+          <button
+            class="cat-chip cat-chip-{cat}"
+            class:active={draft.category === cat}
+            onclick={() => { draft.category = cat; }}
+          >{$t.filter[cat]}</button>
+        {/each}
+      </div>
 
-      <div class="field">
-        <label>{$t.song.musicians}</label>
-        <div class="musician-roster">
+      <div class="musician-roster">
+
+          <div class="roster-header">
+            <span class="header-name">{$t.song.musicians}</span>
+            <span class="row-gap"></span>
+            <span class="header-instruments"></span>
+            <span class="header-progress">Прогресс</span>
+          </div>
 
           <!-- Permanent band members -->
           {#each musicians as bm}
             {@const role = draft.musicians[bm.name]}
             {@const curStage = (draft.progress?.[bm.name] ?? 'nothing') as LearningStage}
             {@const hasInst = (role?.instruments?.length ?? 0) > 0}
-            {@const isQueued = curStage !== 'nothing'}
             <div class="roster-row">
               <span class="roster-name">{bm.name}</span>
+              <span class="row-gap"></span>
               <div class="inst-grid">
                 {#each allInstruments as inst}
                   <button
@@ -189,25 +191,18 @@
                 {/each}
               </div>
               {#if hasInst}
-                {#if !isQueued}
-                  <button class="queue-btn" onclick={() => setProgress(bm.name, 'queue')}>
-                    {$t.progress.queue}
-                  </button>
-                {:else}
-                  <div class="prog-wrap">
-                    <div class="prog-bar" style="--fill: {BAR_COLOR[curStage] ?? 'var(--border)'}">
-                      {#each PROGRESS_SEGS as seg}
-                        <button
-                          class="prog-seg"
-                          class:filled={STAGE_ORDER.indexOf(curStage) >= STAGE_ORDER.indexOf(seg)}
-                          onclick={() => setProgress(bm.name, curStage === seg ? 'queue' : seg)}
-                          title={$t.progress[seg]}
-                        ></button>
-                      {/each}
-                    </div>
-                    <button class="dequeue-btn" onclick={() => setProgress(bm.name, 'nothing')} title="Убрать из очереди">×</button>
+                <div class="prog-wrap">
+                  <div class="prog-bar" style="--fill: {BAR_COLOR[curStage] ?? 'var(--border)'}">
+                    {#each PROGRESS_SEGS as seg}
+                      <button
+                        class="prog-seg"
+                        class:filled={STAGE_ORDER.indexOf(curStage) >= STAGE_ORDER.indexOf(seg)}
+                        onclick={() => setProgress(bm.name, curStage === seg ? 'nothing' : seg)}
+                        title={$t.progress[seg]}
+                      ></button>
+                    {/each}
                   </div>
-                {/if}
+                </div>
               {/if}
             </div>
           {/each}
@@ -215,7 +210,6 @@
           <!-- Ad-hoc guests — same layout, no divider -->
           {#each guestRows as row (row.id)}
             {@const isAdd = !row.name.trim()}
-            {@const isQueued = row.progress !== 'nothing'}
             <div class="roster-row" class:ghost-row={isAdd}>
               <input
                 class="roster-name guest-name"
@@ -223,6 +217,7 @@
                 placeholder={isAdd ? '+ гость' : 'Имя'}
                 oninput={(e) => onGuestInput(row, (e.target as HTMLInputElement).value)}
               />
+              <span class="row-gap"></span>
               <div class="inst-grid">
                 {#each allInstruments as inst}
                   <button
@@ -236,32 +231,26 @@
                 {/each}
               </div>
               {#if !isAdd && row.instruments.length > 0}
-                {#if !isQueued}
-                  <button class="queue-btn" onclick={() => { row.progress = 'queue'; }}>
-                    {$t.progress.queue}
-                  </button>
-                {:else}
-                  <div class="prog-wrap">
-                    <div class="prog-bar" style="--fill: {BAR_COLOR[row.progress] ?? 'var(--border)'}">
-                      {#each PROGRESS_SEGS as seg}
-                        <button
-                          class="prog-seg"
-                          class:filled={STAGE_ORDER.indexOf(row.progress) >= STAGE_ORDER.indexOf(seg)}
-                          onclick={() => { row.progress = row.progress === seg ? 'queue' : seg; }}
-                          title={$t.progress[seg]}
-                        ></button>
-                      {/each}
-                    </div>
-                    <button class="dequeue-btn" onclick={() => { row.progress = 'nothing'; }} title="Убрать из очереди">×</button>
+                <div class="prog-wrap">
+                  <div class="prog-bar" style="--fill: {BAR_COLOR[row.progress] ?? 'var(--border)'}">
+                    {#each PROGRESS_SEGS as seg}
+                      <button
+                        class="prog-seg"
+                        class:filled={STAGE_ORDER.indexOf(row.progress) >= STAGE_ORDER.indexOf(seg)}
+                        onclick={() => { row.progress = row.progress === seg ? 'nothing' : seg; }}
+                        title={$t.progress[seg]}
+                      ></button>
+                    {/each}
                   </div>
-                {/if}
+                </div>
+              {/if}
+              {#if !isAdd}
                 <button class="remove-guest-btn" onclick={() => removeGuest(row.id)}>✕</button>
               {/if}
             </div>
           {/each}
 
         </div>
-      </div>
 
       <div class="field">
         <label>{$t.song.comment}</label>
@@ -283,7 +272,7 @@
   }
   .modal {
     background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+    width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
   }
   .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
@@ -291,6 +280,8 @@
   .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
 
+  .fields-row { display: flex; gap: 12px; }
+  .fields-row .field { flex: 1; }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field > label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   input:not([type="radio"]):not([type="checkbox"]) {
@@ -311,6 +302,16 @@
   /* ── Musician roster ──────────────────────────────────────────────────── */
 
   .musician-roster { display: flex; flex-direction: column; gap: 4px; }
+
+  .roster-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 9px 4px;
+    font-size: 0.82rem; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .header-name { flex-shrink: 0; width: 72px; overflow: visible; white-space: nowrap; }
+  .header-instruments { flex-shrink: 0; width: 293px; }
+  .header-progress { flex-shrink: 0; margin-left: 20px; }
 
   .roster-row {
     display: flex;
@@ -354,20 +355,10 @@
   .inst-btn.active { background: var(--accent); border-color: var(--accent); }
   .inst-btn.invisible { visibility: hidden; pointer-events: none; }
 
-  /* ── Queue button (not yet queued) ───────────────────────────────────── */
-
-  .queue-btn {
-    margin-left: auto; flex-shrink: 0;
-    padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px;
-    background: transparent; cursor: pointer; font-size: 0.75rem;
-    color: var(--text-muted); transition: all 0.12s; white-space: nowrap;
-  }
-  .queue-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-  /* ── Progress bar (queued) ────────────────────────────────────────────── */
+  /* ── Progress bar ────────────────────────────────────────────────────── */
 
   .prog-wrap {
-    margin-left: auto; flex-shrink: 0;
+    margin-left: 20px; flex-shrink: 0;
     display: flex; align-items: center; gap: 6px;
   }
 
@@ -376,7 +367,7 @@
   }
 
   .prog-seg {
-    width: 36px; height: 10px;
+    width: 36px; height: 20px;
     border: none; cursor: pointer; padding: 0;
     background: var(--border);
     transition: background 0.15s;
@@ -385,13 +376,6 @@
   .prog-seg:last-child { border-radius: 0 5px 5px 0; }
   .prog-seg.filled { background: var(--fill, var(--accent)); }
   .prog-seg:hover { opacity: 0.75; }
-
-  .dequeue-btn {
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 0.82rem; padding: 0 2px;
-    opacity: 0.5; transition: opacity 0.12s; line-height: 1;
-  }
-  .dequeue-btn:hover { opacity: 1; color: #ef4444; }
 
   .ghost-row {
     border-style: dashed;
@@ -402,10 +386,12 @@
     border-style: solid;
   }
 
+  .row-gap { flex-shrink: 0; width: 20px; }
   .remove-guest-btn {
-    flex-shrink: 0; background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 0.78rem; padding: 2px 4px;
-    border-radius: 4px; opacity: 0.5; transition: opacity 0.12s;
+    margin-left: auto; flex-shrink: 0; width: 20px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.78rem; padding: 0;
+    opacity: 0.5; transition: opacity 0.12s; text-align: center;
   }
   .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
 

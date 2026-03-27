@@ -8,7 +8,7 @@
   import { getSetlist, togglePlayed } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes, songReadiness } from '$lib/utils';
+  import { formatDuration, addMinutes } from '$lib/utils';
   import { base } from '$app/paths';
 
   let {
@@ -162,11 +162,8 @@
   <div class="song-list">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
       {#if item.kind === 'song'}
-        {@const readiness = songReadiness(item.song.musicians, item.entry.progress ?? {}, selectedMusicianSet)}
         <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
           startTime={entryTimes().get(item.entry.order)}
-          liveProgress={item.entry.progress ?? {}}
-          {readiness}
           {musicians}
           {selectedMusician}
           {canMark}

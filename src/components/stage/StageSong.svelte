@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Song, SetlistEntry, BandMusician, LearningStage } from '$lib/types';
+  import type { Song, SetlistEntry, BandMusician } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { sortInstruments } from '$lib/utils';
 
@@ -7,20 +7,11 @@
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
   };
 
-  const STAGE_COLOR: Record<LearningStage, string> = {
-    nothing: '#94a3b8', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
-  };
-  const READINESS_COLOR: Record<LearningStage, string> = {
-    nothing: '#ef4444', queue: '#cbd5e1', structure: '#f59e0b', mastering: '#3b82f6', ready: '#22c55e'
-  };
-
   let {
     song,
     entry,
     position,
     startTime,
-    liveProgress = {},
-    readiness = 'nothing',
     musicians = [],
     selectedMusician = '',
     canMark = true,
@@ -30,8 +21,6 @@
     entry: SetlistEntry;
     position: number;
     startTime?: string;
-    liveProgress?: Record<string, LearningStage>;
-    readiness?: LearningStage;
     musicians: BandMusician[];
     selectedMusician?: string;
     canMark?: boolean;
@@ -45,14 +34,12 @@
       const role = song.musicians[m.name];
       const active = (role?.instruments?.length ?? 0) > 0;
       const highlight = !!selectedMusician && m.name === selectedMusician && !!active;
-      const stage = (liveProgress[m.name] ?? 'nothing') as LearningStage;
-      return { name: m.name, role: role ?? null, active, highlight, stage };
+      return { name: m.name, role: role ?? null, active, highlight };
     });
     // append ad-hoc guests
     for (const [name, role] of Object.entries(song.musicians)) {
       if (!permanentNames.has(name) && role.instruments.length > 0) {
-        const stage = (liveProgress[name] ?? 'nothing') as LearningStage;
-        cells.push({ name, role, active: true, highlight: !!selectedMusician && name === selectedMusician, stage });
+        cells.push({ name, role, active: true, highlight: !!selectedMusician && name === selectedMusician });
       }
     }
     return cells;
@@ -63,7 +50,6 @@
   class="stage-song"
   class:played={entry.played}
   class:no-mark={!canMark}
-  style="border-left-color: {READINESS_COLOR[readiness]}"
   onclick={ontoggle}
 >
   <div class="song-main">
@@ -78,7 +64,6 @@
       {#each rosterCells() as cell}
         <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
           {#if cell.active}
-            <span class="prog-dot" style="background: {STAGE_COLOR[cell.stage]}"></span>
             <span class="m-icons" class:has-name={!!cell.name}>{sortInstruments(cell.role?.instruments ?? []).map(i => instrumentIcons[i]).join('')}</span>
             <span class="m-name">{cell.name}</span>
           {/if}
@@ -99,7 +84,6 @@
     padding: 8px 12px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-left-width: 4px;
     border-radius: 8px;
     cursor: pointer;
     text-align: left;
@@ -146,11 +130,6 @@
   .musician.highlight { background: #f59e0b; color: #1a1200; }
   :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) { background: #78350f; }
   :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
-
-  .prog-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    flex-shrink: 0;
-  }
 
   .m-icons { flex-shrink: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 1px; line-height: 1.1; font-size: 1.17rem; }
   .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
