@@ -11,9 +11,9 @@ How to apply: Always `if (!browser) return fallback` before touching localStorag
 **Don't summarise what you just did at the end of responses.**
 Why: User can read the diff.
 
-**Never commit or push unless explicitly told to in the current message.**
-Why: User wants full control over when code leaves local. "commit and push" from a previous session does not carry over.
-How to apply: Only run `git commit` or `git push` when the user says so in the current conversation turn.
+## ⛔ NEVER COMMIT OR PUSH UNLESS EXPLICITLY ASKED IN THE CURRENT MESSAGE
+**Why:** User wants full control over when code is committed or pushed. Prior-session instructions do not carry over.
+**How to apply:** Do NOT run `git commit`, `git push`, or any variant unless the user says so in the current turn. No exceptions.
 
 **Bump the relevant `DATA_VERSION` / `MUSICIANS_VERSION` when store data shape changes.**
 Why: Old localStorage data will break new code silently otherwise.
