@@ -15,9 +15,6 @@ Why: User can read the diff.
 **Why:** User wants full control over when code is committed or pushed. Prior-session instructions do not carry over.
 **How to apply:** Do NOT run `git commit`, `git push`, or any variant unless the user says so in the current turn. No exceptions.
 
-**Bump the relevant `DATA_VERSION` / `MUSICIANS_VERSION` when store data shape changes.**
-Why: Old localStorage data will break new code silently otherwise.
-
 **Category labels in Russian are band-specific slang — don't normalise them.**
 - top → "💩 По говну"
 - mid → "🎵 Середняк"
@@ -30,11 +27,6 @@ How to apply: See filter logic in `SongTable.svelte`.
 **Musicians cannot be removed from a song — only their instrument can be cleared.**
 Why: User explicitly removed the include/exclude toggle. All band members are always present in every song record.
 How to apply: No "remove from song" UI. Instrument buttons are the only per-musician control.
-
-**Each musician has exactly one default instrument (not a list).**
-Why: User said "musician can play only 1 instrument". The old `defaultInstruments: Instrument[]` was replaced with `defaultInstrument?: Instrument`.
-How to apply: `BandMusician.defaultInstrument` is a single optional value.
-
 
 **SvelteKit does NOT automatically prepend `paths.base` to `href` attributes — must be done manually.**
 Why: Discovered when deploying to GitHub Pages at `/kittens-setlist/` — all links skipped the base and 404'd.

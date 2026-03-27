@@ -94,6 +94,7 @@ A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM ch
 type Category = 'top' | 'mid' | 'low'
 // canonical display order: vocals, guitar, bass, keys, violin, drums, cajon, percussion
 type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals'
+type LearningStage = 'nothing' | 'queue' | 'structure' | 'mastering' | 'ready'
 
 interface MusicianRole {
   instruments: Instrument[]  // empty = present in song but "free"; multiple allowed
@@ -115,6 +116,7 @@ interface Song {
   comment?: string         // general note
   musicians: Record<string, MusicianRole>  // keyed by musician name
   sortOrder?: number
+  progress?: Record<string, LearningStage>  // keyed by musician name
 }
 
 interface Setlist {
@@ -132,6 +134,7 @@ interface SetlistEntry {
   order: number
   played: boolean          // stage mode tap-to-strikethrough
   comment?: string         // per-entry note; shown and edited inline + in the per-entry edit modal
+  progress?: Record<string, LearningStage>  // per-entry learning progress (all musicians incl. guests)
 }
 ```
 
@@ -173,7 +176,8 @@ src/
     auth.ts                ← currentUser + authLoading stores, initAuth, logout, getToken
     types.ts
     i18n.ts                ← all UI strings (ru + en)
-    utils.ts               ← formatDuration, addMinutes, sortInstruments, INSTRUMENT_ORDER
+    utils.ts               ← formatDuration, addMinutes, sortInstruments, songReadiness, INSTRUMENT_ORDER
+    poller.ts              ← startPolling helper; skips when tab hidden or paused; returns cleanup fn
   components/
     backlog/
       SongTable.svelte     ← toolbar, filter bar (category + musician + instrument), table
