@@ -47,7 +47,7 @@
   <td class="td-title">
     <span class="title-text">{song.title}</span>
     {#each guestTags as g}
-      <span class="guest-tag">{g.icons} {g.name}</span>
+      <span class="guest-tag"><span class="guest-icons">{g.icons}</span><span class="guest-name">{g.name}</span></span>
     {/each}
   </td>
   {#each allMusicians as name, i}
@@ -80,15 +80,23 @@
   .td-title { white-space: normal; }
   .title-text { vertical-align: middle; }
   .guest-tag {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     background: var(--border);
     color: var(--text-muted);
     font-size: 0.7rem;
     padding: 1px 7px;
     border-radius: 10px;
     margin-left: 5px;
-    white-space: nowrap;
     vertical-align: middle;
+  }
+  .guest-icons { flex-shrink: 0; }
+  .guest-name {
+    max-width: 7ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .td-musician { text-align: left; white-space: nowrap; }
   .musician-alt { background: var(--musician-alt-bg); }
