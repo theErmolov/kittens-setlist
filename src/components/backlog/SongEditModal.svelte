@@ -109,12 +109,17 @@
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
+  let guestsMissingInstrument = $derived(
+    new Set(guestRows.filter(r => r.name.trim() && r.instruments.length === 0).map(r => r.id))
+  );
+
   function handleSave() {
     if (!draft.artist.trim() || !draft.title.trim()) return;
+    if (guestsMissingInstrument.size > 0) return;
     const allMusicians: Record<string, MusicianRole> = { ...draft.musicians };
     const allProgress: Record<string, LearningStage> = { ...(draft.progress ?? {}) };
     for (const row of guestRows) {
-      if (row.name.trim()) {
+      if (row.name.trim() && row.instruments.length > 0) {
         allMusicians[row.name.trim()] = { instruments: row.instruments };
         allProgress[row.name.trim()] = row.progress;
       }
@@ -153,6 +158,7 @@
           <input bind:value={draft.title} placeholder={$t.song.title} />
         </div>
       </div>
+      {#if mode !== 'entry'}
       <div class="cat-chips">
         {#each (['top', 'mid', 'low'] as Category[]) as cat}
           <button
@@ -162,6 +168,7 @@
           >{$t.filter[cat]}</button>
         {/each}
       </div>
+      {/if}
 
       <div class="musician-roster">
 
@@ -210,7 +217,8 @@
           <!-- Ad-hoc guests — same layout, no divider -->
           {#each guestRows as row (row.id)}
             {@const isAdd = !row.name.trim()}
-            <div class="roster-row" class:ghost-row={isAdd}>
+            {@const missingInst = guestsMissingInstrument.has(row.id)}
+            <div class="roster-row" class:ghost-row={isAdd} class:row-error={missingInst}>
               <input
                 class="roster-name guest-name"
                 value={row.name}
@@ -381,6 +389,7 @@
     border-style: dashed;
     opacity: 0.55;
   }
+  .row-error { border-color: #ef4444; }
   .ghost-row:focus-within {
     opacity: 1;
     border-style: solid;

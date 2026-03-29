@@ -9,6 +9,8 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
+    nothing:   'rgba(234,179,8,0.18)',
+    queue:     'rgba(234,179,8,0.18)',
     structure: 'rgba(192,80,77,0.18)',
     mastering: 'rgba(59,130,246,0.18)',
     ready:     'rgba(34,197,94,0.18)',
@@ -35,7 +37,8 @@
   let guestTags = $derived(
     Object.entries(song.musicians)
       .filter(([name, role]) => !permanentSet.has(name) && role.instruments.length > 0)
-      .map(([name, role]) => ({ name, icons: sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('') }))
+      .map(([name, role]) => ({ name, instruments: sortInstruments(role.instruments) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   );
 </script>
 
@@ -47,7 +50,7 @@
   <td class="td-title">
     <span class="title-text">{song.title}</span>
     {#each guestTags as g}
-      <span class="guest-tag"><span class="guest-icons">{g.icons}</span><span class="guest-name">{g.name}</span></span>
+      <span class="guest-tag"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
   </td>
   {#each allMusicians as name, i}

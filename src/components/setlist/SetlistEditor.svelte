@@ -15,6 +15,14 @@
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
   };
 
+  const PROG_BG: Partial<Record<LearningStage, string>> = {
+    nothing:   'rgba(234,179,8,0.18)',
+    queue:     'rgba(234,179,8,0.18)',
+    structure: 'rgba(192,80,77,0.18)',
+    mastering: 'rgba(59,130,246,0.18)',
+    ready:     'rgba(34,197,94,0.18)',
+  };
+
 
   let {
     setlist,
@@ -59,12 +67,10 @@
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
-  let selectedMusicians = $state(new Set<string>());
+  let selectedMusician = $state<string | null>(null);
 
   function toggleMusician(name: string) {
-    const next = new Set(selectedMusicians);
-    next.has(name) ? next.delete(name) : next.add(name);
-    selectedMusicians = next;
+    selectedMusician = selectedMusician === name ? null : name;
   }
 
   // Full replace after own mutations — always authoritative
@@ -101,18 +107,21 @@
   let existingIds = $derived(new Set(localEntries.map(e => e.songId).filter((id): id is string => !!id)));
 
   let filteredEntries = $derived(() => {
-    if (selectedMusicians.size === 0) return sortedEntries;
-    return sortedEntries.filter(e => {
-      if (!e.song) return false; // hide breaks when filter active
-      for (const m of selectedMusicians) {
+    if (!selectedMusician) return sortedEntries;
+    const m = selectedMusician!;
+    return sortedEntries
+      .filter(e => {
+        if (!e.song) return false; // hide breaks when filter active
         const role = e.song.musicians[m];
-        if (!role || role.instruments.length === 0) return false;
-      }
-      return true;
-    });
+        return role && role.instruments.length > 0;
+      })
+      .sort((a, b) => {
+        const stageOf = (e: SetlistEntry) => STAGE_IDX[(e.progress?.[m] ?? e.song?.progress?.[m] ?? 'nothing') as LearningStage];
+        return stageOf(a) - stageOf(b);
+      });
   });
 
-  let isFiltered = $derived(selectedMusicians.size > 0);
+  let isFiltered = $derived(selectedMusician !== null);
 
   let displayEntries = $derived(() => {
     const base = filteredEntries();
@@ -141,8 +150,15 @@
     const participating = Object.entries(entry.song.musicians).filter(([, r]) => r.instruments.length > 0);
     if (!participating.length) return 100;
     const max = participating.length * 3;
-    const total = participating.reduce((s, [name]) => s + STAGE_IDX[(entry.progress?.[name] ?? 'nothing') as LearningStage], 0);
+    const total = participating.reduce((s, [name]) => s + STAGE_IDX[(entry.progress?.[name] ?? entry.song?.progress?.[name] ?? 'nothing') as LearningStage], 0);
     return Math.round(total / max * 100);
+  }
+
+  function pctBubble(pct: number): string {
+    if (pct === 100) return 'border: 1px solid #22c55e; color: #22c55e; background: transparent';
+    if (pct >= 75)   return 'background: rgba(59,130,246,0.22); color: #3b82f6';
+    if (pct >= 25)   return 'background: rgba(245,158,11,0.30); color: #b45309';
+    return                  'background: rgba(239,68,68,0.18); color: #ef4444';
   }
 
   // Per-entry start times, keyed by entryKey. Only computed when startTime is set.
@@ -232,11 +248,12 @@
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
 
-  function guestTagsFor(song: Song): { name: string; icons: string }[] {
+  function guestTagsFor(song: Song): { name: string; instruments: Instrument[] }[] {
     const permSet = new Set(allMusicians);
     return Object.entries(song.musicians)
       .filter(([name, role]) => !permSet.has(name) && role.instruments.length > 0)
-      .map(([name, role]) => ({ name, icons: sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('') }));
+      .map(([name, role]) => ({ name, instruments: sortInstruments(role.instruments) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 </script>
 
@@ -285,7 +302,7 @@
       {#each allMusicians as name}
         <button
           class="filter-chip"
-          class:active={selectedMusicians.has(name)}
+          class:active={selectedMusician === name}
           onclick={() => toggleMusician(name)}
         >{name}</button>
       {/each}
@@ -335,7 +352,7 @@
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
                     {songNum}
-                    <span class="entry-pct">{entryProgressPct(entry)}%</span>
+                    <span class="entry-pct" style={pctBubble(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
@@ -345,7 +362,7 @@
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
                       {#each guestTags as g}
-                        <span class="guest-tag">{g.icons} {g.name}</span>
+                        <span class="guest-tag">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
                       {/each}
                     </div>
                     <CommentInput
@@ -355,7 +372,13 @@
                   </td>
                   {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
-                    <td class="td-musician" class:musician-alt={i % 2 === 0}>
+                    {@const stage = (entry.progress?.[name] ?? entry.song?.progress?.[name] ?? 'nothing') as LearningStage}
+                    {@const progBg = selectedMusician === name ? (PROG_BG[stage] ?? null) : null}
+                    <td
+                      class="td-musician"
+                      class:musician-alt={i % 2 === 0 && !progBg}
+                      style={progBg ? `background: ${progBg}` : ''}
+                    >
                       {#if role?.instruments?.length}
                         <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
                       {/if}
@@ -528,7 +551,7 @@
   .song-row:hover .drag-handle, .break-row:hover .drag-handle { opacity: 1; }
 
   .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
-  .entry-pct { display: block; font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; text-align: right; }
+  .entry-pct { display: block; font-size: 0.62rem; font-weight: 600; padding: 1px 5px; border-radius: 8px; white-space: nowrap; margin-top: 3px; }
 
 
   .td-song { white-space: nowrap; }

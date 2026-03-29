@@ -29,7 +29,7 @@
 
   let permanentNames = $derived(new Set(musicians.map(m => m.name)));
 
-  let rosterCells = $derived(() => {
+  let rosterCells = $derived.by(() => {
     const cells = musicians.map(m => {
       const role = song.musicians[m.name];
       const active = (role?.instruments?.length ?? 0) > 0;
@@ -61,10 +61,10 @@
       {#if startTime}<span class="start-time">{startTime}</span>{/if}
     </div>
     <div class="musicians">
-      {#each rosterCells() as cell}
+      {#each rosterCells as cell}
         <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
           {#if cell.active}
-            <span class="m-icons" class:has-name={!!cell.name}>{sortInstruments(cell.role?.instruments ?? []).map(i => instrumentIcons[i]).join('')}</span>
+            <span class="m-icons" class:has-name={!!cell.name}>{#each sortInstruments(cell.role?.instruments ?? []) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
             <span class="m-name">{cell.name}</span>
           {/if}
         </span>
@@ -131,7 +131,7 @@
   :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) { background: #78350f; }
   :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
 
-  .m-icons { flex-shrink: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 1px; line-height: 1.1; font-size: 1.17rem; }
+  .m-icons { flex-shrink: 0; display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 1px; line-height: 1.1; font-size: 1.17rem; }
   .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   .comment {
     margin-top: 2px;

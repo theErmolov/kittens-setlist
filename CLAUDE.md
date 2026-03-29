@@ -48,9 +48,9 @@ The token is valid for 180 days so this only needs doing occasionally.
 All components talk to this file only. Makes `fetch()` calls to `PUBLIC_API_URL` (`.env.local` for dev, GitHub Actions var for prod). Bearer token injected automatically.
 
 ### Emoji — `static/emoji/` + `src/routes/+layout.svelte`
-All emoji are rendered via **Twemoji** (`@twemoji/api`) for consistent cross-platform appearance (critical for Windows). SVG files are self-hosted in `static/emoji/` — named by Unicode codepoint (e.g. `1f3b8.svg` for 🎸).
+All emoji are rendered as **Google Noto Color Emoji SVGs** for consistent cross-platform appearance (critical for Windows). SVG files are self-hosted in `static/emoji/` — named by Unicode codepoint (e.g. `1f3b8.svg` for 🎸).
 
-A `MutationObserver` in `+layout.svelte` calls `twemoji.parse()` on every DOM change, replacing emoji text with `<img class="emoji">` tags.
+A `MutationObserver` in `+layout.svelte` uses `@twemoji/api` as the emoji parser — it scans the DOM for emoji text and replaces them with `<img class="emoji">` tags pointing to the local SVGs.
 
 > **IMPORTANT — MANDATORY RULE:** Every emoji used anywhere in the UI **must** have its SVG pre-downloaded into `static/emoji/`. Missing SVGs produce 404s. Whenever you add or change an emoji in any `.svelte` or `.ts` file, you MUST immediately run the curl command below to download the corresponding SVG. Do not skip this step.
 
@@ -97,7 +97,7 @@ interface Song {
   id: string
   artist: string
   title: string
-  category: Category       // top=💩 По говну, mid=🎵 Середняк, low=🧪 Андеграунд (emojis rendered via Twemoji)
+  category: Category       // top=💩 По говну, mid=🎵 Середняк, low=🧪 Андеграунд (emojis rendered as Google Noto SVGs)
   comment?: string         // general note
   musicians: Record<string, MusicianRole>  // keyed by musician name
   sortOrder?: number
