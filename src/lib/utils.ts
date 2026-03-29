@@ -1,5 +1,28 @@
 import type { Instrument, LearningStage, MusicianRole } from '$lib/types';
 
+export const STAGE_PCT: Record<LearningStage, number> = {
+  nothing: 0, queue: 0, structure: 25, mastering: 75, ready: 100
+};
+
+/** Compute overall progress % (0–100) for a set of musicians. */
+export function progressPct(
+  musicians: Record<string, MusicianRole>,
+  progress: Record<string, LearningStage>
+): number {
+  const active = Object.keys(musicians).filter(n => (musicians[n].instruments?.length ?? 0) > 0);
+  if (active.length === 0) return 100;
+  const total = active.reduce((s, n) => s + STAGE_PCT[progress[n] ?? 'nothing'], 0);
+  return Math.round(total / active.length);
+}
+
+/** Inline CSS style string for a progress percentage bubble. */
+export function pctBubbleStyle(pct: number): string {
+  if (pct === 100) return 'border: 1px solid #22c55e; color: #22c55e; background: transparent';
+  if (pct >= 75)   return 'background: rgba(59,130,246,0.22); color: #3b82f6';
+  if (pct >= 25)   return 'background: rgba(245,158,11,0.30); color: #b45309';
+  return                  'background: rgba(239,68,68,0.18); color: #ef4444';
+}
+
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
 
 export function sortInstruments(instruments: Instrument[]): Instrument[] {

@@ -31,6 +31,7 @@
   let categoryFilter = $state(new Set<Category>());
   let selectedMusicians = $state(new Set<string>());
   let selectedInstruments = $state(new Set<Instrument>());
+  let showProgress = $state(false);
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
   let sortCol = $state<'artist' | 'title'>('artist');
@@ -145,12 +146,17 @@
         >{instrumentIcons[inst]}</button>
       {/each}
     </div>
+    <button
+      class="filter-chip progress-toggle"
+      class:active={showProgress}
+      onclick={() => { showProgress = !showProgress; }}
+    >{$t.backlog.progress}</button>
   </div>
 
   <div class="scroll-wrap">
     <table>
       <colgroup>
-        <col style="width: 9%">
+        <col style="width: 5%">
         <col style="width: 18%">
         <col style="width: 28%">
         {#each permanentNames as _}
@@ -160,7 +166,7 @@
       </colgroup>
       <thead>
         <tr>
-          <th class="th-cat">{$t.backlog.cols.cat}</th>
+          <th class="th-cat">{showProgress ? $t.backlog.progress : $t.backlog.cols.cat}</th>
           <th class="th-sortable" onclick={() => toggleSort('artist')}>
             {$t.backlog.cols.artist}{sortCol === 'artist' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
           </th>
@@ -178,7 +184,7 @@
           <SongRow
             {song}
             allMusicians={permanentNames}
-            {selectedMusicians}
+            {showProgress}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => { addToSetlistSong = song; }}
@@ -276,6 +282,7 @@
   .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
   .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .filter-chip-inst { padding: 3px 9px; font-size: 0.95rem; }
+  .progress-toggle { margin-left: auto; }
 
   .scroll-wrap { overflow-x: auto; overflow-y: auto; flex: 1; }
   table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }

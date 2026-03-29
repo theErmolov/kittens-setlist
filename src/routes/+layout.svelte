@@ -98,7 +98,7 @@
     </a>
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
-  <button class="theme-toggle" onclick={toggleTheme} title="Toggle theme">{dark ? '☀️' : '🌙'}</button>
+  <button class="theme-toggle" onclick={toggleTheme} title="Toggle theme">{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if $currentUser}
     <button class="logout-btn" onclick={handleLogout} title="Log out">🚪</button>
   {/if}

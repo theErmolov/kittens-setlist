@@ -7,7 +7,7 @@
   import { getSetlist, updateSetlist, updateSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes, sortInstruments, songReadiness } from '$lib/utils';
+  import { formatDuration, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
 
@@ -116,7 +116,7 @@
         return role && role.instruments.length > 0;
       })
       .sort((a, b) => {
-        const stageOf = (e: SetlistEntry) => STAGE_IDX[(e.progress?.[m] ?? e.song?.progress?.[m] ?? 'nothing') as LearningStage];
+        const stageOf = (e: SetlistEntry) => STAGE_PCT[(e.progress?.[m] ?? e.song?.progress?.[m] ?? 'nothing') as LearningStage];
         return stageOf(a) - stageOf(b);
       });
   });
@@ -137,8 +137,6 @@
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
   let totalMinutes = $derived(songCount * 5 + sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
 
-  const STAGE_IDX: Record<LearningStage, number> = { nothing: 0, queue: 0, structure: 1, mastering: 2, ready: 3 };
-
   let readyCount = $derived(
     sortedEntries.filter(e =>
       e.song && songReadiness(e.song.musicians, e.progress ?? {}, new Set()) === 'ready'
@@ -147,18 +145,12 @@
 
   function entryProgressPct(entry: SetlistEntry): number {
     if (!entry.song) return 0;
-    const participating = Object.entries(entry.song.musicians).filter(([, r]) => r.instruments.length > 0);
-    if (!participating.length) return 100;
-    const max = participating.length * 3;
-    const total = participating.reduce((s, [name]) => s + STAGE_IDX[(entry.progress?.[name] ?? entry.song?.progress?.[name] ?? 'nothing') as LearningStage], 0);
-    return Math.round(total / max * 100);
-  }
-
-  function pctBubble(pct: number): string {
-    if (pct === 100) return 'border: 1px solid #22c55e; color: #22c55e; background: transparent';
-    if (pct >= 75)   return 'background: rgba(59,130,246,0.22); color: #3b82f6';
-    if (pct >= 25)   return 'background: rgba(245,158,11,0.30); color: #b45309';
-    return                  'background: rgba(239,68,68,0.18); color: #ef4444';
+    const merged = Object.fromEntries(
+      Object.keys(entry.song.musicians).map(n => [
+        n, (entry.progress?.[n] ?? entry.song?.progress?.[n] ?? 'nothing') as LearningStage
+      ])
+    );
+    return progressPct(entry.song.musicians, merged);
   }
 
   // Per-entry start times, keyed by entryKey. Only computed when startTime is set.
@@ -352,7 +344,7 @@
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
                     {songNum}
-                    <span class="entry-pct" style={pctBubble(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
+                    <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>

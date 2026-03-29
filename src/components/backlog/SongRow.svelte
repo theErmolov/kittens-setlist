@@ -2,7 +2,7 @@
   import type { Song, Instrument, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { t } from '$lib/i18n';
-  import { sortInstruments } from '$lib/utils';
+  import { sortInstruments, progressPct, pctBubbleStyle } from '$lib/utils';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
@@ -19,18 +19,27 @@
   let {
     song,
     allMusicians,
-    selectedMusicians = new Set<string>(),
+    showProgress = false,
     onedit,
     ondelete,
     onaddtosetlist
   }: {
     song: Song;
     allMusicians: string[];
-    selectedMusicians?: Set<string>;
+    showProgress?: boolean;
     onedit: () => void;
     ondelete: () => void;
     onaddtosetlist: () => void;
   } = $props();
+
+  let overallPct = $derived.by(() => {
+    const permMusicians = Object.fromEntries(
+      allMusicians.filter(n => song.musicians[n]).map(n => [n, song.musicians[n]])
+    );
+    const active = Object.values(permMusicians).filter(r => r.instruments.length > 0);
+    if (active.length === 0) return null;
+    return progressPct(permMusicians, (song.progress ?? {}) as Record<string, LearningStage>);
+  });
 
   // Guests = musicians in this song not in the permanent roster, who have instruments
   let permanentSet = $derived(new Set(allMusicians));
@@ -44,7 +53,11 @@
 
 <tr class="song-row">
   <td class="td-cat">
-    <CategoryBadge category={song.category} />
+    {#if showProgress && overallPct !== null}
+      <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
+    {:else}
+      <CategoryBadge category={song.category} iconOnly />
+    {/if}
   </td>
   <td class="td-artist">{song.artist}</td>
   <td class="td-title">
@@ -56,7 +69,7 @@
   {#each allMusicians as name, i}
     {@const role = song.musicians[name]}
     {@const stage = (song.progress?.[name] ?? 'nothing') as LearningStage}
-    {@const progBg = selectedMusicians.has(name) ? (PROG_BG[stage] ?? null) : null}
+    {@const progBg = showProgress && (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
     <td
       class="td-musician"
       class:musician-alt={i % 2 === 0 && !progBg}
@@ -78,7 +91,9 @@
   .song-row { border-bottom: 1px solid var(--border); }
   .song-row:hover { background: var(--row-hover); }
   td { padding: 8px 12px; font-size: 0.88rem; vertical-align: middle; overflow: hidden; }
-  .td-cat { text-align: left; white-space: nowrap; }
+  .td-cat { text-align: center; white-space: nowrap; line-height: 1.2; padding: 6px 4px; }
+  .td-cat :global(.badge.icon-only) { font-size: 1rem; padding: 3px 5px; }
+  .overall-pct { display: block; font-size: 0.9rem; font-weight: 600; padding: 1px 4px; border-radius: 8px; white-space: nowrap; }
   .td-artist { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .td-title { white-space: normal; }
   .title-text { vertical-align: middle; }

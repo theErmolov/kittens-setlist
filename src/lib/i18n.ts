@@ -47,6 +47,7 @@ const strings = {
       search: 'Search artist or title…',
       addSong: '+ Add Song',
       cols: { artist: 'Artist', title: 'Title', cat: 'Cat', musicians: 'Musicians' },
+      progress: 'Progress',
       empty: 'No songs found',
       shown: (n: number, total: number) =>
         n === total ? `${n} song${n !== 1 ? 's' : ''}` : `${n} / ${total} songs`,
@@ -187,6 +188,7 @@ const strings = {
       search: 'Поиск по исполнителю или названию…',
       addSong: '+ Добавить',
       cols: { artist: 'Исполнитель', title: 'Название', cat: 'Категория', musicians: 'Музыканты' },
+      progress: 'Прогресс',
       empty: 'Ничего не найдено',
       shown: (n: number, total: number) => {
         const word = ruPlural(total, 'песня', 'песни', 'песен');
