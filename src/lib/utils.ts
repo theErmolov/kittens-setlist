@@ -1,7 +1,7 @@
 import type { Instrument, LearningStage, MusicianRole } from '$lib/types';
 
 export const STAGE_PCT: Record<LearningStage, number> = {
-  nothing: 0, queue: 0, structure: 25, mastering: 75, ready: 100
+  queue: 0, structure: 25, mastering: 75, ready: 100
 };
 
 /** Compute overall progress % (0–100) for a set of musicians. */
@@ -11,15 +11,15 @@ export function progressPct(
 ): number {
   const active = Object.keys(musicians).filter(n => (musicians[n].instruments?.length ?? 0) > 0);
   if (active.length === 0) return 100;
-  const total = active.reduce((s, n) => s + STAGE_PCT[progress[n] ?? 'nothing'], 0);
+  const total = active.reduce((s, n) => s + STAGE_PCT[progress[n] ?? 'queue'], 0);
   return Math.round(total / active.length);
 }
 
 /** Inline CSS style string for a progress percentage bubble. */
 export function pctBubbleStyle(pct: number): string {
-  if (pct === 100) return 'border: 1px solid #22c55e; color: #22c55e; background: transparent';
-  if (pct >= 75)   return 'background: rgba(59,130,246,0.22); color: #3b82f6';
-  if (pct >= 25)   return 'background: rgba(245,158,11,0.30); color: #b45309';
+  if (pct === 100) return 'border: 1px solid #3b82f6; color: #3b82f6; background: transparent';
+  if (pct >= 75)   return 'background: rgba(34,197,94,0.22); color: #22c55e';
+  if (pct > 0)     return 'background: rgba(234,179,8,0.25); color: #ca8a04';
   return                  'background: rgba(239,68,68,0.18); color: #ef4444';
 }
 
@@ -37,7 +37,7 @@ export function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-const STAGE_ORDER: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
+const STAGE_ORDER: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
 
 /** Returns the worst (lowest) learning stage across participating musicians.
  *  If selectedMusicians is non-empty, only those musicians are considered. */
@@ -52,7 +52,7 @@ export function songReadiness(
   );
   if (names.length === 0) return 'ready';
   return names
-    .map(n => progress[n] ?? 'nothing')
+    .map(n => progress[n] ?? 'queue')
     .reduce((worst, s) =>
       STAGE_ORDER.indexOf(s) < STAGE_ORDER.indexOf(worst) ? s : worst,
       'ready' as LearningStage

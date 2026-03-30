@@ -121,7 +121,6 @@ const strings = {
       backToSetlists: '← Back to setlists',
     },
     progress: {
-      nothing:    'Not started',
       queue:      'In queue',
       structure:  'Structure',
       mastering:  'Mastering',
@@ -266,7 +265,6 @@ const strings = {
       backToSetlists: '← К сетлистам',
     },
     progress: {
-      nothing:    'Не начато',
       queue:      'В очередь',
       structure:  'Структура',
       mastering:  'Пальцы',

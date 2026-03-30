@@ -79,7 +79,7 @@ A `MutationObserver` in `+layout.svelte` uses `@twemoji/api` as the emoji parser
 type Category = 'top' | 'mid' | 'low'
 // canonical display order: vocals, guitar, bass, keys, violin, drums, cajon, percussion
 type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals'
-type LearningStage = 'nothing' | 'queue' | 'structure' | 'mastering' | 'ready'
+type LearningStage = 'queue' | 'structure' | 'mastering' | 'ready'
 
 interface MusicianRole {
   instruments: Instrument[]  // empty = present in song but "free"; multiple allowed

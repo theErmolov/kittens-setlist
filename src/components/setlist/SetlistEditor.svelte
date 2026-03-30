@@ -16,11 +16,17 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
-    nothing:   'rgba(234,179,8,0.18)',
-    queue:     'rgba(234,179,8,0.18)',
-    structure: 'rgba(192,80,77,0.18)',
-    mastering: 'rgba(59,130,246,0.18)',
-    ready:     'rgba(34,197,94,0.18)',
+    queue:     'rgba(239,68,68,0.18)',
+    structure: 'rgba(234,179,8,0.22)',
+    mastering: 'rgba(34,197,94,0.18)',
+    ready:     'rgba(59,130,246,0.18)',
+  };
+
+  const PROG_COLOR: Partial<Record<LearningStage, string>> = {
+    queue:     '#ef4444',
+    structure: '#ca8a04',
+    mastering: '#22c55e',
+    ready:     '#3b82f6',
   };
 
 
@@ -36,6 +42,17 @@
 
   let allMusicians = $derived(musicians.map(m => m.name));
   let permanentNamesSet = $derived(new Set(allMusicians));
+
+  let guestNames = $derived.by(() => {
+    const seen = new Set<string>();
+    for (const entry of sortedEntries) {
+      if (!entry.song) continue;
+      for (const [name, role] of Object.entries(entry.song.musicians)) {
+        if (!permanentNamesSet.has(name) && role.instruments.length > 0) seen.add(name);
+      }
+    }
+    return [...seen].sort();
+  });
 
   // Editable meta (name / date / startTime)
   let editingMeta = $state(false);
@@ -116,7 +133,7 @@
         return role && role.instruments.length > 0;
       })
       .sort((a, b) => {
-        const stageOf = (e: SetlistEntry) => STAGE_PCT[(e.progress?.[m] ?? e.song?.progress?.[m] ?? 'nothing') as LearningStage];
+        const stageOf = (e: SetlistEntry) => STAGE_PCT[entryStage(e, m)];
         return stageOf(a) - stageOf(b);
       });
   });
@@ -143,12 +160,16 @@
     ).length
   );
 
+  function entryStage(entry: SetlistEntry, name: string): LearningStage {
+    return (entry.song?.progress?.[name]
+      ?? entry.progress?.[name]
+      ?? 'queue') as LearningStage;
+  }
+
   function entryProgressPct(entry: SetlistEntry): number {
     if (!entry.song) return 0;
     const merged = Object.fromEntries(
-      Object.keys(entry.song.musicians).map(n => [
-        n, (entry.progress?.[n] ?? entry.song?.progress?.[n] ?? 'nothing') as LearningStage
-      ])
+      Object.keys(entry.song.musicians).map(n => [n, entryStage(entry, n)])
     );
     return progressPct(entry.song.musicians, merged);
   }
@@ -165,8 +186,8 @@
     return map;
   });
 
-  // total columns: drag + num + (time?) + cat + song + musicians + actions
-  let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
+  // total columns: drag + num + (time?) + song + musicians + actions
+  let totalCols = $derived(allMusicians.length + 4 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(songs: Song[]) {
     const updated = await addSongsToSetlist(setlist.id, songs);
@@ -298,6 +319,16 @@
           onclick={() => toggleMusician(name)}
         >{name}</button>
       {/each}
+      {#if guestNames.length > 0}
+        <span class="filter-sep"></span>
+        {#each guestNames as name}
+          <button
+            class="filter-chip filter-chip-guest"
+            class:active={selectedMusician === name}
+            onclick={() => toggleMusician(name)}
+          >{name}</button>
+        {/each}
+      {/if}
     </div>
   {/if}
 
@@ -314,10 +345,9 @@
             <th class="th-drag"></th>
             <th class="th-num">#</th>
             {#if localMeta.startTime}<th class="th-time">⏱</th>{/if}
-            <th class="th-cat"></th>
             <th class="th-song">Песня</th>
             {#each allMusicians as name, i}
-              <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
+              <th class="th-musician progress-delim" class:musician-alt={i % 2 === 0}>{name}</th>
             {/each}
             <th class="th-actions"></th>
           </tr>
@@ -347,14 +377,15 @@
                     <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
-                  <td class="td-cat"><CategoryBadge category={song.category} iconOnly /></td>
                   <td class="td-song">
                     <div class="song-name">
+                      <span class="cat-inline"><CategoryBadge category={song.category} iconOnly /></span>
                       <span class="artist">{song.artist}</span>
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
                       {#each guestTags as g}
-                        <span class="guest-tag">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
+                        {@const gStage = entryStage(entry, g.name)}
+                        <span class="guest-tag" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
                       {/each}
                     </div>
                     <CommentInput
@@ -364,15 +395,15 @@
                   </td>
                   {#each allMusicians as name, i}
                     {@const role = song.musicians[name]}
-                    {@const stage = (entry.progress?.[name] ?? entry.song?.progress?.[name] ?? 'nothing') as LearningStage}
-                    {@const progBg = selectedMusician === name ? (PROG_BG[stage] ?? null) : null}
+                    {@const stage = entryStage(entry, name)}
+                    {@const progBg = (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
                     <td
-                      class="td-musician"
+                      class="td-musician progress-delim"
                       class:musician-alt={i % 2 === 0 && !progBg}
                       style={progBg ? `background: ${progBg}` : ''}
                     >
                       {#if role?.instruments?.length}
-                        <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
+                        <span class="inst-slot">{#each sortInstruments(role.instruments) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
                       {/if}
                     </td>
                   {/each}
@@ -487,6 +518,8 @@
   }
   .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
   .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filter-chip-guest { border-style: dashed; }
+  .filter-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; align-self: center; }
 
   .break-wrap { position: relative; }
   .break-picker {
@@ -498,7 +531,7 @@
   .break-opt:hover { background: var(--row-hover); }
 
   .table-wrap { overflow: auto; flex: 1; padding: 0 16px 16px; }
-  table { width: 100%; border-collapse: separate; border-spacing: 0 3px; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0 3px; background: var(--surface); }
 
   thead th {
     padding: 4px 8px; font-size: 0.72rem; font-weight: 700;
@@ -509,10 +542,10 @@
   }
   .th-num, .td-num { text-align: right; width: 28px; }
   .th-time, .td-time { width: 42px; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; text-align: right; padding-right: 6px; }
-  .th-cat, .td-cat { width: 32px; text-align: center; }
   .th-drag, .td-drag { width: 24px; }
   .th-musician { text-align: center; width: 6%; min-width: 52px; }
   .td-musician { text-align: left; width: 6%; min-width: 52px; }
+  .td-musician.progress-delim, .th-musician.progress-delim { border-right: 1px solid rgba(128,128,128,0.22); }
   .th-musician.musician-alt { background: var(--musician-alt-bg); }
   tbody tr td.musician-alt { background: var(--musician-alt-bg); }
   thead .th-musician { text-align: center; }
@@ -542,8 +575,9 @@
   .drag-handle { color: var(--text-muted); font-size: 1rem; cursor: grab; opacity: 0.4; display: block; text-align: center; }
   .song-row:hover .drag-handle, .break-row:hover .drag-handle { opacity: 1; }
 
-  .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
-  .entry-pct { display: block; font-size: 0.62rem; font-weight: 600; padding: 1px 5px; border-radius: 8px; white-space: nowrap; margin-top: 3px; }
+  .td-num { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; text-align: right; }
+  .entry-pct { display: block; font-size: 0.68rem; font-weight: 600; padding: 1px 5px; border-radius: 8px; white-space: nowrap; margin-top: 3px; }
+  .cat-inline { font-size: 0.98em; margin-left: 6px; margin-right: 6px; vertical-align: middle; display: inline-block; }
 
 
   .td-song { white-space: nowrap; }
@@ -556,12 +590,11 @@
 
   .guest-tag {
     display: inline-block;
-    background: var(--border);
-    color: var(--text-muted);
-    font-size: 0.7rem;
-    padding: 1px 7px;
+    font-size: 0.89rem;
+    font-weight: 500;
+    padding: 2px 10px;
     border-radius: 10px;
-    margin-left: 5px;
+    margin-left: 6px;
     white-space: nowrap;
     vertical-align: middle;
   }

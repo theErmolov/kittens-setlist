@@ -26,7 +26,7 @@
   .comment-input {
     display: block; width: 100%; margin-top: 3px;
     background: transparent; border: none; border-bottom: 1px dashed transparent;
-    font-size: 0.75rem; color: var(--text-muted); font-style: italic;
+    font-size: 0.94rem; color: var(--text); font-style: italic;
     padding: 1px 0; outline: none; cursor: text;
     transition: border-color 0.15s;
   }

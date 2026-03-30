@@ -9,11 +9,10 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
-    nothing:   'rgba(234,179,8,0.18)',
-    queue:     'rgba(234,179,8,0.18)',
-    structure: 'rgba(192,80,77,0.18)',
-    mastering: 'rgba(59,130,246,0.18)',
-    ready:     'rgba(34,197,94,0.18)',
+    queue:     'rgba(239,68,68,0.18)',
+    structure: 'rgba(234,179,8,0.22)',
+    mastering: 'rgba(34,197,94,0.18)',
+    ready:     'rgba(59,130,246,0.18)',
   };
 
   let {
@@ -68,7 +67,7 @@
   </td>
   {#each allMusicians as name, i}
     {@const role = song.musicians[name]}
-    {@const stage = (song.progress?.[name] ?? 'nothing') as LearningStage}
+    {@const stage = (song.progress?.[name] ?? 'queue') as LearningStage}
     {@const progBg = showProgress && (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
     <td
       class="td-musician"
@@ -76,7 +75,7 @@
       style={progBg ? `background: ${progBg}` : ''}
     >
       {#if role?.instruments?.length}
-        <span class="inst-slot">{sortInstruments(role.instruments).map(i => instrumentIcons[i]).join('')}</span>
+        <span class="inst-slot">{#each sortInstruments(role.instruments) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
       {/if}
     </td>
   {/each}

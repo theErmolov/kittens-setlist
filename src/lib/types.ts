@@ -1,6 +1,6 @@
 export type Category = 'top' | 'mid' | 'low';
 export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals';
-export type LearningStage = 'nothing' | 'queue' | 'structure' | 'mastering' | 'ready';
+export type LearningStage = 'queue' | 'structure' | 'mastering' | 'ready';
 
 export interface MusicianRole {
   instruments: Instrument[];  // empty = present but "free" (no specific instrument)

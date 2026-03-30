@@ -9,11 +9,11 @@
 
   // Stages that appear as progress bar segments (in order)
   const PROGRESS_SEGS: LearningStage[] = ['structure', 'mastering', 'ready'];
-  const STAGE_ORDER: LearningStage[] = ['nothing', 'queue', 'structure', 'mastering', 'ready'];
+  const STAGE_ORDER: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
   const BAR_COLOR: Partial<Record<LearningStage, string>> = {
-    structure: '#c0504d',
-    mastering: '#3b82f6',
-    ready:     '#22c55e',
+    structure: '#ca8a04',
+    mastering: '#22c55e',
+    ready:     '#3b82f6',
   };
 
   let {
