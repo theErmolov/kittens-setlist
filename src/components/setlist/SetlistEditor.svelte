@@ -268,6 +268,24 @@
       .map(([name, role]) => ({ name, instruments: sortInstruments(role.instruments) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  function mobileEntryBubbles(entry: SetlistEntry, song: Song): { name: string; instruments: Instrument[]; progBg: string; isGuest: boolean }[] {
+    const out: { name: string; instruments: Instrument[]; progBg: string; isGuest: boolean }[] = [];
+    for (const name of allMusicians) {
+      const role = song.musicians[name];
+      if (!role?.instruments?.length) continue;
+      const stage = entryStage(entry, name);
+      out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '#fcd34d40', isGuest: false });
+    }
+    const permSet = new Set(allMusicians);
+    for (const [name, role] of Object.entries(song.musicians)) {
+      if (!permSet.has(name) && role.instruments.length > 0) {
+        const stage = entryStage(entry, name);
+        out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '', isGuest: true });
+      }
+    }
+    return out;
+  }
 </script>
 
 <div class="editor">
@@ -361,6 +379,7 @@
               {@const song = entry.song}
               {#if song}
                 {@const guestTags = guestTagsFor(song)}
+                {@const mobBubbles = mobileEntryBubbles(entry, song)}
                 <tr
                   class="song-row"
                   class:dragging={isDragging}
@@ -385,9 +404,19 @@
                       <span class="title">{song.title}</span>
                       {#each guestTags as g}
                         {@const gStage = entryStage(entry, g.name)}
-                        <span class="guest-tag" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
+                        <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
                       {/each}
                     </div>
+                    {#if mobBubbles.length > 0}
+                      <div class="mobile-musicians">
+                        {#each mobBubbles as b}
+                          <span class="mob-bubble" class:mob-guest={b.isGuest} style="background: {b.progBg}">
+                            <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+                            <span class="mob-name">{b.name}</span>
+                          </span>
+                        {/each}
+                      </div>
+                    {/if}
                     <CommentInput
                       value={entry.comment ?? ''}
                       onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
@@ -625,4 +654,26 @@
 
   .remove-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 6px; font-size: 0.82rem; border-radius: 4px; }
   .remove-btn:hover { color: #ef4444; }
+
+  .mobile-musicians { display: none; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .mob-bubble {
+    display: inline-flex; align-items: center; gap: 3px;
+    border-radius: 6px; padding: 1px 6px 1px 3px;
+    font-size: 0.82rem; color: var(--text-muted);
+  }
+  .mob-bubble.mob-guest { border: 1px dashed var(--border); background: transparent !important; }
+  .mob-icons { font-size: 1rem; flex-shrink: 0; }
+  .mob-name { white-space: nowrap; }
+  :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(0.7); }
+
+  @media (max-width: 700px) {
+    .th-musician { display: none; }
+    .td-musician { display: none; }
+    .desktop-only { display: none !important; }
+    .mobile-musicians { display: flex; }
+    .td-song { white-space: normal; }
+    .table-wrap { padding: 0 8px 16px; }
+    .editor-header { padding: 12px; }
+    .song-name { flex-wrap: wrap; }
+  }
 </style>

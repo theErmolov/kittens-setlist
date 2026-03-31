@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
   import { t } from '$lib/i18n';
 
@@ -113,9 +115,9 @@
     new Set(guestRows.filter(r => r.name.trim() && r.instruments.length === 0).map(r => r.id))
   );
 
-  function handleSave() {
-    if (!draft.artist.trim() || !draft.title.trim()) return;
-    if (guestsMissingInstrument.size > 0) return;
+  function handleSave(): boolean {
+    if (!draft.artist.trim() || !draft.title.trim()) return false;
+    if (guestsMissingInstrument.size > 0) return false;
     const allMusicians: Record<string, MusicianRole> = { ...draft.musicians };
     const allProgress: Record<string, LearningStage> = { ...(draft.progress ?? {}) };
     for (const row of guestRows) {
@@ -125,10 +127,43 @@
       }
     }
     onsave({ ...draft, musicians: allMusicians, progress: allProgress });
+    return true;
   }
 
   function handleBackdrop(e: MouseEvent) {
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) onclose();
+    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal();
+  }
+
+  // ── Mobile: full-screen + browser back-button support ─────────────────────
+
+  let historyPushed = false;
+
+  function handlePopstate() {
+    historyPushed = false;
+    onclose();
+  }
+
+  onMount(() => {
+    if (!browser || window.innerWidth > 700) return;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ kittenModal: true }, '');
+    historyPushed = true;
+    window.addEventListener('popstate', handlePopstate);
+  });
+
+  onDestroy(() => {
+    if (!browser) return;
+    document.body.style.overflow = '';
+    window.removeEventListener('popstate', handlePopstate);
+  });
+
+  function closeModal() {
+    if (browser) window.removeEventListener('popstate', handlePopstate);
+    if (historyPushed) {
+      historyPushed = false;
+      history.back();
+    }
+    onclose();
   }
 
   let modalTitle = $derived(
@@ -143,8 +178,9 @@
 <div class="modal-backdrop" onclick={handleBackdrop}>
   <div class="modal">
     <div class="modal-header">
+      <button class="back-btn" onclick={closeModal}>← {$t.song.cancel}</button>
       <h2>{modalTitle}</h2>
-      <button class="close-btn" onclick={onclose}>✕</button>
+      <button class="close-btn" onclick={closeModal}>✕</button>
     </div>
 
     <div class="modal-body">
@@ -267,8 +303,8 @@
     </div>
 
     <div class="modal-footer">
-      <button class="btn-secondary" onclick={onclose}>{$t.song.cancel}</button>
-      <button class="btn-primary" onclick={handleSave}>{$t.song.save}</button>
+      <button class="btn-secondary" onclick={closeModal}>{$t.song.cancel}</button>
+      <button class="btn-primary" onclick={() => { if (handleSave()) closeModal(); }}>{$t.song.save}</button>
     </div>
   </div>
 </div>
@@ -406,4 +442,38 @@
 
   .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+
+  .back-btn { display: none; }
+
+  @media (max-width: 700px) {
+    /* Full-screen modal */
+    .modal-backdrop { padding: 0; align-items: stretch; }
+    .modal { max-width: none; max-height: none; border-radius: 0; height: 100dvh; }
+    .modal-header { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+    .modal-header h2 { flex: 1; text-align: center; }
+    .back-btn {
+      display: flex; align-items: center; gap: 4px;
+      background: none; border: none; cursor: pointer;
+      color: var(--accent); font-size: 0.9rem; font-weight: 600; padding: 4px 0;
+    }
+    .close-btn { display: none; }
+    .fields-row { flex-direction: column; }
+
+    /* 2-line musician layout:
+       Line 1: name  ···  progress bar
+       Line 2: instrument buttons (full width) */
+    .roster-header { display: none; }
+    .roster-row { flex-wrap: wrap; gap: 6px 0; }
+    .row-gap { display: none; }
+    .roster-name { order: 1; width: auto; flex: 1; }
+    .guest-name { order: 1; flex: 1; width: auto !important; }
+    .prog-wrap { order: 2; margin-left: auto; }
+    .prog-seg { height: 28px; width: 44px; }
+    .remove-guest-btn { order: 3; margin-left: 8px; width: auto; }
+    .inst-grid {
+      order: 4; width: 100%;
+      grid-template-columns: repeat(8, 1fr);
+    }
+    .inst-btn { width: 100%; height: 40px; }
+  }
 </style>

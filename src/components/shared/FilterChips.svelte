@@ -19,6 +19,12 @@
   function selectAll() {
     onchange(new Set());
   }
+
+  // Split "💩 Top" → { icon: "💩", label: " Top" }
+  function splitLabel(text: string) {
+    const i = text.indexOf(' ');
+    return i === -1 ? { icon: text, label: '' } : { icon: text.slice(0, i), label: text.slice(i) };
+  }
 </script>
 
 <div class="chips">
@@ -30,12 +36,13 @@
     {$t.filter.all}
   </button>
   {#each (['top', 'mid', 'low'] as Category[]) as cat}
+    {@const { icon, label } = splitLabel($t.filter[cat])}
     <button
       class="chip chip-{cat}"
       class:active={selected.has(cat)}
       onclick={() => toggle(cat)}
     >
-      {$t.filter[cat]}
+      {icon}<span class="cat-label">{label}</span>
     </button>
   {/each}
 </div>
@@ -61,4 +68,9 @@
   .chip-top.active   { background: #b91c1c; border-color: #ef4444; }
   .chip-mid.active   { background: #7c3aed; border-color: #a78bfa; }
   .chip-low.active   { background: #15803d; border-color: #22c55e; }
+
+  @media (max-width: 700px) {
+    .cat-label { display: none; }
+    .chip { padding: 4px 10px; }
+  }
 </style>

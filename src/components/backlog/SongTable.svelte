@@ -120,8 +120,10 @@
 <div class="table-container">
   <div class="toolbar">
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
-    <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-    <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().length * 5)})</span>
+    <div class="chips-row">
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().length * 5)})</span>
+    </div>
     <button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
   </div>
 
@@ -150,7 +152,7 @@
       class="filter-chip progress-toggle"
       class:active={showProgress}
       onclick={() => { showProgress = !showProgress; }}
-    >{$t.backlog.progress}</button>
+    ><span class="progress-icon">📊</span><span class="progress-label">{$t.backlog.progress}</span></button>
   </div>
 
   <div class="scroll-wrap">
@@ -167,7 +169,7 @@
       <thead>
         <tr>
           <th class="th-cat">{showProgress ? $t.backlog.progress : $t.backlog.cols.cat}</th>
-          <th class="th-sortable" onclick={() => toggleSort('artist')}>
+          <th class="th-sortable th-artist" onclick={() => toggleSort('artist')}>
             {$t.backlog.cols.artist}{sortCol === 'artist' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
           </th>
           <th class="th-sortable" onclick={() => toggleSort('title')}>
@@ -299,6 +301,27 @@
   .th-sortable { cursor: pointer; user-select: none; }
   .th-sortable:hover { color: var(--accent); }
   .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+
+  .chips-row { display: flex; align-items: center; gap: 8px; }
+  .chips-row .song-count { flex-shrink: 0; }
+
+  @media (max-width: 700px) {
+    /* Toolbar:
+       line 1: [search ···············] [+ Add]
+       line 2: [category chips] [count right-aligned] */
+    .toolbar { gap: 6px 8px; padding: 8px 12px; }
+    .search { min-width: 0; }
+    .add-btn { margin-left: 0; flex-shrink: 0; }
+    .chips-row { width: 100%; }
+    .chips-row .song-count { margin-left: auto; }
+    /* Filter-bar: progress label hidden, only icon shown */
+    .progress-label { display: none; }
+    /* Table → card list */
+    thead { display: none; }
+    table { display: block; }
+    tbody { display: block; }
+    .scroll-wrap { overflow-x: hidden; }
+  }
 
   .modal-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);

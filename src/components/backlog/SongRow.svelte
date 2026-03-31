@@ -48,22 +48,57 @@
       .map(([name, role]) => ({ name, instruments: sortInstruments(role.instruments) }))
       .sort((a, b) => a.name.localeCompare(b.name))
   );
+
+  let mobileBubbles = $derived.by(() => {
+    const out: Array<{ name: string; instruments: Instrument[]; progBg: string | null; isGuest: boolean }> = [];
+    for (const name of allMusicians) {
+      const role = song.musicians[name];
+      if (!role?.instruments?.length) continue;
+      const stage = (song.progress?.[name] ?? 'queue') as LearningStage;
+      const progBg = showProgress ? (PROG_BG[stage] ?? null) : '#fcd34d40';
+      out.push({ name, instruments: sortInstruments(role.instruments), progBg, isGuest: false });
+    }
+    for (const g of guestTags) {
+      out.push({ name: g.name, instruments: g.instruments, progBg: null, isGuest: true });
+    }
+    return out;
+  });
 </script>
 
 <tr class="song-row">
-  <td class="td-cat">
+  <td class="td-cat desktop-only">
     {#if showProgress && overallPct !== null}
       <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
     {:else}
       <CategoryBadge category={song.category} iconOnly />
     {/if}
   </td>
-  <td class="td-artist">{song.artist}</td>
+  <td class="td-artist desktop-only">{song.artist}</td>
   <td class="td-title">
-    <span class="title-text">{song.title}</span>
+    <div class="mobile-song-header">
+      {#if showProgress && overallPct !== null}
+        <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
+      {:else}
+        <span class="mobile-cat"><CategoryBadge category={song.category} iconOnly /></span>
+      {/if}
+      <span class="mobile-artist">{song.artist}</span>
+      <span class="mobile-sep">–</span>
+      <span class="mobile-title">{song.title}</span>
+    </div>
+    <span class="title-text desktop-only">{song.title}</span>
     {#each guestTags as g}
-      <span class="guest-tag"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
+      <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
+    {#if mobileBubbles.length > 0}
+      <div class="mobile-musicians">
+        {#each mobileBubbles as b}
+          <span class="mob-bubble" class:mob-guest={b.isGuest} style={b.progBg ? `background: ${b.progBg}` : ''}>
+            <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+            <span class="mob-name">{b.name}</span>
+          </span>
+        {/each}
+      </div>
+    {/if}
   </td>
   {#each allMusicians as name, i}
     {@const role = song.musicians[name]}
@@ -119,6 +154,17 @@
   .musician-alt { background: var(--musician-alt-bg); }
   .inst-slot { font-size: 1.17rem; vertical-align: middle; }
 
+  .mobile-musicians { display: none; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .mob-bubble {
+    display: inline-flex; align-items: center; gap: 3px;
+    border-radius: 6px; padding: 1px 6px 1px 3px;
+    font-size: 0.82rem; color: var(--text-muted);
+  }
+  .mob-bubble.mob-guest { border: 1px dashed var(--border); }
+  .mob-icons { font-size: 1rem; flex-shrink: 0; }
+  .mob-name { white-space: nowrap; }
+  :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { background: #78350f; }
+
   .td-actions { white-space: nowrap; text-align: center; }
   .action-btn {
     background: none; border: none; cursor: pointer;
@@ -127,4 +173,31 @@
   }
   .action-btn:hover { opacity: 1; }
   .action-btn.danger:hover { color: #ef4444; }
+
+  .mobile-song-header { display: none; line-height: 1.5; }
+  .mobile-song-header .overall-pct { display: inline; padding: 1px 5px; }
+  .mobile-cat { vertical-align: middle; margin-right: 2px; }
+  .mobile-artist { font-weight: 500; font-size: 0.88rem; }
+  .mobile-sep { color: var(--text-muted); margin: 0 2px; }
+  .mobile-title { font-weight: 600; font-size: 0.88rem; }
+
+  @media (max-width: 700px) {
+    /* Break out of table — row becomes a flex card */
+    tr.song-row { display: flex; align-items: flex-start; gap: 6px; padding: 8px 4px; }
+    .desktop-only { display: none !important; }
+    .td-musician { display: none !important; }
+    .td-title { flex: 1; padding: 4px 0; min-width: 0; overflow: visible; }
+    .td-actions { padding: 2px 0; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .action-btn { font-size: 1.1rem; padding: 3px 4px; }
+    /* Song header: inline text, icon + artist – title */
+    .mobile-song-header { display: block; }
+    /* Musician bubbles: 3-per-row grid, equal width */
+    .mobile-musicians {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
+  }
 </style>
