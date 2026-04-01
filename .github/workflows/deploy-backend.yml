@@ -10,6 +10,9 @@ on:
       - 'samconfig.toml'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -48,5 +51,4 @@ jobs:
         run: |
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --parameter-overrides \
-              TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }} \
-              SuperadminTelegramId=${{ secrets.SUPERADMIN_TELEGRAM_ID }}
+              TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }}

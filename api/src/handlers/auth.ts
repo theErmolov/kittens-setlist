@@ -15,11 +15,6 @@ function getBotToken(): string {
   return t;
 }
 
-function getSuperadminId(): string {
-  const id = process.env.SUPERADMIN_TELEGRAM_ID;
-  if (!id) throw new Error('SUPERADMIN_TELEGRAM_ID not set');
-  return id;
-}
 
 async function getSession(token: string): Promise<KittensSession | undefined> {
   const session = await dbGetByKey<KittensSession>(SESSIONS_TABLE, { token });
@@ -70,9 +65,6 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
 
     if (!valid) return err('Invalid or expired Telegram auth data', 401);
 
-    const superadminId = getSuperadminId();
-    const isAdmin = data.id === superadminId;
-
     // Upsert user — preserve existing status/musicianId if already approved
     const existing = await getUser(data.id);
     const now = new Date().toISOString();
@@ -82,11 +74,11 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
       ...(data.last_name ? { lastName: data.last_name } : {}),
       ...(data.username ? { username: data.username } : {}),
       ...(data.photo_url ? { photoUrl: data.photo_url } : {}),
-      status: existing?.status ?? (isAdmin ? 'approved' : 'pending'),
+      status: existing?.status ?? 'pending',
       ...(existing?.musicianId ? { musicianId: existing.musicianId } : {}),
-      isAdmin: isAdmin || existing?.isAdmin,
+      isAdmin: existing?.isAdmin,
       createdAt: existing?.createdAt ?? now,
-      ...(existing?.approvedAt ? { approvedAt: existing.approvedAt } : isAdmin && !existing ? { approvedAt: now } : {}),
+      ...(existing?.approvedAt ? { approvedAt: existing.approvedAt } : {}),
     };
     await dbPut(USERS_TABLE, user as unknown as Record<string, unknown>);
 
