@@ -208,6 +208,12 @@
     {musicians}
     onclose={() => { editingSong = null; }}
     onsave={handleSave}
+    ondelete={async () => {
+      const id = editingSong!.id;
+      await deleteSong(id);
+      songs = songs.filter(s => s.id !== id);
+    }}
+    onaddtosetlist={() => { addToSetlistSong = editingSong; }}
   />
 {/if}
 

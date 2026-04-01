@@ -23,13 +23,17 @@
     musicians,
     mode = 'backlog',
     onclose,
-    onsave
+    onsave,
+    ondelete,
+    onaddtosetlist
   }: {
     song: Partial<Song> | null;
     musicians: BandMusician[];
     mode?: 'backlog' | 'entry';
     onclose: () => void;
     onsave: (s: Song) => void;
+    ondelete?: () => void;
+    onaddtosetlist?: () => void;
   } = $props();
 
   const permanentNames = new Set(musicians.map(m => m.name));
@@ -303,8 +307,18 @@
     </div>
 
     <div class="modal-footer">
-      <button class="btn-secondary" onclick={closeModal}>{$t.song.cancel}</button>
-      <button class="btn-primary" onclick={() => { if (handleSave()) closeModal(); }}>{$t.song.save}</button>
+      <div class="footer-left">
+        {#if ondelete}
+          <button class="btn-icon danger" onclick={() => { if (confirm($t.deleteConfirm)) { ondelete!(); closeModal(); } }} title={$t.song.remove}>🗑</button>
+        {/if}
+        {#if onaddtosetlist}
+          <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
+        {/if}
+      </div>
+      <div class="footer-right">
+        <button class="btn-secondary" onclick={closeModal}>{$t.song.cancel}</button>
+        <button class="btn-primary" onclick={() => { if (handleSave()) closeModal(); }}>{$t.song.save}</button>
+      </div>
     </div>
   </div>
 </div>
@@ -322,7 +336,16 @@
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
   .close-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 4px 8px; }
   .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
-  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+  .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+  .footer-left { display: flex; gap: 6px; }
+  .footer-right { display: flex; gap: 8px; }
+  .btn-icon {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 1.2rem; padding: 6px 10px;
+    color: var(--text-muted); transition: border-color 0.12s, color 0.12s;
+  }
+  .btn-icon:hover { border-color: var(--accent); color: var(--text); }
+  .btn-icon.danger:hover { border-color: #ef4444; color: #ef4444; }
 
   .fields-row { display: flex; gap: 12px; }
   .fields-row .field { flex: 1; }
@@ -465,8 +488,8 @@
     .roster-header { display: none; }
     .roster-row { flex-wrap: wrap; gap: 6px 0; }
     .row-gap { display: none; }
-    .roster-name { order: 1; width: auto; flex: 1; }
-    .guest-name { order: 1; flex: 1; width: auto !important; }
+    .roster-name { order: 1; min-width: 0; flex: 1 1 auto; width: auto; }
+    .guest-name { order: 1; flex: 1 1 auto; min-width: 0; width: auto !important; }
     .prog-wrap { order: 2; margin-left: auto; }
     .prog-seg { height: 28px; width: 44px; }
     .remove-guest-btn { order: 3; margin-left: 8px; width: auto; }
@@ -475,5 +498,7 @@
       grid-template-columns: repeat(8, 1fr);
     }
     .inst-btn { width: 100%; height: 40px; }
+    /* Ghost row: hide invisible inst-grid to avoid blank space */
+    .ghost-row .inst-grid { display: none; }
   }
 </style>

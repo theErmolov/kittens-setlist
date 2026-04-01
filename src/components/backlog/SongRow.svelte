@@ -115,9 +115,9 @@
     </td>
   {/each}
   <td class="td-actions">
-    <button class="action-btn" onclick={onedit} title={$t.song.editTitle}>✏️</button>
-    <button class="action-btn" onclick={onaddtosetlist} title={$t.addToSetlist.title}>📋</button>
-    <button class="action-btn danger" onclick={ondelete} title={$t.song.remove}>🗑</button>
+    <button class="action-btn action-edit" onclick={onedit} title={$t.song.editTitle}>✏️</button>
+    <button class="action-btn action-addset" onclick={onaddtosetlist} title={$t.addToSetlist.title}>📋</button>
+    <button class="action-btn action-del danger" onclick={ondelete} title={$t.song.remove}>🗑</button>
   </td>
 </tr>
 
@@ -188,7 +188,9 @@
     .td-musician { display: none !important; }
     .td-title { flex: 1; padding: 4px 0; min-width: 0; overflow: visible; }
     .td-actions { padding: 2px 0; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-    .action-btn { font-size: 1.1rem; padding: 3px 4px; }
+    .action-addset, .action-del { display: none; }
+    .action-edit { font-size: 1.5rem; padding: 8px 6px; opacity: 1; }
+    .action-edit:hover { opacity: 1; }
     /* Song header: inline text, icon + artist – title */
     .mobile-song-header { display: block; }
     /* Musician bubbles: 3-per-row grid, equal width */
