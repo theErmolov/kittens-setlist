@@ -33,6 +33,9 @@
   let selectedInstruments = $state(new Set<Instrument>());
   let showProgress = $state(false);
   let filterOpen = $state(false);
+  let hasActiveFilters = $derived(
+    search.length > 0 || categoryFilter.size > 0 || selectedMusicians.size > 0 || selectedInstruments.size > 0
+  );
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
   let sortCol = $state<'artist' | 'title'>('artist');
@@ -119,6 +122,7 @@
 </script>
 
 <div class="table-container">
+  <!-- Desktop toolbar (hidden on mobile) -->
   <div class="toolbar">
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="chips-row">
@@ -128,23 +132,9 @@
     <button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
   </div>
 
+  <!-- Desktop filter bar (hidden on mobile) -->
   <div class="filter-bar">
-    <!-- Mobile: compact row with just two toggle buttons -->
-    <div class="filter-mobile-header">
-      <button
-        class="filter-chip filter-toggle-btn"
-        class:active={filterOpen || selectedMusicians.size > 0 || selectedInstruments.size > 0}
-        onclick={() => { filterOpen = !filterOpen; }}
-      >🎛️ {$t.backlog.filterBtn}</button>
-      <button
-        class="filter-chip filter-toggle-btn"
-        class:active={showProgress}
-        onclick={() => { showProgress = !showProgress; }}
-      >📊 {$t.backlog.progress}</button>
-    </div>
-
-    <!-- Filter content: always visible on desktop, collapsible on mobile -->
-    <div class="filter-content" class:mobile-open={filterOpen}>
+    <div class="filter-content">
       <div class="filter-group">
         {#each permanentNames as name}
           <button
@@ -166,8 +156,6 @@
         {/each}
       </div>
     </div>
-
-    <!-- Progress toggle: desktop only -->
     <button
       class="filter-chip progress-toggle"
       class:active={showProgress}
@@ -219,6 +207,50 @@
         {/if}
       </tbody>
     </table>
+  </div>
+
+  <!-- Mobile filter panel (fixed above bottom bar, shown when filterOpen) -->
+  <div class="mobile-filter-panel" class:open={filterOpen}>
+    <input class="search mobile-search" placeholder={$t.backlog.search} bind:value={search} />
+    <div class="mobile-chips-row">
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)}</span>
+    </div>
+    <div class="filter-group">
+      {#each permanentNames as name}
+        <button
+          class="filter-chip"
+          class:active={selectedMusicians.has(name)}
+          onclick={() => toggleMusician(name)}
+        >{name}</button>
+      {/each}
+    </div>
+    <div class="filter-sep-h"></div>
+    <div class="filter-group">
+      {#each allInstruments as inst}
+        <button
+          class="filter-chip filter-chip-inst"
+          class:active={selectedInstruments.has(inst)}
+          onclick={() => toggleInstrument(inst)}
+          title={$t.instrument[inst]}
+        >{instrumentIcons[inst]}</button>
+      {/each}
+    </div>
+  </div>
+
+  <!-- Mobile bottom bar -->
+  <div class="mobile-bottom-bar">
+    <button
+      class="bottom-btn"
+      class:active={filterOpen || hasActiveFilters}
+      onclick={() => { filterOpen = !filterOpen; }}
+    >🎛️ {$t.backlog.filterBtn}</button>
+    <button
+      class="bottom-btn"
+      class:active={showProgress}
+      onclick={() => { showProgress = !showProgress; }}
+    >📊 {$t.backlog.progress}</button>
+    <button class="bottom-add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
   </div>
 </div>
 
@@ -292,12 +324,13 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  .filter-mobile-header { display: none; }
   .filter-content { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
   .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
   .filter-sep {
     width: 1px; height: 22px; background: var(--border); flex-shrink: 0; align-self: center;
   }
+  .mobile-filter-panel { display: none; }
+  .mobile-bottom-bar { display: none; }
   .filter-chip {
     padding: 3px 12px;
     border: 1px solid var(--border);
@@ -334,25 +367,48 @@
   .chips-row .song-count { flex-shrink: 0; }
 
   @media (max-width: 700px) {
-    /* Toolbar:
-       line 1: [search ···············] [+ Add]
-       line 2: [category chips] [count right-aligned] */
-    .toolbar { gap: 6px 8px; padding: 8px 12px; }
-    .search { order: 1; flex: 1; min-width: 0; font-size: 16px; }
-    .add-btn { order: 2; margin-left: 0; flex-shrink: 0; }
-    .chips-row { order: 3; width: 100%; }
-    .chips-row .song-count { margin-left: auto; }
-    /* Filter-bar: show compact header, hide desktop elements */
-    .filter-bar { padding: 0; gap: 0; }
-    .filter-mobile-header { display: flex; gap: 8px; padding: 8px 12px; }
-    .filter-content { display: none; padding: 8px 12px; border-top: 1px solid var(--border); }
-    .filter-content.mobile-open { display: flex; }
-    .progress-toggle { display: none; }
+    /* Hide desktop toolbar and filter bar entirely */
+    .toolbar { display: none; }
+    .filter-bar { display: none; }
+
+    /* Song list fills height minus bottom bar */
+    .table-container { height: calc(100dvh - 72px - 52px); }
+    .scroll-wrap { overflow-x: hidden; }
+
+    /* Mobile filter panel — slides up above bottom bar when open */
+    .mobile-filter-panel {
+      position: fixed; bottom: 52px; left: 0; right: 0; z-index: 20;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px; display: none; flex-direction: column; gap: 10px;
+    }
+    .mobile-filter-panel.open { display: flex; }
+    .mobile-search { font-size: 16px; width: 100%; box-sizing: border-box; }
+    .mobile-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .mobile-chips-row .song-count { margin-left: auto; }
+    .filter-sep-h { height: 1px; background: var(--border); }
+
+    /* Mobile bottom bar */
+    .mobile-bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 52px; z-index: 21;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    }
+    .bottom-btn {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+      color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
+    }
+    .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .bottom-add-btn {
+      margin-left: auto; padding: 6px 16px;
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      cursor: pointer; font-weight: 600; font-size: 0.88rem; white-space: nowrap;
+    }
+
     /* Table → card list */
     thead { display: none; }
     table { display: block; }
     tbody { display: block; }
-    .scroll-wrap { overflow-x: hidden; }
   }
 
   .modal-backdrop {
