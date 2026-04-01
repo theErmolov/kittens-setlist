@@ -85,6 +85,8 @@
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
   let selectedMusician = $state<string | null>(null);
+  let filterNotReady = $state(false);
+  let filterOpen = $state(false);
 
   function toggleMusician(name: string) {
     selectedMusician = selectedMusician === name ? null : name;
@@ -171,21 +173,33 @@
   let existingIds = $derived(new Set(localEntries.map(e => e.songId).filter((id): id is string => !!id)));
 
   let filteredEntries = $derived(() => {
-    if (!selectedMusician) return sortedEntries;
-    const m = selectedMusician!;
-    return sortedEntries
-      .filter(e => {
-        if (!e.song) return false; // hide breaks when filter active
-        const role = e.song.musicians[m];
-        return role && role.instruments.length > 0;
-      })
-      .sort((a, b) => {
-        const stageOf = (e: SetlistEntry) => STAGE_PCT[entryStage(e, m)];
-        return stageOf(a) - stageOf(b);
+    let entries: SetlistEntry[] = sortedEntries;
+
+    if (selectedMusician) {
+      const m = selectedMusician;
+      entries = entries
+        .filter(e => {
+          if (!e.song) return false; // hide breaks when musician filter active
+          const role = e.song.musicians[m];
+          return role && role.instruments.length > 0;
+        })
+        .sort((a, b) => {
+          const stageOf = (e: SetlistEntry) => STAGE_PCT[entryStage(e, m)];
+          return stageOf(a) - stageOf(b);
+        });
+    }
+
+    if (filterNotReady) {
+      entries = entries.filter(e => {
+        if (!e.song) return false; // hide breaks when readiness filter active
+        return entryProgressPct(e) < 100;
       });
+    }
+
+    return entries;
   });
 
-  let isFiltered = $derived(selectedMusician !== null);
+  let isFiltered = $derived(selectedMusician !== null || filterNotReady);
 
   let displayEntries = $derived(() => {
     const base = filteredEntries();
@@ -401,17 +415,50 @@
     </div>
   </div>
 
-  {#if allMusicians.length > 0}
-    <div class="filter-bar">
-      {#each allMusicians as name}
+  <div class="filter-bar">
+    {#each allMusicians as name}
+      <button
+        class="filter-chip"
+        class:active={selectedMusician === name}
+        onclick={() => toggleMusician(name)}
+      >{name}</button>
+    {/each}
+    {#if guestNames.length > 0}
+      <span class="filter-sep"></span>
+      {#each guestNames as name}
         <button
-          class="filter-chip"
+          class="filter-chip filter-chip-guest"
           class:active={selectedMusician === name}
           onclick={() => toggleMusician(name)}
         >{name}</button>
       {/each}
-      {#if guestNames.length > 0}
-        <span class="filter-sep"></span>
+    {/if}
+    {#if allMusicians.length > 0 || guestNames.length > 0}
+      <span class="filter-sep"></span>
+    {/if}
+    <button
+      class="filter-chip"
+      class:active={filterNotReady}
+      onclick={() => { filterNotReady = !filterNotReady; }}
+    >не готово</button>
+  </div>
+
+  <!-- Mobile filter panel (slides up above bottom bar) -->
+  <div class="mobile-filter-panel" class:open={filterOpen}>
+    {#if allMusicians.length > 0}
+      <div class="filter-group">
+        {#each allMusicians as name}
+          <button
+            class="filter-chip"
+            class:active={selectedMusician === name}
+            onclick={() => toggleMusician(name)}
+          >{name}</button>
+        {/each}
+      </div>
+    {/if}
+    {#if guestNames.length > 0}
+      <div class="filter-sep-h"></div>
+      <div class="filter-group">
         {#each guestNames as name}
           <button
             class="filter-chip filter-chip-guest"
@@ -419,9 +466,29 @@
             onclick={() => toggleMusician(name)}
           >{name}</button>
         {/each}
-      {/if}
+      </div>
+    {/if}
+    {#if allMusicians.length > 0 || guestNames.length > 0}
+      <div class="filter-sep-h"></div>
+    {/if}
+    <div class="filter-group">
+      <button
+        class="filter-chip"
+        class:active={filterNotReady}
+        onclick={() => { filterNotReady = !filterNotReady; }}
+      >не готово</button>
     </div>
-  {/if}
+  </div>
+
+  <!-- Mobile bottom bar -->
+  <div class="mobile-bottom-bar">
+    <button
+      class="bottom-btn"
+      class:active={filterOpen || isFiltered}
+      onclick={() => { filterOpen = !filterOpen; }}
+    >🎛️ Фильтр</button>
+    <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>+ Добавить</button>
+  </div>
 
   {#if sortedEntries.length === 0}
     <div class="empty">
@@ -640,6 +707,9 @@
   .filter-chip-guest { border-style: dashed; }
   .filter-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; align-self: center; }
 
+  .mobile-filter-panel { display: none; }
+  .mobile-bottom-bar { display: none; }
+
   .break-wrap { position: relative; }
   .break-picker {
     position: absolute; top: calc(100% + 4px); left: 0;
@@ -766,10 +836,12 @@
   .entry-time-mob { display: none; }
 
   @media (max-width: 700px) {
+    .editor { height: calc(100dvh - 56px - 52px); }
     .th-musician { display: none; }
     .td-musician { display: none; }
     .th-time, .td-time { display: none; }
     .desktop-only { display: none !important; }
+    .filter-bar { display: none; }
     .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
     .mobile-musicians {
       display: grid;
@@ -783,5 +855,31 @@
     .editor-header { padding: 12px; }
     .song-name { flex-wrap: wrap; }
     .meta-input { font-size: 16px; }
+
+    .mobile-filter-panel {
+      position: fixed; bottom: 52px; left: 0; right: 0; z-index: 20;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px; display: none; flex-direction: column; gap: 10px;
+    }
+    .mobile-filter-panel.open { display: flex; }
+    .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
+    .filter-sep-h { height: 1px; background: var(--border); }
+
+    .mobile-bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 52px; z-index: 21;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    }
+    .bottom-btn {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+      color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
+    }
+    .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .bottom-add-btn {
+      margin-left: auto; padding: 8px 18px;
+      background: var(--accent); color: #fff; border: none; border-radius: 20px;
+      cursor: pointer; font-weight: 600; font-size: 0.88rem;
+    }
   }
 </style>
