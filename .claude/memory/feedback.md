@@ -4,30 +4,15 @@ description: Preferences and key decisions made during development
 type: feedback
 ---
 
-**Use `browser` from `$app/environment` for any localStorage access.**
-Why: SvelteKit SSR makes `localStorage` exist but throws on `.getItem()`. `typeof localStorage === 'undefined'` doesn't catch it.
-How to apply: Always `if (!browser) return fallback` before touching localStorage.
-
 **Don't summarise what you just did at the end of responses.**
 Why: User can read the diff.
 
-## ⛔ NEVER COMMIT OR PUSH UNLESS EXPLICITLY ASKED IN THE CURRENT MESSAGE
-**Why:** User wants full control over when code is committed or pushed. Prior-session instructions do not carry over.
-**How to apply:** Do NOT run `git commit`, `git push`, or any variant unless the user says so in the current turn. No exceptions.
-
-**Category labels in Russian are band-specific slang — don't normalise them.**
-- top → "💩 По говну"
-- mid → "🎵 Середняк"
-- low → "🧪 Андеграунд"
-
-**Instrument filter when musicians are also selected must be scoped to those musicians.**
-Why: "Маша + 🎻" means songs where Маша plays violin, not songs where anyone plays violin.
-How to apply: See filter logic in `SongTable.svelte`.
+---
+# 🚨🚨🚨 NEVER COMMIT OR PUSH UNLESS THE USER EXPLICITLY SAYS SO IN THE CURRENT MESSAGE 🚨🚨🚨
+### This means: do NOT run `git commit`, `git push`, or any variant as part of a code change. ONLY when the user's message is literally "commit", "push", "commit and push", or equivalent. NO EXCEPTIONS. NO EXCEPTIONS. NO EXCEPTIONS.
+**Why:** User was burned by Claude auto-committing after every code change without being asked.
+---
 
 **Musicians cannot be removed from a song — only their instrument can be cleared.**
 Why: User explicitly removed the include/exclude toggle. All band members are always present in every song record.
 How to apply: No "remove from song" UI. Instrument buttons are the only per-musician control.
-
-**SvelteKit does NOT automatically prepend `paths.base` to `href` attributes — must be done manually.**
-Why: Discovered when deploying to GitHub Pages at `/kittens-setlist/` — all links skipped the base and 404'd.
-How to apply: Import `base` from `$app/paths` and write `href="{base}/route"` in every Svelte file that has absolute hrefs. Also prefix `redirect()` calls: `redirect(302, \`${base}/route\`)`. `goto()` IS base-aware and needs no change.
