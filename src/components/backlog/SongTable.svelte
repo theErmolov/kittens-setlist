@@ -310,9 +310,9 @@
        line 1: [search ···············] [+ Add]
        line 2: [category chips] [count right-aligned] */
     .toolbar { gap: 6px 8px; padding: 8px 12px; }
-    .search { min-width: 0; }
-    .add-btn { margin-left: 0; flex-shrink: 0; }
-    .chips-row { width: 100%; }
+    .search { order: 1; flex: 1; min-width: 0; }
+    .add-btn { order: 2; margin-left: 0; flex-shrink: 0; }
+    .chips-row { order: 3; width: 100%; }
     .chips-row .song-count { margin-left: auto; }
     /* Filter-bar: progress label hidden, only icon shown */
     .progress-label { display: none; }
