@@ -112,11 +112,58 @@
     }
   }
 
-  onMount(() => startPolling(
-    async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
-    3000,
-    () => false,
-  ));
+  onMount(() => {
+    const stopPoller = startPolling(
+      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+      3000,
+      () => false,
+    );
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartY === null || touchStartX === null) return;
+      const touch = e.touches[0];
+      const dy = Math.abs(touch.clientY - touchStartY);
+      const dx = Math.abs(touch.clientX - touchStartX);
+
+      // Left swipe to reveal delete (takes priority over drag)
+      if (dragIndex === null && touch.clientX < touchStartX - 36 && dx > dy * 1.5) {
+        if (swipeTouchedKey !== null) swipedKey = swipeTouchedKey;
+        return;
+      }
+
+      if (dragIndex === null) {
+        if (touchStartIndex !== null && dy > DRAG_THRESHOLD && dy > dx) {
+          dragIndex = touchStartIndex;
+        } else {
+          return;
+        }
+      }
+      e.preventDefault();
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const row = el?.closest('[data-row-i]') as HTMLElement | null;
+      if (row) {
+        const idx = parseInt(row.dataset.rowI ?? '');
+        if (!isNaN(idx)) overIndex = idx;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (dragIndex !== null) onDrop();
+      touchStartIndex = null;
+      touchStartY = null;
+      touchStartX = null;
+      swipeTouchedKey = null;
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      stopPoller();
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  });
 
   // songMap kept for AddSongsModal deduplication (existingIds)
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
@@ -261,6 +308,22 @@
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
 
+  let touchStartIndex = $state<number | null>(null);
+  let touchStartY = $state<number | null>(null);
+  let touchStartX = $state<number | null>(null);
+  const DRAG_THRESHOLD = 8;
+
+  let swipedKey = $state<string | null>(null);
+  let swipeTouchedKey = $state<string | null>(null);
+
+  function handleRowTouchStart(e: TouchEvent, i: number, key: string) {
+    if (swipedKey !== null && swipedKey !== key) swipedKey = null;
+    swipeTouchedKey = key;
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    if (!isFiltered) touchStartIndex = i;
+  }
+
   function guestTagsFor(song: Song): { name: string; instruments: Instrument[] }[] {
     const permSet = new Set(allMusicians);
     return Object.entries(song.musicians)
@@ -385,15 +448,18 @@
                   class:dragging={isDragging}
                   class:drag-over={isOver}
                   draggable={!isFiltered}
+                  data-row-i={i}
                   ondragstart={!isFiltered ? () => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))) : undefined}
                   ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
                   ondrop={!isFiltered ? onDrop : undefined}
                   ondragend={!isFiltered ? onDragEnd : undefined}
+                  ontouchstart={(e) => handleRowTouchStart(e, i, entryKey(entry))}
                 >
                   <td class="td-drag"><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
                     {songNum}
                     <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
+                    {#if localMeta.startTime}<span class="entry-time-mob">{entryTimes().get(entryKey(entry)) ?? ''}</span>{/if}
                   </td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td class="td-song">
@@ -437,8 +503,14 @@
                     </td>
                   {/each}
                   <td class="td-actions">
-                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
-                    <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                    {#if swipedKey === entryKey(entry)}
+                      <button class="trash-reveal" onclick={(e) => { e.stopPropagation(); swipedKey = null; handleRemove(entry.songId!); }}>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                      </button>
+                    {:else}
+                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                      <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                    {/if}
                   </td>
                 </tr>
               {/if}
@@ -448,10 +520,12 @@
                 class:dragging={isDragging}
                 class:drag-over={isOver}
                 draggable="true"
+                data-row-i={i}
                 ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
                 ondragover={e => onDragOver(e, i)}
                 ondrop={onDrop}
                 ondragend={onDragEnd}
+                ontouchstart={(e) => handleRowTouchStart(e, i, entryKey(entry))}
               >
                 <td class="td-drag"><span class="drag-handle">⠿</span></td>
                 <td class="td-num"></td>
@@ -474,7 +548,13 @@
                   {/if}
                 </td>
                 <td class="td-actions">
-                  <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
+                  {#if swipedKey === entryKey(entry)}
+                    <button class="trash-reveal" onclick={(e) => { e.stopPropagation(); swipedKey = null; handleRemoveBreak(entry.order); }}>
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                  {:else}
+                    <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
+                  {/if}
                 </td>
               </tr>
             {/if}
@@ -655,6 +735,13 @@
   .remove-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 6px; font-size: 0.82rem; border-radius: 4px; }
   .remove-btn:hover { color: #ef4444; }
 
+  .trash-reveal {
+    background: #ef4444; color: #fff; border: none; cursor: pointer;
+    border-radius: 6px; padding: 5px 10px; display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.12s;
+  }
+  .trash-reveal:hover { background: #dc2626; }
+
   .mobile-musicians { display: none; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
   .mob-bubble {
     display: inline-flex; align-items: center; gap: 3px;
@@ -666,11 +753,21 @@
   .mob-name { white-space: nowrap; }
   :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(0.7); }
 
+  .entry-time-mob { display: none; }
+
   @media (max-width: 700px) {
     .th-musician { display: none; }
     .td-musician { display: none; }
+    .th-time, .td-time { display: none; }
     .desktop-only { display: none !important; }
-    .mobile-musicians { display: flex; }
+    .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
+    .mobile-musicians {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
     .td-song { white-space: normal; }
     .table-wrap { padding: 0 8px 16px; }
     .editor-header { padding: 12px; }
