@@ -32,6 +32,7 @@
   let selectedMusicians = $state(new Set<string>());
   let selectedInstruments = $state(new Set<Instrument>());
   let showProgress = $state(false);
+  let filterOpen = $state(false);
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
   let sortCol = $state<'artist' | 'title'>('artist');
@@ -128,26 +129,45 @@
   </div>
 
   <div class="filter-bar">
-    <div class="filter-group">
-      {#each permanentNames as name}
-        <button
-          class="filter-chip"
-          class:active={selectedMusicians.has(name)}
-          onclick={() => toggleMusician(name)}
-        >{name}</button>
-      {/each}
+    <!-- Mobile: compact row with just two toggle buttons -->
+    <div class="filter-mobile-header">
+      <button
+        class="filter-chip filter-toggle-btn"
+        class:active={filterOpen || selectedMusicians.size > 0 || selectedInstruments.size > 0}
+        onclick={() => { filterOpen = !filterOpen; }}
+      >🎛️ {$t.backlog.filterBtn}</button>
+      <button
+        class="filter-chip filter-toggle-btn"
+        class:active={showProgress}
+        onclick={() => { showProgress = !showProgress; }}
+      >📊 {$t.backlog.progress}</button>
     </div>
-    <div class="filter-sep"></div>
-    <div class="filter-group">
-      {#each allInstruments as inst}
-        <button
-          class="filter-chip filter-chip-inst"
-          class:active={selectedInstruments.has(inst)}
-          onclick={() => toggleInstrument(inst)}
-          title={$t.instrument[inst]}
-        >{instrumentIcons[inst]}</button>
-      {/each}
+
+    <!-- Filter content: always visible on desktop, collapsible on mobile -->
+    <div class="filter-content" class:mobile-open={filterOpen}>
+      <div class="filter-group">
+        {#each permanentNames as name}
+          <button
+            class="filter-chip"
+            class:active={selectedMusicians.has(name)}
+            onclick={() => toggleMusician(name)}
+          >{name}</button>
+        {/each}
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        {#each allInstruments as inst}
+          <button
+            class="filter-chip filter-chip-inst"
+            class:active={selectedInstruments.has(inst)}
+            onclick={() => toggleInstrument(inst)}
+            title={$t.instrument[inst]}
+          >{instrumentIcons[inst]}</button>
+        {/each}
+      </div>
     </div>
+
+    <!-- Progress toggle: desktop only -->
     <button
       class="filter-chip progress-toggle"
       class:active={showProgress}
@@ -267,12 +287,13 @@
   .filter-bar {
     display: flex;
     align-items: center;
-    gap: 0;
     padding: 8px 16px;
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
     gap: 8px;
   }
+  .filter-mobile-header { display: none; }
+  .filter-content { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
   .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
   .filter-sep {
     width: 1px; height: 22px; background: var(--border); flex-shrink: 0; align-self: center;
@@ -321,8 +342,12 @@
     .add-btn { order: 2; margin-left: 0; flex-shrink: 0; }
     .chips-row { order: 3; width: 100%; }
     .chips-row .song-count { margin-left: auto; }
-    /* Filter-bar: progress label hidden, only icon shown */
-    .progress-label { display: none; }
+    /* Filter-bar: show compact header, hide desktop elements */
+    .filter-bar { padding: 0; gap: 0; }
+    .filter-mobile-header { display: flex; gap: 8px; padding: 8px 12px; }
+    .filter-content { display: none; padding: 8px 12px; border-top: 1px solid var(--border); }
+    .filter-content.mobile-open { display: flex; }
+    .progress-toggle { display: none; }
     /* Table → card list */
     thead { display: none; }
     table { display: block; }
