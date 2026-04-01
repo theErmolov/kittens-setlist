@@ -65,7 +65,7 @@
   });
 </script>
 
-<tr class="song-row">
+<tr class="song-row" onclick={onedit}>
   <td class="td-cat desktop-only">
     {#if showProgress && overallPct !== null}
       <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
@@ -115,15 +115,17 @@
     </td>
   {/each}
   <td class="td-actions">
-    <button class="action-btn action-edit" onclick={onedit} title={$t.song.editTitle}>✏️</button>
-    <button class="action-btn action-addset" onclick={onaddtosetlist} title={$t.addToSetlist.title}>📋</button>
-    <button class="action-btn action-del danger" onclick={ondelete} title={$t.song.remove}>🗑</button>
+    <button class="action-btn action-edit" onclick={(e) => { e.stopPropagation(); onedit(); }} title={$t.song.editTitle}>✏️</button>
+    <button class="action-btn action-addset" onclick={(e) => { e.stopPropagation(); onaddtosetlist(); }} title={$t.addToSetlist.title}>📋</button>
+    <button class="action-btn action-del danger" onclick={(e) => { e.stopPropagation(); ondelete(); }} title={$t.song.remove}>🗑</button>
   </td>
 </tr>
 
 <style>
   .song-row { border-bottom: 1px solid var(--border); }
-  .song-row:hover { background: var(--row-hover); }
+  @media (hover: hover) {
+    .song-row:hover { background: var(--row-hover); }
+  }
   td { padding: 8px 12px; font-size: 0.88rem; vertical-align: middle; overflow: hidden; }
   .td-cat { text-align: center; white-space: nowrap; line-height: 1.2; padding: 6px 4px; }
   .td-cat :global(.badge.icon-only) { font-size: 1rem; padding: 3px 5px; }
@@ -183,14 +185,12 @@
 
   @media (max-width: 700px) {
     /* Break out of table — row becomes a flex card */
-    tr.song-row { display: flex; align-items: flex-start; gap: 6px; padding: 8px 4px; }
+    tr.song-row { display: flex; align-items: flex-start; gap: 6px; padding: 8px 4px; cursor: pointer; }
+    tr.song-row td { cursor: pointer; }
     .desktop-only { display: none !important; }
     .td-musician { display: none !important; }
     .td-title { flex: 1; padding: 4px 0; min-width: 0; overflow: visible; }
-    .td-actions { padding: 2px 0; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-    .action-addset, .action-del { display: none; }
-    .action-edit { font-size: 1.5rem; padding: 8px 6px; opacity: 1; }
-    .action-edit:hover { opacity: 1; }
+    .td-actions { display: none; }
     /* Song header: inline text, icon + artist – title */
     .mobile-song-header { display: block; }
     /* Musician bubbles: 3-per-row grid, equal width */

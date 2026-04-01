@@ -316,11 +316,21 @@
   let swipedKey = $state<string | null>(null);
   let swipeTouchedKey = $state<string | null>(null);
 
-  function handleRowTouchStart(e: TouchEvent, i: number, key: string) {
+  // Row touch — swipe detection only, never initiates drag
+  function handleRowTouchStart(e: TouchEvent, key: string) {
     if (swipedKey !== null && swipedKey !== key) swipedKey = null;
     swipeTouchedKey = key;
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
+    touchStartIndex = null;
+  }
+
+  // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
+  function handleDragHandleTouchStart(e: TouchEvent, i: number) {
+    e.stopPropagation();
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    swipeTouchedKey = null;
     if (!isFiltered) touchStartIndex = i;
   }
 
@@ -453,9 +463,9 @@
                   ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
                   ondrop={!isFiltered ? onDrop : undefined}
                   ondragend={!isFiltered ? onDragEnd : undefined}
-                  ontouchstart={(e) => handleRowTouchStart(e, i, entryKey(entry))}
+                  ontouchstart={(e) => handleRowTouchStart(e, entryKey(entry))}
                 >
-                  <td class="td-drag"><span class="drag-handle">⠿</span></td>
+                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
                     {songNum}
                     <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
@@ -525,9 +535,9 @@
                 ondragover={e => onDragOver(e, i)}
                 ondrop={onDrop}
                 ondragend={onDragEnd}
-                ontouchstart={(e) => handleRowTouchStart(e, i, entryKey(entry))}
+                ontouchstart={(e) => handleRowTouchStart(e, entryKey(entry))}
               >
-                <td class="td-drag"><span class="drag-handle">⠿</span></td>
+                <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
                 <td class="td-num"></td>
                 {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                 <td colspan={totalCols - 3 - (localMeta.startTime ? 1 : 0)} class="td-break">
