@@ -255,6 +255,7 @@
   .search {
     padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--bg); color: var(--text); font-size: 0.88rem; min-width: 200px;
+    touch-action: manipulation;
   }
   .song-count { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
   .add-btn {
@@ -316,7 +317,7 @@
        line 1: [search ···············] [+ Add]
        line 2: [category chips] [count right-aligned] */
     .toolbar { gap: 6px 8px; padding: 8px 12px; }
-    .search { order: 1; flex: 1; min-width: 0; }
+    .search { order: 1; flex: 1; min-width: 0; font-size: 16px; }
     .add-btn { order: 2; margin-left: 0; flex-shrink: 0; }
     .chips-row { order: 3; width: 100%; }
     .chips-row .song-count { margin-left: auto; }
