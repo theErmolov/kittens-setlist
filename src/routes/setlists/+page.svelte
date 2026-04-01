@@ -85,4 +85,8 @@
   .empty p { margin-bottom: 12px; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
+
+  @media (max-width: 700px) {
+    .new-form input { font-size: 16px; }
+  }
 </style>

@@ -33,4 +33,8 @@
   .comment-input:focus { border-bottom-color: var(--accent); }
   .comment-input:not(:placeholder-shown) { border-bottom-color: var(--border); }
   .comment-input::placeholder { opacity: 0; transition: opacity 0.15s; }
+
+  @media (max-width: 700px) {
+    .comment-input { font-size: 16px; }
+  }
 </style>

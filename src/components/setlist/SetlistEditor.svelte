@@ -782,5 +782,6 @@
     .table-wrap { padding: 0 8px 16px; }
     .editor-header { padding: 12px; }
     .song-name { flex-wrap: wrap; }
+    .meta-input { font-size: 16px; }
   }
 </style>

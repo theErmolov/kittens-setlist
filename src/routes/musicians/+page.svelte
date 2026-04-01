@@ -253,4 +253,8 @@
   .del-btn:hover { color: #ef4444; }
 
   .empty, .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+
+  @media (max-width: 700px) {
+    .edit-form input:not([type="checkbox"]) { font-size: 16px; }
+  }
 </style>

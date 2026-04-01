@@ -126,6 +126,9 @@
   @media (hover: hover) {
     .song-row:hover { background: var(--row-hover); }
   }
+  @media (hover: none) {
+    .song-row:active { background: var(--row-hover); }
+  }
   td { padding: 8px 12px; font-size: 0.88rem; vertical-align: middle; overflow: hidden; }
   .td-cat { text-align: center; white-space: nowrap; line-height: 1.2; padding: 6px 4px; }
   .td-cat :global(.badge.icon-only) { font-size: 1rem; padding: 3px 5px; }
