@@ -478,6 +478,13 @@
         onclick={() => { filterNotReady = !filterNotReady; }}
       >не готово</button>
     </div>
+    <div class="filter-sep-h"></div>
+    <div class="filter-group mob-break-group">
+      <span class="mob-break-label">⏸ Перерыв:</span>
+      {#each [10, 20, 30] as min}
+        <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{min} мин</button>
+      {/each}
+    </div>
   </div>
 
   <!-- Mobile bottom bar -->
@@ -487,6 +494,7 @@
       class:active={filterOpen || isFiltered}
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ Фильтр</button>
+    <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">🎤 На сцену</a>
     <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>+ Добавить</button>
   </div>
 
@@ -842,6 +850,7 @@
     .th-time, .td-time { display: none; }
     .desktop-only { display: none !important; }
     .filter-bar { display: none; }
+    .header-actions { display: none; }
     .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
     .mobile-musicians {
       display: grid;
@@ -876,10 +885,17 @@
       color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
     }
     .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .bottom-stage {
+      text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; font-size: 0.85rem; font-weight: 500; color: var(--text-muted);
+      white-space: nowrap;
+    }
     .bottom-add-btn {
       margin-left: auto; padding: 8px 18px;
       background: var(--accent); color: #fff; border: none; border-radius: 20px;
       cursor: pointer; font-weight: 600; font-size: 0.88rem;
     }
+    .mob-break-label { font-size: 0.82rem; color: var(--text-muted); align-self: center; }
+    .mob-break-group { align-items: center; }
   }
 </style>
