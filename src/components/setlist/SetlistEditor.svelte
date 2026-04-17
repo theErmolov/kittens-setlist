@@ -16,17 +16,17 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
-    queue:     'rgba(128,128,128,0.2)',
-    structure: 'rgba(255,0,0,0.2)',
-    mastering: 'rgba(255,220,0,0.2)',
-    ready:     'rgba(0,200,0,0.2)',
+    queue:     'rgba(66,66,66,0.2)',
+    structure: 'rgba(138,0,10,0.2)',
+    mastering: 'rgba(133,97,0,0.2)',
+    ready:     'rgba(0,89,9,0.2)',
   };
 
   const PROG_COLOR: Partial<Record<LearningStage, string>> = {
-    queue:     '#6b7280',
-    structure: '#dc2626',
-    mastering: '#ca8a04',
-    ready:     '#16a34a',
+    queue:     '#424242',
+    structure: '#8A000A',
+    mastering: '#856100',
+    ready:     '#005909',
   };
 
 
@@ -688,7 +688,7 @@
   .meta-details { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
   .date, .count, .start-time { font-size: 0.82rem; color: var(--text-muted); }
   .start-time { font-weight: 600; }
-  .ready-count { font-size: 0.82rem; font-weight: 600; color: #22c55e; }
+  .ready-count { font-size: 0.82rem; font-weight: 600; color: #005909; }
   .edit-meta-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; opacity: 0.5; padding: 4px; margin-top: 2px; }
   .edit-meta-btn:hover { opacity: 1; }
   .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

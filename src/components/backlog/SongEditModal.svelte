@@ -13,9 +13,9 @@
   const PROGRESS_SEGS: LearningStage[] = ['structure', 'mastering', 'ready'];
   const STAGE_ORDER: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
   const BAR_COLOR: Partial<Record<LearningStage, string>> = {
-    structure: '#dc2626',
-    mastering: '#ca8a04',
-    ready:     '#16a34a',
+    structure: '#8A000A',
+    mastering: '#856100',
+    ready:     '#005909',
   };
 
   let {
