@@ -25,7 +25,8 @@
     onclose,
     onsave,
     ondelete,
-    onaddtosetlist
+    onaddtosetlist,
+    onremove
   }: {
     song: Partial<Song> | null;
     musicians: BandMusician[];

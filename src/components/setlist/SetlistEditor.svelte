@@ -584,6 +584,7 @@
                   {/each}
                   <td class="td-actions">
                     <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                    <button class="remove-btn desktop-only" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
                   </td>
                 </tr>
               {/if}
