@@ -86,6 +86,7 @@
   let editingEntry = $state<SetlistEntry | null>(null);
   let selectedMusician = $state<string | null>(null);
   let filterNotReady = $state(false);
+  let filterText = $state('');
   let filterOpen = $state(false);
 
   function toggleMusician(name: string) {
@@ -127,12 +128,6 @@
       const dy = Math.abs(touch.clientY - touchStartY);
       const dx = Math.abs(touch.clientX - touchStartX);
 
-      // Left swipe to reveal delete (takes priority over drag)
-      if (dragIndex === null && touch.clientX < touchStartX - 36 && dx > dy * 1.5) {
-        if (swipeTouchedKey !== null) swipedKey = swipeTouchedKey;
-        return;
-      }
-
       if (dragIndex === null) {
         if (touchStartIndex !== null && dy > DRAG_THRESHOLD && dy > dx) {
           dragIndex = touchStartIndex;
@@ -154,7 +149,6 @@
       touchStartIndex = null;
       touchStartY = null;
       touchStartX = null;
-      swipeTouchedKey = null;
     };
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -196,10 +190,18 @@
       });
     }
 
+    const q = filterText.trim().toLowerCase();
+    if (q) {
+      entries = entries.filter(e => {
+        if (!e.song) return false;
+        return e.song.artist.toLowerCase().includes(q) || e.song.title.toLowerCase().includes(q);
+      });
+    }
+
     return entries;
   });
 
-  let isFiltered = $derived(selectedMusician !== null || filterNotReady);
+  let isFiltered = $derived(selectedMusician !== null || filterNotReady || filterText.trim() !== '');
 
   let displayEntries = $derived(() => {
     const base = filteredEntries();
@@ -327,24 +329,11 @@
   let touchStartX = $state<number | null>(null);
   const DRAG_THRESHOLD = 8;
 
-  let swipedKey = $state<string | null>(null);
-  let swipeTouchedKey = $state<string | null>(null);
-
-  // Row touch — swipe detection only, never initiates drag
-  function handleRowTouchStart(e: TouchEvent, key: string) {
-    if (swipedKey !== null && swipedKey !== key) swipedKey = null;
-    swipeTouchedKey = key;
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    touchStartIndex = null;
-  }
-
   // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
   function handleDragHandleTouchStart(e: TouchEvent, i: number) {
     e.stopPropagation();
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
-    swipeTouchedKey = null;
     if (!isFiltered) touchStartIndex = i;
   }
 
@@ -416,6 +405,7 @@
   </div>
 
   <div class="filter-bar">
+    <input class="filter-search" type="search" placeholder="Поиск..." bind:value={filterText} />
     {#each allMusicians as name}
       <button
         class="filter-chip"
@@ -445,6 +435,10 @@
 
   <!-- Mobile filter panel (slides up above bottom bar) -->
   <div class="mobile-filter-panel" class:open={filterOpen}>
+    <div class="filter-group">
+      <input class="filter-search filter-search-full" type="search" placeholder="Поиск по названию или исполнителю..." bind:value={filterText} />
+    </div>
+    <div class="filter-sep-h"></div>
     {#if allMusicians.length > 0}
       <div class="filter-group">
         {#each allMusicians as name}
@@ -538,7 +532,6 @@
                   ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
                   ondrop={!isFiltered ? onDrop : undefined}
                   ondragend={!isFiltered ? onDragEnd : undefined}
-                  ontouchstart={(e) => handleRowTouchStart(e, entryKey(entry))}
                 >
                   <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
                   <td class="td-num">
@@ -588,14 +581,8 @@
                     </td>
                   {/each}
                   <td class="td-actions">
-                    {#if swipedKey === entryKey(entry)}
-                      <button class="trash-reveal" onclick={(e) => { e.stopPropagation(); swipedKey = null; handleRemove(entry.songId!); }}>
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                      </button>
-                    {:else}
-                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
-                      <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
-                    {/if}
+                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                    <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
                   </td>
                 </tr>
               {/if}
@@ -610,7 +597,6 @@
                 ondragover={e => onDragOver(e, i)}
                 ondrop={onDrop}
                 ondragend={onDragEnd}
-                ontouchstart={(e) => handleRowTouchStart(e, entryKey(entry))}
               >
                 <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
                 <td class="td-num"></td>
@@ -633,13 +619,7 @@
                   {/if}
                 </td>
                 <td class="td-actions">
-                  {#if swipedKey === entryKey(entry)}
-                    <button class="trash-reveal" onclick={(e) => { e.stopPropagation(); swipedKey = null; handleRemoveBreak(entry.order); }}>
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    </button>
-                  {:else}
-                    <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
-                  {/if}
+                  <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
                 </td>
               </tr>
             {/if}
@@ -677,6 +657,7 @@
     mode="entry"
     onclose={() => { editingEntry = null; }}
     onsave={handleEntrySave}
+    onremove={editingEntry.songId ? () => { handleRemove(editingEntry!.songId!); } : undefined}
   />
 {/if}
 
@@ -817,18 +798,19 @@
   }
   .break-icon { margin-right: 4px; }
 
+  .filter-search {
+    padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px;
+    background: transparent; color: var(--text); font-size: 0.82rem;
+    outline: none; width: 140px;
+  }
+  .filter-search:focus { border-color: var(--accent); }
+  .filter-search-full { width: 100%; box-sizing: border-box; border-radius: 8px; padding: 6px 10px; }
+
   .edit-btn { background: none; border: none; cursor: pointer; font-size: 1.17rem; padding: 2px 4px; opacity: 0.4; transition: opacity 0.12s; }
   .edit-btn:hover { opacity: 1; }
 
   .remove-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 6px; font-size: 0.82rem; border-radius: 4px; }
   .remove-btn:hover { color: #ef4444; }
-
-  .trash-reveal {
-    background: #ef4444; color: #fff; border: none; cursor: pointer;
-    border-radius: 6px; padding: 5px 10px; display: inline-flex; align-items: center; justify-content: center;
-    transition: background 0.12s;
-  }
-  .trash-reveal:hover { background: #dc2626; }
 
   .mobile-musicians { display: none; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
   .mob-bubble {
@@ -844,7 +826,7 @@
   .entry-time-mob { display: none; }
 
   @media (max-width: 700px) {
-    .editor { height: calc(100dvh - 56px - 52px); }
+    .editor { height: calc(100dvh - 56px - 64px); }
     .th-musician { display: none; }
     .td-musician { display: none; }
     .th-time, .td-time { display: none; }
@@ -859,14 +841,22 @@
       margin-top: 6px;
     }
     .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
-    .td-song { white-space: normal; }
-    .table-wrap { padding: 0 8px 16px; }
+    .td-song { white-space: normal; min-width: 0; overflow: hidden; word-break: break-word; }
+    .table-wrap { padding: 0 8px 16px; overflow-x: hidden; }
+    table { table-layout: fixed; }
     .editor-header { padding: 12px; }
-    .song-name { flex-wrap: wrap; }
+    .song-name { flex-wrap: wrap; min-width: 0; }
     .meta-input { font-size: 16px; }
 
+    /* No hover effects on touch devices */
+    .song-row:hover td { background: var(--surface); }
+    .song-row:hover .drag-handle { opacity: 0.4; }
+    .break-row:hover td { border-color: var(--border); }
+    .break-row:hover .drag-handle { opacity: 0.4; }
+    .edit-btn { opacity: 1; }
+
     .mobile-filter-panel {
-      position: fixed; bottom: 52px; left: 0; right: 0; z-index: 20;
+      position: fixed; bottom: 64px; left: 0; right: 0; z-index: 20;
       background: var(--surface); border-top: 1px solid var(--border);
       padding: 12px; display: none; flex-direction: column; gap: 10px;
     }
@@ -875,25 +865,25 @@
     .filter-sep-h { height: 1px; background: var(--border); }
 
     .mobile-bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 52px; z-index: 21;
+      position: fixed; bottom: 0; left: 0; right: 0; height: 64px; z-index: 21;
       background: var(--surface); border-top: 1px solid var(--border);
       display: flex; align-items: center; gap: 8px; padding: 0 12px;
     }
     .bottom-btn {
-      padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
-      color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
+      padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      color: var(--text-muted); white-space: nowrap;
     }
     .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .bottom-stage {
-      text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; font-size: 0.85rem; font-weight: 500; color: var(--text-muted);
+      text-decoration: none; padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; font-size: 0.9rem; font-weight: 500; color: var(--text-muted);
       white-space: nowrap;
     }
     .bottom-add-btn {
-      margin-left: auto; padding: 8px 18px;
+      margin-left: auto; padding: 10px 20px;
       background: var(--accent); color: #fff; border: none; border-radius: 20px;
-      cursor: pointer; font-weight: 600; font-size: 0.88rem;
+      cursor: pointer; font-weight: 600; font-size: 0.95rem;
     }
     .mob-break-label { font-size: 0.82rem; color: var(--text-muted); align-self: center; }
     .mob-break-group { align-items: center; }

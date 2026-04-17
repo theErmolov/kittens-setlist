@@ -34,6 +34,7 @@
     onsave: (s: Song) => void;
     ondelete?: () => void;
     onaddtosetlist?: () => void;
+    onremove?: () => void;
   } = $props();
 
   const permanentNames = new Set(musicians.map(m => m.name));
@@ -313,6 +314,9 @@
         {/if}
         {#if onaddtosetlist}
           <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
+        {/if}
+        {#if onremove}
+          <button class="btn-icon danger" onclick={() => { if (confirm('Убрать из сетлиста?')) { onremove!(); closeModal(); } }} title="Убрать из сетлиста">✕</button>
         {/if}
       </div>
       <div class="footer-right">
