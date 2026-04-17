@@ -347,19 +347,19 @@
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  function mobileEntryBubbles(entry: SetlistEntry, song: Song): { name: string; instruments: Instrument[]; progBg: string; isGuest: boolean }[] {
-    const out: { name: string; instruments: Instrument[]; progBg: string; isGuest: boolean }[] = [];
+  function mobileEntryBubbles(entry: SetlistEntry, song: Song): { name: string; instruments: Instrument[]; progBg: string; progColor: string; isGuest: boolean }[] {
+    const out: { name: string; instruments: Instrument[]; progBg: string; progColor: string; isGuest: boolean }[] = [];
     for (const name of allMusicians) {
       const role = song.musicians[name];
       if (!role?.instruments?.length) continue;
       const stage = entryStage(entry, name);
-      out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '#fcd34d40', isGuest: false });
+      out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '#fcd34d40', progColor: PROG_COLOR[stage] ?? 'var(--text-muted)', isGuest: false });
     }
     const permSet = new Set(allMusicians);
     for (const [name, role] of Object.entries(song.musicians)) {
       if (!permSet.has(name) && role.instruments.length > 0) {
         const stage = entryStage(entry, name);
-        out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '', isGuest: true });
+        out.push({ name, instruments: sortInstruments(role.instruments), progBg: PROG_BG[stage] ?? '', progColor: 'var(--text)', isGuest: true });
       }
     }
     return out;
@@ -558,7 +558,7 @@
                         {#each mobBubbles as b}
                           <span class="mob-bubble" class:mob-guest={b.isGuest} style="background: {b.progBg}">
                             <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
-                            <span class="mob-name">{b.name}</span>
+                            <span class="mob-name" style="color: {b.progColor}">{b.name}</span>
                           </span>
                         {/each}
                       </div>
