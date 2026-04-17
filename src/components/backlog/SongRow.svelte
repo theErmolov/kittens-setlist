@@ -15,6 +15,13 @@
     ready:     'rgba(0,200,0,0.2)',
   };
 
+  const PROG_COLOR: Partial<Record<LearningStage, string>> = {
+    queue:     '#424242',
+    structure: '#8A000A',
+    mastering: '#856100',
+    ready:     '#005909',
+  };
+
   let {
     song,
     allMusicians,
@@ -50,16 +57,17 @@
   );
 
   let mobileBubbles = $derived.by(() => {
-    const out: Array<{ name: string; instruments: Instrument[]; progBg: string | null; isGuest: boolean }> = [];
+    const out: Array<{ name: string; instruments: Instrument[]; progBg: string | null; progColor: string | null; isGuest: boolean }> = [];
     for (const name of allMusicians) {
       const role = song.musicians[name];
       if (!role?.instruments?.length) continue;
       const stage = (song.progress?.[name] ?? 'queue') as LearningStage;
       const progBg = showProgress ? (PROG_BG[stage] ?? null) : '#fcd34d40';
-      out.push({ name, instruments: sortInstruments(role.instruments), progBg, isGuest: false });
+      const progColor = showProgress ? (PROG_COLOR[stage] ?? null) : null;
+      out.push({ name, instruments: sortInstruments(role.instruments), progBg, progColor, isGuest: false });
     }
     for (const g of guestTags) {
-      out.push({ name: g.name, instruments: g.instruments, progBg: null, isGuest: true });
+      out.push({ name: g.name, instruments: g.instruments, progBg: null, progColor: null, isGuest: true });
     }
     return out;
   });
@@ -92,7 +100,7 @@
     {#if mobileBubbles.length > 0}
       <div class="mobile-musicians">
         {#each mobileBubbles as b}
-          <span class="mob-bubble" class:mob-guest={b.isGuest} style={b.progBg ? `background: ${b.progBg}` : ''}>
+          <span class="mob-bubble" class:mob-guest={b.isGuest} style={[b.progBg ? `background: ${b.progBg}` : '', b.progColor ? `color: ${b.progColor}` : ''].filter(Boolean).join('; ')}>
             <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
             <span class="mob-name">{b.name}</span>
           </span>
