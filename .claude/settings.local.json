@@ -14,7 +14,8 @@
       "Bash(git pull:*)",
       "Bash(git stash:*)",
       "Bash(find /Users/ermolovi/personal/kittens-setlist/api/src -type f \\\\\\(-name *.ts -o -name *.js \\\\\\))",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
