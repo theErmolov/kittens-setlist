@@ -16,10 +16,10 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
-    queue:     'rgba(66,66,66,0.2)',
-    structure: 'rgba(138,0,10,0.2)',
-    mastering: 'rgba(133,97,0,0.2)',
-    ready:     'rgba(0,89,9,0.2)',
+    queue:     'rgba(128,128,128,0.2)',
+    structure: 'rgba(255,0,0,0.2)',
+    mastering: 'rgba(255,220,0,0.2)',
+    ready:     'rgba(0,200,0,0.2)',
   };
 
   const PROG_COLOR: Partial<Record<LearningStage, string>> = {
