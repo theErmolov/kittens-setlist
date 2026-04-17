@@ -583,7 +583,7 @@
                     </td>
                   {/each}
                   <td class="td-actions">
-                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
                   </td>
                 </tr>
               {/if}
