@@ -194,7 +194,9 @@
     if (q) {
       entries = entries.filter(e => {
         if (!e.song) return false;
-        return e.song.artist.toLowerCase().includes(q) || e.song.title.toLowerCase().includes(q);
+        return e.song.artist.toLowerCase().includes(q)
+          || e.song.title.toLowerCase().includes(q)
+          || (e.comment ?? '').toLowerCase().includes(q);
       });
     }
 
@@ -581,8 +583,7 @@
                     </td>
                   {/each}
                   <td class="td-actions">
-                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
-                    <button class="remove-btn" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
                   </td>
                 </tr>
               {/if}
