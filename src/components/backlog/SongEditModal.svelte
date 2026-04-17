@@ -317,7 +317,7 @@
           <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
         {/if}
         {#if onremove}
-          <button class="btn-icon danger" onclick={() => { if (confirm('Убрать из сетлиста?')) { onremove!(); closeModal(); } }} title="Убрать из сетлиста">✕</button>
+          <button class="btn-remove-setlist danger" onclick={() => { if (confirm('Убрать из сетлиста?')) { onremove!(); closeModal(); } }} title="Убрать из сетлиста">− из сетлиста</button>
         {/if}
       </div>
       <div class="footer-right">
@@ -351,6 +351,12 @@
   }
   .btn-icon:hover { border-color: var(--accent); color: var(--text); }
   .btn-icon.danger:hover { border-color: #ef4444; color: #ef4444; }
+  .btn-remove-setlist {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 0.82rem; padding: 6px 10px;
+    color: var(--text-muted); transition: border-color 0.12s, color 0.12s;
+  }
+  .btn-remove-setlist:hover { border-color: #ef4444; color: #ef4444; }
 
   .fields-row { display: flex; gap: 12px; }
   .fields-row .field { flex: 1; }
