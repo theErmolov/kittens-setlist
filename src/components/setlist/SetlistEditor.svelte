@@ -16,17 +16,17 @@
   };
 
   const PROG_BG: Partial<Record<LearningStage, string>> = {
-    queue:     'rgba(239,68,68,0.18)',
-    structure: 'rgba(234,179,8,0.22)',
-    mastering: 'rgba(34,197,94,0.18)',
-    ready:     'rgba(59,130,246,0.18)',
+    queue:     'rgba(128,128,128,0.2)',
+    structure: 'rgba(255,0,0,0.2)',
+    mastering: 'rgba(255,220,0,0.2)',
+    ready:     'rgba(0,200,0,0.2)',
   };
 
   const PROG_COLOR: Partial<Record<LearningStage, string>> = {
-    queue:     '#ef4444',
-    structure: '#ca8a04',
-    mastering: '#22c55e',
-    ready:     '#3b82f6',
+    queue:     '#6b7280',
+    structure: '#dc2626',
+    mastering: '#ca8a04',
+    ready:     '#16a34a',
   };
 
 
