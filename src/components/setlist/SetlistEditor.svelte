@@ -841,11 +841,10 @@
       margin-top: 6px;
     }
     .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
-    .td-song { white-space: normal; min-width: 0; overflow: hidden; word-break: break-word; }
+    .td-song { white-space: normal; }
     .table-wrap { padding: 0 8px 16px; overflow-x: hidden; }
-    table { table-layout: fixed; }
     .editor-header { padding: 12px; }
-    .song-name { flex-wrap: wrap; min-width: 0; }
+    .song-name { flex-wrap: wrap; }
     .meta-input { font-size: 16px; }
 
     /* No hover effects on touch devices */
