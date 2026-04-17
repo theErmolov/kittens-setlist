@@ -17,10 +17,10 @@ export function progressPct(
 
 /** Inline CSS style string for a progress percentage bubble. */
 export function pctBubbleStyle(pct: number): string {
-  if (pct === 100) return 'border: 1px solid #3b82f6; color: #3b82f6; background: transparent';
-  if (pct >= 75)   return 'background: rgba(34,197,94,0.22); color: #22c55e';
-  if (pct > 0)     return 'background: rgba(234,179,8,0.25); color: #ca8a04';
-  return                  'background: rgba(239,68,68,0.18); color: #ef4444';
+  if (pct === 100) return 'border: 1px solid #16a34a; color: #16a34a; background: transparent';
+  if (pct >= 75)   return 'background: rgba(255,220,0,0.2); color: #ca8a04';
+  if (pct > 0)     return 'background: rgba(255,0,0,0.2); color: #dc2626';
+  return                  'background: rgba(128,128,128,0.2); color: #6b7280';
 }
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
