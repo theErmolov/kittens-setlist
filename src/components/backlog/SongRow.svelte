@@ -175,7 +175,14 @@
   }
   .mob-bubble.mob-guest { border: 1px dashed var(--border); }
   .mob-icons { font-size: 1rem; flex-shrink: 0; }
-  .mob-name { white-space: nowrap; }
+  .mob-name {
+    white-space: nowrap;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  }
   :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { background: #78350f; }
 
   .td-actions { white-space: nowrap; text-align: center; }
@@ -211,6 +218,6 @@
       gap: 4px;
       margin-top: 6px;
     }
-    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
+    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; }
   }
 </style>

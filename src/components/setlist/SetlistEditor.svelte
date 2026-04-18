@@ -822,7 +822,14 @@
   }
   .mob-bubble.mob-guest { border: 1px dashed var(--border); background: transparent !important; }
   .mob-icons { font-size: 1rem; flex-shrink: 0; }
-  .mob-name { white-space: nowrap; }
+  .mob-name {
+    white-space: nowrap;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  }
   :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(0.7); }
 
   .entry-time-mob { display: none; }
@@ -842,7 +849,7 @@
       gap: 4px;
       margin-top: 6px;
     }
-    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; }
+    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; }
     .td-song { white-space: normal; }
     .table-wrap { padding: 0 8px 16px; overflow-x: hidden; }
     .editor-header { padding: 12px; }
