@@ -606,7 +606,7 @@
                 <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
                 <td class="td-num"></td>
                 {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
-                <td colspan={totalCols - 3 - (localMeta.startTime ? 1 : 0)} class="td-break">
+                <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
                   <span class="break-icon">⏸</span>
                   {#if editingBreakOrder === entry.order}
                     {#each [10, 20, 30] as min}
@@ -622,9 +622,7 @@
                       Перерыв — {entry.breakMinutes} мин
                     </button>
                   {/if}
-                </td>
-                <td class="td-actions">
-                  <button class="remove-btn" onclick={() => handleRemoveBreak(entry.order)}>✕</button>
+                  <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
                 </td>
               </tr>
             {/if}
@@ -785,7 +783,8 @@
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; vertical-align: middle; }
 
-  .td-break { font-size: 0.82rem; color: var(--text-muted); }
+  .td-break { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+  .break-remove { margin-left: auto; }
   .break-label {
     background: none; border: none; cursor: pointer; font-size: 0.82rem;
     color: var(--text-muted); font-style: italic; padding: 0;
