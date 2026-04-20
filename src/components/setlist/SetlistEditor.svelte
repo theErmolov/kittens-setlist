@@ -846,12 +846,12 @@
     .header-actions { display: none; }
     .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
     .mobile-musicians {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 4px;
       margin-top: 6px;
     }
-    .mob-bubble { display: flex; flex: 1 0 calc(33.33% - 3px); max-width: calc(50% - 2px); box-sizing: border-box; min-width: 0; overflow: hidden; }
+    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; }
     .th-actions, .td-actions { width: 32px; }
     .td-actions { vertical-align: top; }
     .td-song { white-space: normal; }
