@@ -833,7 +833,7 @@
     -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
     mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
   }
-  :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(0.7); }
+  :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(2); }
 
   .entry-time-mob { display: none; }
 
@@ -847,12 +847,14 @@
     .header-actions { display: none; }
     .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
     .mobile-musicians {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       margin-top: 6px;
     }
-    .mob-bubble { display: flex; width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; }
+    .mob-bubble { display: flex; flex: 1 0 calc(33.33% - 3px); max-width: calc(50% - 2px); box-sizing: border-box; min-width: 0; overflow: hidden; }
+    .th-actions, .td-actions { width: 32px; }
+    .td-actions { vertical-align: top; }
     .td-song { white-space: normal; }
     .table-wrap { padding: 0 8px 16px; overflow-x: hidden; }
     .editor-header { padding: 12px; }
