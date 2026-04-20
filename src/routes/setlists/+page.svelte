@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
   import type { Setlist } from '$lib/types';
+  import { canWrite } from '$lib/auth';
 
   let setlists = $state<Setlist[]>([]);
   let showNew = $state(false);
@@ -36,10 +37,10 @@
 <div class="page">
   <div class="page-header">
     <h1>{$t.setlists.title}</h1>
-    <button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>
+    {#if $canWrite}<button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>{/if}
   </div>
 
-  {#if showNew}
+  {#if showNew && $canWrite}
     <div class="new-form">
       <input bind:value={newName} placeholder={$t.setlists.namePlaceholder} />
       <div class="new-form-row">
@@ -58,7 +59,7 @@
   {:else if setlists.length === 0}
     <div class="empty">
       <p>{$t.setlists.empty}</p>
-      {#if !showNew}
+      {#if !showNew && $canWrite}
         <button class="btn-primary" onclick={() => { showNew = true; }}>{$t.setlists.createFirst}</button>
       {/if}
     </div>

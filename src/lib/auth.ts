@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { writable, get } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { KittensUser } from '$lib/types';
 import { PUBLIC_API_URL } from '$env/static/public';
 
@@ -68,3 +68,8 @@ export async function logout(): Promise<void> {
 export function isAdmin(): boolean {
   return get(currentUser)?.isAdmin === true;
 }
+
+/** True for admins and writers; false for readers and unauthenticated users. */
+export const canWrite = derived(currentUser, $u =>
+  $u?.isAdmin === true || ($u?.status === 'approved' && $u?.role === 'writer')
+);

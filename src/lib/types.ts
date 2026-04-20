@@ -44,6 +44,7 @@ export interface Setlist {
 }
 
 export type UserStatus = 'pending' | 'approved' | 'rejected';
+export type UserRole = 'writer' | 'reader';
 
 export interface KittensUser {
   telegramId: string;
@@ -52,6 +53,7 @@ export interface KittensUser {
   username?: string;
   photoUrl?: string;
   status: UserStatus;
+  role?: UserRole;
   musicianId?: string;
   isAdmin?: boolean;
   createdAt: string;

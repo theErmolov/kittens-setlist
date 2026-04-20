@@ -137,6 +137,6 @@ export async function getUsers(): Promise<KittensUser[]> {
   return req('/auth/users');
 }
 
-export async function patchUser(telegramId: string, patch: { status?: string; musicianId?: string | null }): Promise<KittensUser> {
+export async function patchUser(telegramId: string, patch: { status?: string; musicianId?: string | null; role?: string | null }): Promise<KittensUser> {
   return req(`/auth/users/${telegramId}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }

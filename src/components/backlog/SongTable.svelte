@@ -6,6 +6,7 @@
   import { updateSong, deleteSong, addSongsToSetlist, removeSongFromSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
   import { t } from '$lib/i18n';
+  import { canWrite } from '$lib/auth';
 
   let {
     songs: songsProp,
@@ -129,7 +130,7 @@
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
       <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().length * 5)})</span>
     </div>
-    <button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
+    {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>
 
   <!-- Desktop filter bar (hidden on mobile) -->
@@ -250,7 +251,7 @@
       class:active={showProgress}
       onclick={() => { showProgress = !showProgress; }}
     >📊 {$t.backlog.progress}</button>
-    <button class="bottom-add-btn" onclick={onadd}>{$t.backlog.addSong}</button>
+    {#if $canWrite}<button class="bottom-add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>
 </div>
 

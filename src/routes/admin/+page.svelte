@@ -4,7 +4,7 @@
   import { t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { getUsers, patchUser, getMusicians } from '$lib/api';
-  import type { KittensUser, BandMusician } from '$lib/types';
+  import type { KittensUser, BandMusician, UserRole } from '$lib/types';
 
   let users = $state<KittensUser[]>([]);
   let musicians = $state<BandMusician[]>([]);
@@ -13,6 +13,8 @@
 
   // Map of telegramId → selected musicianId (local edit state)
   let musicianSelections = $state<Record<string, string>>({});
+  // Map of telegramId → selected role
+  let roleSelections = $state<Record<string, UserRole>>({});
 
   let dataLoaded = $state(false);
 
@@ -23,7 +25,10 @@
     Promise.all([getUsers(), getMusicians()]).then(([u, m]) => {
       users = u;
       musicians = m;
-      for (const user of u) musicianSelections[user.telegramId] = user.musicianId ?? '';
+      for (const user of u) {
+        musicianSelections[user.telegramId] = user.musicianId ?? '';
+        roleSelections[user.telegramId] = user.role ?? 'reader';
+      }
       loading = false;
     });
   });
@@ -31,7 +36,8 @@
   async function setStatus(user: KittensUser, status: 'approved' | 'rejected') {
     saving = user.telegramId;
     const musicianId = musicianSelections[user.telegramId] || null;
-    const updated = await patchUser(user.telegramId, { status, ...(musicianId ? { musicianId } : { musicianId: null }) });
+    const role = roleSelections[user.telegramId] ?? 'writer';
+    const updated = await patchUser(user.telegramId, { status, role, ...(musicianId ? { musicianId } : { musicianId: null }) });
     users = users.map(u => u.telegramId === updated.telegramId ? updated : u);
     saving = null;
   }
@@ -40,6 +46,14 @@
     saving = user.telegramId;
     const musicianId = musicianSelections[user.telegramId] || null;
     const updated = await patchUser(user.telegramId, { musicianId });
+    users = users.map(u => u.telegramId === updated.telegramId ? updated : u);
+    saving = null;
+  }
+
+  async function saveRole(user: KittensUser) {
+    saving = user.telegramId;
+    const role = roleSelections[user.telegramId] ?? 'writer';
+    const updated = await patchUser(user.telegramId, { role });
     users = users.map(u => u.telegramId === updated.telegramId ? updated : u);
     saving = null;
   }
@@ -72,6 +86,10 @@
                 <option value={m.id}>{m.name}</option>
               {/each}
             </select>
+            <select bind:value={roleSelections[user.telegramId]} class="role-select">
+              <option value="writer">Writer</option>
+              <option value="reader">Reader</option>
+            </select>
             <button class="btn approve" disabled={saving === user.telegramId}
               onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
             <button class="btn reject" disabled={saving === user.telegramId}
@@ -102,6 +120,11 @@
               {/each}
             </select>
             {#if !user.isAdmin}
+              <select bind:value={roleSelections[user.telegramId]} class="role-select"
+                onchange={() => saveRole(user)}>
+                <option value="writer">Writer</option>
+                <option value="reader">Reader</option>
+              </select>
               <button class="btn reject" disabled={saving === user.telegramId}
                 onclick={() => setStatus(user, 'rejected')}>{$t.admin.revoke}</button>
             {/if}
@@ -208,7 +231,7 @@
     width: fit-content;
   }
 
-  .musician-select {
+  .musician-select, .role-select {
     padding: 4px 8px;
     border: 1px solid var(--border);
     border-radius: 6px;

@@ -5,6 +5,7 @@
   import type { Song, Setlist, BandMusician } from '$lib/types';
   import { getSongs, addSong, getSetlists, getMusicians } from '$lib/api';
   import { startPolling } from '$lib/poller';
+  import { canWrite, currentUser } from '$lib/auth';
 
   let songs = $state<Song[]>([]);
   let setlists = $state<Setlist[]>([]);
@@ -16,7 +17,8 @@
     Promise.all([getSongs(), getSetlists(), getMusicians()]).then(([s, sl, m]) => {
       songs = s; setlists = sl; musicians = m; loading = false;
     });
-    return startPolling(async () => { songs = await getSongs(); }, 10000, () => false);
+    const interval = ($currentUser?.isAdmin || $currentUser?.role === 'writer') ? 10000 : 50000;
+    return startPolling(async () => { songs = await getSongs(); }, interval, () => false);
   });
 
   async function handleAdd(song: Song) {

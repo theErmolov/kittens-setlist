@@ -3,6 +3,7 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { t } from '$lib/i18n';
   import { sortInstruments, progressPct, pctBubbleStyle } from '$lib/utils';
+  import { canWrite } from '$lib/auth';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
@@ -73,7 +74,7 @@
   });
 </script>
 
-<tr class="song-row" onclick={onedit}>
+<tr class="song-row" onclick={$canWrite ? onedit : undefined}>
   <td class="td-cat desktop-only">
     {#if showProgress && overallPct !== null}
       <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
@@ -123,9 +124,11 @@
     </td>
   {/each}
   <td class="td-actions">
-    <button class="action-btn action-edit" onclick={(e) => { e.stopPropagation(); onedit(); }} title={$t.song.editTitle}>✏️</button>
-    <button class="action-btn action-addset" onclick={(e) => { e.stopPropagation(); onaddtosetlist(); }} title={$t.addToSetlist.title}>📋</button>
-    <button class="action-btn action-del danger" onclick={(e) => { e.stopPropagation(); ondelete(); }} title={$t.song.remove}>🗑</button>
+    {#if $canWrite}
+      <button class="action-btn action-edit" onclick={(e) => { e.stopPropagation(); onedit(); }} title={$t.song.editTitle}>✏️</button>
+      <button class="action-btn action-addset" onclick={(e) => { e.stopPropagation(); onaddtosetlist(); }} title={$t.addToSetlist.title}>📋</button>
+      <button class="action-btn action-del danger" onclick={(e) => { e.stopPropagation(); ondelete(); }} title={$t.song.remove}>🗑</button>
+    {/if}
   </td>
 </tr>
 

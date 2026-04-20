@@ -7,6 +7,7 @@
   import { getSetlist, updateSetlist, updateSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
+  import { currentUser } from '$lib/auth';
   import { formatDuration, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
@@ -116,9 +117,11 @@
   }
 
   onMount(() => {
+    const u = $currentUser;
+    const pollMs = (u?.isAdmin || u?.role === 'writer') ? 3000 : 15000;
     const stopPoller = startPolling(
       async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
-      3000,
+      pollMs,
       () => false,
     );
 

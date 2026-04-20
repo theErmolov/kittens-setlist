@@ -77,6 +77,7 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
       status: existing?.status ?? 'pending',
       ...(existing?.musicianId ? { musicianId: existing.musicianId } : {}),
       isAdmin: existing?.isAdmin,
+      ...(existing?.role ? { role: existing.role } : {}),
       createdAt: existing?.createdAt ?? now,
       ...(existing?.approvedAt ? { approvedAt: existing.approvedAt } : {}),
     };
@@ -141,7 +142,7 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
     const user = await getUser(telegramId);
     if (!user) return err('User not found', 404);
 
-    let patch: { status?: string; musicianId?: string | null };
+    let patch: { status?: string; musicianId?: string | null; role?: string | null };
     try {
       patch = JSON.parse(event.body ?? '{}');
     } catch {
@@ -156,6 +157,11 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
         ? patch.musicianId === null
           ? { musicianId: undefined }
           : { musicianId: patch.musicianId }
+        : {}),
+      ...(patch.role !== undefined
+        ? patch.role === null
+          ? { role: undefined }
+          : { role: patch.role as KittensUser['role'] }
         : {}),
     };
     await dbPut(USERS_TABLE, updated as unknown as Record<string, unknown>);

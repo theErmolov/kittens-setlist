@@ -40,6 +40,9 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     const user = await resolveAuth(event);
     if (!user) return err('Unauthorized', 401);
     if (user.status !== 'approved') return err('Your account is pending approval', 403);
+    // Readers may only read — block all mutations
+    const method = event.requestContext.http.method;
+    if (user.role !== 'writer' && !user.isAdmin && method !== 'GET') return err('Forbidden', 403);
   }
 
   if (path.startsWith('/musicians')) return musiciansHandler(event, path);

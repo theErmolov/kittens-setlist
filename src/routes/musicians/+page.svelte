@@ -3,6 +3,7 @@
   import { addMusician, updateMusician, deleteMusician, getMusicians } from '$lib/api';
   import { t } from '$lib/i18n';
   import type { BandMusician, Instrument } from '$lib/types';
+  import { canWrite } from '$lib/auth';
 
   const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'percussion', 'vocals'];
   const instrumentIcons: Record<Instrument, string> = {
@@ -18,10 +19,12 @@
   let draftInstruments = $state<Instrument[]>([]);
   let dragIdx = $state<number | null>(null);
   let dragOverIdx = $state<number | null>(null);
+  let canDrag = $state(false);
 
   onMount(async () => {
     musicians = await getMusicians();
     loading = false;
+    canDrag = !('ontouchstart' in window);
   });
 
   function startAdd() {
@@ -104,7 +107,7 @@
 <div class="page">
   <div class="page-header">
     <h1>{$t.musicians.title}</h1>
-    <button class="btn-primary" onclick={startAdd}>{$t.musicians.addBtn}</button>
+    {#if $canWrite}<button class="btn-primary" onclick={startAdd}>{$t.musicians.addBtn}</button>{/if}
   </div>
 
   {#if showNew}
@@ -137,13 +140,13 @@
         <li
           class="musician-item"
           class:drag-over={dragOverIdx === i && dragIdx !== i}
-          draggable="true"
-          ondragstart={() => onDragStart(i)}
-          ondragover={(e) => onDragOver(e, i)}
-          ondrop={onDrop}
-          ondragend={onDragEnd}
+          draggable={canDrag && $canWrite}
+          ondragstart={canDrag && $canWrite ? () => onDragStart(i) : undefined}
+          ondragover={canDrag && $canWrite ? (e) => onDragOver(e, i) : undefined}
+          ondrop={canDrag && $canWrite ? onDrop : undefined}
+          ondragend={canDrag && $canWrite ? onDragEnd : undefined}
         >
-          <span class="drag-handle" title="Drag to reorder">⠿</span>
+          {#if $canWrite && canDrag}<span class="drag-handle" title="Drag to reorder">⠿</span>{/if}
           {#if editingId === m.id}
             <div class="edit-form inline">
               <input bind:value={draftName} />
@@ -175,10 +178,12 @@
                 {/if}
               </span>
             </div>
+            {#if $canWrite}
             <div class="item-actions">
               <button class="edit-btn" onclick={() => startEdit(m)}>✏️</button>
               <button class="del-btn" onclick={() => handleDelete(m.id)}>🗑</button>
             </div>
+            {/if}
           {/if}
         </li>
       {/each}

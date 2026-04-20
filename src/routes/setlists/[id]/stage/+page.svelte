@@ -13,9 +13,11 @@
   let musicians = $state<BandMusician[]>([]);
   let loading = $state(true);
 
-  let canMark = $derived($currentUser?.status === 'approved');
-  // Authenticated users poll every 2s; unauthenticated every 10s
-  let pollInterval = $derived(canMark ? 2000 : 30000);
+  let canMark = $derived($currentUser?.isAdmin === true || ($currentUser?.status === 'approved' && $currentUser?.role === 'writer'));
+  // admin/writer: 2s, reader: 10s, anonymous: 30s
+  let pollInterval = $derived(
+    canMark ? 2000 : $currentUser?.status === 'approved' ? 10000 : 30000
+  );
 
   onMount(async () => {
     setlist = await getSetlist(id!);
