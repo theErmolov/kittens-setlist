@@ -852,6 +852,7 @@
       margin-top: 6px;
     }
     .mob-bubble { display: flex; width: 100%; box-sizing: border-box; min-width: 0; overflow: hidden; }
+    thead { display: none; }
     .th-actions, .td-actions { width: 32px; }
     .td-actions { vertical-align: top; }
     .td-song { white-space: normal; }
