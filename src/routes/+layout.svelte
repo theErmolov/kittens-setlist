@@ -267,7 +267,8 @@
     .brand-text { display: none; }
     .nav-brand { margin-right: 4px; }
     .link-label { display: none; }
-    .nav-link { padding: 0 12px; font-size: 1.2rem; }
+    .nav-link { padding: 0 16px; font-size: 1.2rem; }
+    .link-icon { font-size: 1.45rem; }
     .lang-toggle { margin-left: auto; padding: 4px 7px; }
   }
 </style>
