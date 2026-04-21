@@ -112,6 +112,9 @@
   let totalMinutes = $derived(totalCount * 5 + localEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
   let visibleCount = $derived(sortedEntries().length);
 
+  let filterOpen = $state(false);
+  let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '');
+
   // Per-entry start times keyed by entry order, only when startTime is set
   let entryTimes = $derived((): Map<number, string> => {
     if (!setlist.startTime) return new Map();
@@ -138,9 +141,58 @@
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}
-    <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+    <div class="header-filters">
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      {#if musicians.length > 0 || guestNames().length > 0}
+        <div class="musician-picker">
+          {#each musicians as m}
+            <button
+              class="musician-chip"
+              class:active={selectedMusician === m.name}
+              onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
+            >{m.name}</button>
+          {/each}
+          {#each guestNames() as name}
+            <button
+              class="musician-chip guest-chip"
+              class:active={selectedMusician === name}
+              onclick={() => { selectedMusician = selectedMusician === name ? '' : name; }}
+            >{name}</button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <div class="song-list">
+    {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
+      {#if item.kind === 'song'}
+        <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
+          startTime={entryTimes().get(item.entry.order)}
+          {musicians}
+          {selectedMusician}
+          {canMark}
+          ontoggle={() => handleToggle(item.entry.songId!)} />
+      {:else}
+        <div class="stage-break">
+          <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
+          {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
+        </div>
+      {/if}
+    {/each}
+    {#if sortedEntries().length === 0}
+      <p class="empty">{$t.stage.noSongs}</p>
+    {/if}
+  </div>
+
+  <!-- Mobile filter panel (slides up above bottom bar) -->
+  <div class="mobile-filter-panel" class:open={filterOpen}>
+    <div class="filter-group">
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+    </div>
     {#if musicians.length > 0 || guestNames().length > 0}
-      <div class="musician-picker">
+      <div class="filter-sep-h"></div>
+      <div class="filter-group">
         {#each musicians as m}
           <button
             class="musician-chip"
@@ -159,25 +211,13 @@
     {/if}
   </div>
 
-  <div class="song-list">
-    {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
-      {#if item.kind === 'song'}
-        <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
-          startTime={entryTimes().get(item.entry.order)}
-          {musicians}
-          {selectedMusician}
-          {canMark}
-          ontoggle={() => handleToggle(item.entry.songId!)} />
-      {:else}
-        <div class="stage-break">
-          ⏸ {item.entry.breakMinutes} мин
-          {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
-        </div>
-      {/if}
-    {/each}
-    {#if sortedEntries().length === 0}
-      <p class="empty">{$t.stage.noSongs}</p>
-    {/if}
+  <!-- Mobile bottom bar -->
+  <div class="mobile-bottom-bar">
+    <button
+      class="bottom-btn"
+      class:active={filterOpen || isFiltered}
+      onclick={() => { filterOpen = !filterOpen; }}
+    >🎛️ Фильтр</button>
   </div>
 </div>
 
@@ -215,13 +255,18 @@
 
   .song-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }
+
+  .mobile-filter-panel { display: none; }
+  .mobile-bottom-bar { display: none; }
   .stage-break {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 6px 12px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
-    letter-spacing: 0.03em;
+    background: rgba(234, 179, 8, 0.08); letter-spacing: 0.03em;
   }
-  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .break-main { flex: 1; }
+  .break-note { font-style: italic; opacity: 0.85; }
+  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
 
   .login-hint {
     font-size: 0.8rem;
@@ -232,6 +277,30 @@
   .login-hint:hover { color: var(--accent); }
 
   @media (max-width: 700px) {
+    .header-filters { display: none; }
+    .song-list { padding-bottom: 74px; }
+
+    .mobile-filter-panel {
+      position: fixed; bottom: 64px; left: 0; right: 0; z-index: 20;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px; display: none; flex-direction: column; gap: 10px;
+    }
+    .mobile-filter-panel.open { display: flex; }
+    .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
+    .filter-sep-h { height: 1px; background: var(--border); }
+
+    .mobile-bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 64px; z-index: 21;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    }
+    .bottom-btn {
+      padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      color: var(--text-muted); white-space: nowrap;
+    }
+    .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
     .musician-chip { padding: 7px 14px; font-size: 0.88rem; }
   }
 </style>

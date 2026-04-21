@@ -82,6 +82,7 @@
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);
   let editingBreakOrder = $state<number | null>(null);
+  let breakCommentDraft = $state('');
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
@@ -608,20 +609,40 @@
                 {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                 <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
                   <span class="break-icon">⏸</span>
-                  {#if editingBreakOrder === entry.order}
-                    {#each [10, 20, 30] as min}
-                      <button
-                        class="break-opt"
-                        class:break-opt-active={entry.breakMinutes === min}
-                        onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
-                      >{min} мин</button>
-                    {/each}
-                    <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
-                  {:else}
-                    <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
-                      Перерыв — {entry.breakMinutes} мин
-                    </button>
-                  {/if}
+                  <div class="break-body">
+                    {#if editingBreakOrder === entry.order}
+                      <div class="break-edit-row">
+                        {#each [10, 20, 30] as min}
+                          <button
+                            class="break-opt"
+                            class:break-opt-active={entry.breakMinutes === min}
+                            onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
+                          >{min} мин</button>
+                        {/each}
+                        <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
+                      </div>
+                      <input
+                        class="break-comment-input"
+                        placeholder="Комментарий..."
+                        bind:value={breakCommentDraft}
+                        onclick={(e) => e.stopPropagation()}
+                        onblur={() => {
+                          if (breakCommentDraft !== (entry.comment ?? '')) {
+                            updateEntryComment(setlist.id, entry.order, breakCommentDraft).then(applyUpdate);
+                          }
+                          editingBreakOrder = null;
+                        }}
+                        onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      />
+                    {:else}
+                      <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; breakCommentDraft = entry.comment ?? ''; }}>
+                        Перерыв — {entry.breakMinutes} мин
+                      </button>
+                      {#if entry.comment}
+                        <span class="break-comment">{entry.comment}</span>
+                      {/if}
+                    {/if}
+                  </div>
                   <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
                 </td>
               </tr>
@@ -743,7 +764,7 @@
   .song-row.drag-over td { outline: 2px dashed var(--accent); outline-offset: -1px; }
 
   .break-row { cursor: grab; user-select: none; }
-  .break-row td { background: transparent; border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
+  .break-row td { background: rgba(234, 179, 8, 0.08); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
   .break-row td:first-child { border-left: 1px dashed var(--border); }
   .break-row td:last-child { border-right: 1px dashed var(--border); }
   .break-row:hover td { border-color: var(--accent); }
@@ -783,13 +804,22 @@
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; vertical-align: middle; }
 
-  .td-break { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
-  .break-remove { margin-left: auto; }
+  .td-break { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .break-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .break-edit-row { display: flex; align-items: center; gap: 4px; }
+  .break-remove { margin-left: auto; flex-shrink: 0; }
   .break-label {
     background: none; border: none; cursor: pointer; font-size: 0.82rem;
-    color: var(--text-muted); font-style: italic; padding: 0;
+    color: var(--text-muted); font-style: italic; padding: 0; text-align: left;
   }
   .break-label:hover { color: var(--accent); }
+  .break-comment { font-size: 0.76rem; color: var(--text-muted); font-style: italic; opacity: 0.75; }
+  .break-comment-input {
+    border: none; border-bottom: 1px solid var(--border); background: transparent;
+    font-size: 0.78rem; color: var(--text); padding: 1px 2px; outline: none;
+    width: 100%; max-width: 260px;
+  }
+  .break-comment-input::placeholder { color: var(--text-muted); opacity: 0.55; }
   .break-opt {
     background: none; border: 1px solid var(--border); border-radius: 4px;
     padding: 1px 8px; font-size: 0.8rem; cursor: pointer; color: var(--text-muted); margin-right: 4px;
@@ -800,7 +830,7 @@
     background: none; border: none; cursor: pointer; font-size: 0.78rem;
     color: var(--text-muted); padding: 0 4px; margin-left: 2px;
   }
-  .break-icon { margin-right: 4px; }
+  .break-icon { margin-right: 2px; flex-shrink: 0; }
 
   .filter-search {
     padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px;
@@ -860,6 +890,15 @@
     .editor-header { padding: 12px; }
     .song-name { flex-wrap: wrap; }
     .meta-input { font-size: 16px; }
+
+    /* Song row separators */
+    .song-row td { border-top: 1px solid var(--border); }
+
+    /* Break row: collapse td-num and reflow as flex so content starts near left edge */
+    .break-row { display: flex; align-items: stretch; }
+    .break-row .td-drag { width: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .break-row .td-num { display: none; }
+    .break-row .td-break { flex: 1; min-width: 0; }
 
     /* No hover effects on touch devices */
     .song-row:hover td { background: var(--surface); }
