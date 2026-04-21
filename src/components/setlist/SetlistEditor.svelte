@@ -813,7 +813,7 @@
     color: var(--text-muted); font-style: italic; padding: 0; text-align: left;
   }
   .break-label:hover { color: var(--accent); }
-  .break-comment { font-size: 0.76rem; color: var(--text-muted); font-style: italic; opacity: 0.75; }
+  .break-comment { font-size: 0.8rem; color: var(--text-muted); font-style: italic; }
   .break-comment-input {
     border: none; border-bottom: 1px solid var(--border); background: transparent;
     font-size: 0.78rem; color: var(--text); padding: 1px 2px; outline: none;
@@ -894,11 +894,8 @@
     /* Song row separators */
     .song-row td { border-top: 1px solid var(--border); }
 
-    /* Break row: collapse td-num and reflow as flex so content starts near left edge */
-    .break-row { display: flex; align-items: stretch; }
-    .break-row .td-drag { width: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
-    .break-row .td-num { display: none; }
-    .break-row .td-break { flex: 1; min-width: 0; }
+    /* Make table fill full width so break row reaches right edge */
+    table { width: 100%; }
 
     /* No hover effects on touch devices */
     .song-row:hover td { background: var(--surface); }
