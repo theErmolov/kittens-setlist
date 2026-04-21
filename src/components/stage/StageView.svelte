@@ -185,7 +185,7 @@
   .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
 
   .stage-header {
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 56px; z-index: 10;
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;
   }
@@ -230,4 +230,8 @@
     text-align: center;
   }
   .login-hint:hover { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .musician-chip { padding: 7px 14px; font-size: 0.88rem; }
+  }
 </style>
