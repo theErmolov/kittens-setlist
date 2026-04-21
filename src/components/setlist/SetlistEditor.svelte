@@ -713,7 +713,7 @@
   .break-opt { padding: 8px 16px; background: transparent; border: none; cursor: pointer; text-align: left; font-size: 0.88rem; color: var(--text); }
   .break-opt:hover { background: var(--row-hover); }
 
-  .table-wrap { overflow: auto; flex: 1; padding: 0 16px 16px; }
+  .table-wrap { overflow: auto; flex: 1; min-height: 0; padding: 0 16px 16px; }
   table { width: 100%; border-collapse: separate; border-spacing: 0 3px; background: var(--surface); }
 
   thead th {
