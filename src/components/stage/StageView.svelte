@@ -175,7 +175,7 @@
           ontoggle={() => handleToggle(item.entry.songId!)} />
       {:else}
         <div class="stage-break">
-          ⏸ {item.entry.breakMinutes} мин
+          <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
           {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
         </div>
       {/if}
@@ -259,12 +259,14 @@
   .mobile-filter-panel { display: none; }
   .mobile-bottom-bar { display: none; }
   .stage-break {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 6px 12px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
-    letter-spacing: 0.03em;
+    background: rgba(234, 179, 8, 0.08); letter-spacing: 0.03em;
   }
-  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .break-main { flex: 1; }
+  .break-note { font-style: italic; opacity: 0.85; }
+  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
 
   .login-hint {
     font-size: 0.8rem;
