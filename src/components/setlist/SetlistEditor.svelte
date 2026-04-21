@@ -82,7 +82,6 @@
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);
   let editingBreakOrder = $state<number | null>(null);
-  let breakCommentDraft = $state('');
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
@@ -621,27 +620,15 @@
                         {/each}
                         <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
                       </div>
-                      <input
-                        class="break-comment-input"
-                        placeholder="Комментарий..."
-                        bind:value={breakCommentDraft}
-                        onclick={(e) => e.stopPropagation()}
-                        onblur={() => {
-                          if (breakCommentDraft !== (entry.comment ?? '')) {
-                            updateEntryComment(setlist.id, entry.order, breakCommentDraft).then(applyUpdate);
-                          }
-                          editingBreakOrder = null;
-                        }}
-                        onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      />
                     {:else}
-                      <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; breakCommentDraft = entry.comment ?? ''; }}>
+                      <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
                         Перерыв — {entry.breakMinutes} мин
                       </button>
-                      {#if entry.comment}
-                        <span class="break-comment">{entry.comment}</span>
-                      {/if}
                     {/if}
+                    <CommentInput
+                      value={entry.comment ?? ''}
+                      onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
+                    />
                   </div>
                   <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
                 </td>
@@ -764,7 +751,7 @@
   .song-row.drag-over td { outline: 2px dashed var(--accent); outline-offset: -1px; }
 
   .break-row { cursor: grab; user-select: none; }
-  .break-row td { background: rgba(234, 179, 8, 0.08); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
+  .break-row td { background: rgba(59, 130, 246, 0.09); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
   .break-row td:first-child { border-left: 1px dashed var(--border); }
   .break-row td:last-child { border-right: 1px dashed var(--border); }
   .break-row:hover td { border-color: var(--accent); }
@@ -813,13 +800,8 @@
     color: var(--text-muted); font-style: italic; padding: 0; text-align: left;
   }
   .break-label:hover { color: var(--accent); }
-  .break-comment { font-size: 0.8rem; color: var(--text-muted); font-style: italic; }
-  .break-comment-input {
-    border: none; border-bottom: 1px solid var(--border); background: transparent;
-    font-size: 0.78rem; color: var(--text); padding: 1px 2px; outline: none;
-    width: 100%; max-width: 260px;
-  }
-  .break-comment-input::placeholder { color: var(--text-muted); opacity: 0.55; }
+  .break-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
+  .break-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
   .break-opt {
     background: none; border: 1px solid var(--border); border-radius: 4px;
     padding: 1px 8px; font-size: 0.8rem; cursor: pointer; color: var(--text-muted); margin-right: 4px;
@@ -894,7 +876,7 @@
     /* Song row separators */
     .song-row td { border-top: 1px solid var(--border); }
 
-    /* Make table fill full width so break row reaches right edge */
+    /* Full-width table so td-break colspan reaches the right edge */
     table { width: 100%; }
 
     /* No hover effects on touch devices */

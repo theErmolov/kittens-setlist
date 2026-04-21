@@ -262,7 +262,7 @@
     display: flex; align-items: center; gap: 8px;
     padding: 6px 12px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
-    background: rgba(234, 179, 8, 0.08); letter-spacing: 0.03em;
+    background: rgba(59, 130, 246, 0.09); letter-spacing: 0.03em;
   }
   .break-main { flex: 1; }
   .break-note { font-style: italic; opacity: 0.85; }
