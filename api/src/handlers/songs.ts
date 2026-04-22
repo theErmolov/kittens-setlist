@@ -46,11 +46,14 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
       for (const m of allMusicians) {
         const b = before.progress?.[m] ?? null;
         const a = body.progress?.[m] ?? null;
-        if (b !== a) parts.push(`прогресс ${m}: ${stageLabel(JSON.parse(b))} → ${stageLabel(JSON.parse(a))}`);
+        if (b !== a) parts.push(`прогресс ${m}: ${stageLabel(b)} → ${stageLabel(a)}`);
       }
     }
-    const summary = parts.length ? parts.join(', ') : 'обновлена';
-    await logAudit({ action: 'song.update', actor: user, entityType: 'song', entityId: id, entityName: songName(body), summary });
+    const noaudit = event.queryStringParameters?.noaudit === '1';
+    if (!noaudit) {
+      const summary = parts.length ? parts.join(', ') : 'обновлена';
+      await logAudit({ action: 'song.update', actor: user, entityType: 'song', entityId: id, entityName: songName(body), summary });
+    }
     return ok(body);
   }
   if (method === 'DELETE') {

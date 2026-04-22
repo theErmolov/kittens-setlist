@@ -51,8 +51,9 @@ export async function addSong(song: Omit<Song, 'id'>): Promise<Song> {
   return req('/songs', { method: 'POST', body: JSON.stringify(song) });
 }
 
-export async function updateSong(song: Song): Promise<Song> {
-  return req(`/songs/${song.id}`, { method: 'PUT', body: JSON.stringify(song) });
+export async function updateSong(song: Song, noaudit = false): Promise<Song> {
+  const path = noaudit ? `/songs/${song.id}?noaudit=1` : `/songs/${song.id}`;
+  return req(path, { method: 'PUT', body: JSON.stringify(song) });
 }
 
 export async function getSong(id: string): Promise<Song | null> {

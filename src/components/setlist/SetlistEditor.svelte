@@ -312,7 +312,7 @@
             ...canonical,
             progress: { ...(canonical.progress ?? {}), ...(updatedSong.progress ?? {}) },
             lengthMinutes: updatedSong.lengthMinutes ?? canonical.lengthMinutes,
-          });
+          }, true);
         }
       } catch (err) {
         console.error('Failed to sync song changes to backlog:', err);

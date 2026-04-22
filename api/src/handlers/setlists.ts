@@ -130,6 +130,16 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         const beforeName = before?.song ? songName(before.song) : '?';
         await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order + 1}: ${beforeName} → ${songName(song)}` });
       }
+      // Log per-musician progress changes in the snapshot
+      const allMusicians = new Set([...Object.keys(before?.song?.progress ?? {}), ...Object.keys(song.progress ?? {})]);
+      const entryLabel = before ? entryName(setlist, before) : `${setlistName(setlist)} #${order + 1}`;
+      for (const m of allMusicians) {
+        const b = before?.song?.progress?.[m] ?? null;
+        const a = song.progress?.[m] ?? null;
+        if (b !== a) {
+          await logAudit({ action: 'setlist.entry_progress_update', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: `${m}: ${stageLabel(b)} → ${stageLabel(a)}` });
+        }
+      }
       return ok(updated);
     }
     return err('Method not allowed', 405);
