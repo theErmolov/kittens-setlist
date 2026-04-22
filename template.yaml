@@ -15,6 +15,7 @@ Globals:
         MUSICIANS_TABLE: !Ref MusiciansTable
         USERS_TABLE: !Ref UsersTable
         SESSIONS_TABLE: !Ref SessionsTable
+        AUDIT_LOG_TABLE: !Ref AuditLogTable
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
 
 Parameters:
@@ -68,6 +69,8 @@ Resources:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AuditLogTable
       Events:
         ApiRoot:
           Type: HttpApi
@@ -152,6 +155,23 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
+
+  AuditLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: kittens-audit-log
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
 
   # Frontend (S3 + CloudFront) is managed outside this template.
   # Bucket: kittens-setlist-frontend-540966180378

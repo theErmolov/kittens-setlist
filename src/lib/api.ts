@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage, AuditLogEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -143,4 +143,10 @@ export async function getUsers(): Promise<KittensUser[]> {
 
 export async function patchUser(telegramId: string, patch: { status?: string; musicianId?: string | null; role?: string | null }): Promise<KittensUser> {
   return req(`/auth/users/${telegramId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+
+export async function getAuditLog(limit: number, cursor?: string): Promise<{ items: AuditLogEntry[]; nextCursor?: string }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  return req(`/auth/audit-log?${params}`);
 }

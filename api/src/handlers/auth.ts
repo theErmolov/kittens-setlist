@@ -4,6 +4,7 @@ import { ok, err } from '../lib/response.js';
 import { dbGetByKey, dbDeleteByKey, dbPut, dbScan } from '../lib/dynamo.js';
 import { verifyTelegramAuth, type TelegramAuthData } from '../lib/telegram.js';
 import type { KittensUser, KittensSession } from '../lib/types.js';
+import { logAudit, queryAuditLog } from '../lib/audit.js';
 
 const USERS_TABLE = 'kittens-users';
 const SESSIONS_TABLE = 'kittens-sessions';
@@ -165,7 +166,37 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
         : {}),
     };
     await dbPut(USERS_TABLE, updated as unknown as Record<string, unknown>);
+
+    const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+    if (patch.status && patch.status !== user.status) {
+      const action = patch.status === 'approved' ? 'user.approve' : 'user.reject';
+      await logAudit({ action, actor: caller!, entityType: 'user', entityId: telegramId, entityName: userName, summary: `статус: ${user.status} → ${patch.status}` });
+    } else if (patch.role !== undefined && patch.role !== (user.role ?? null)) {
+      await logAudit({ action: 'user.role_change', actor: caller!, entityType: 'user', entityId: telegramId, entityName: userName, summary: `роль: ${user.role ?? 'reader'} → ${patch.role ?? 'reader'}` });
+    } else if (patch.musicianId !== undefined && patch.musicianId !== (user.musicianId ?? null)) {
+      await logAudit({ action: 'user.musician_assign', actor: caller!, entityType: 'user', entityId: telegramId, entityName: userName, summary: `musicianId: ${user.musicianId ?? null} → ${patch.musicianId}` });
+    }
+
     return ok(updated);
+  }
+
+  // GET /auth/audit-log — admin only: paginated audit log
+  if (method === 'GET' && path === '/auth/audit-log') {
+    const authHeader = event.headers?.authorization ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return err('Unauthorized', 401);
+    const session = await getSession(token);
+    if (!session) return err('Session expired or invalid', 401);
+    const caller = await getUser(session.telegramId);
+    if (!caller?.isAdmin) return err('Forbidden', 403);
+
+    const params = event.queryStringParameters ?? {};
+    const limitRaw = parseInt(params.limit ?? '20', 10);
+    const limit = [20, 50, 100].includes(limitRaw) ? limitRaw : 20;
+    const cursor = params.cursor ?? undefined;
+
+    const result = await queryAuditLog(limit, cursor);
+    return ok(result);
   }
 
   return err('Not found', 404);

@@ -44,6 +44,18 @@ export interface Setlist {
   entries: SetlistEntry[];
 }
 
+export interface AuditLogEntry {
+  sk: string;
+  timestamp: string;
+  action: string;
+  actorTelegramId: string;
+  actorName: string;
+  entityType: 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user';
+  entityId: string;
+  entityName: string;
+  summary: string;
+}
+
 export type UserStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'writer' | 'reader';
 

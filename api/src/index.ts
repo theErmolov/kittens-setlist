@@ -5,6 +5,7 @@ import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
 import { err } from './lib/response.js';
+import type { KittensUser } from './lib/types.js';
 
 export const handler = async (event: APIGatewayProxyEventV2) => {
   // API Gateway HTTP API prepends the stage name to rawPath (e.g. /prod/songs).
@@ -35,9 +36,10 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     event.requestContext.http.method === 'GET' &&
     /^\/setlists\/[^/]+$/.test(path);
 
+  let user: KittensUser | null = null;
   if (!isPublicSetlistGet) {
     // All other routes require an authenticated, approved user
-    const user = await resolveAuth(event);
+    user = await resolveAuth(event);
     if (!user) return err('Unauthorized', 401);
     if (user.status !== 'approved') return err('Your account is pending approval', 403);
     // Readers may only read — block all mutations
@@ -45,9 +47,9 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     if (user.role !== 'writer' && !user.isAdmin && method !== 'GET') return err('Forbidden', 403);
   }
 
-  if (path.startsWith('/musicians')) return musiciansHandler(event, path);
-  if (path.startsWith('/songs')) return songsHandler(event, path);
-  if (path.startsWith('/setlists')) return setlistsHandler(event, path);
+  if (path.startsWith('/musicians')) return musiciansHandler(event, path, user!);
+  if (path.startsWith('/songs')) return songsHandler(event, path, user!);
+  if (path.startsWith('/setlists')) return setlistsHandler(event, path, user!);
 
   return { statusCode: 404, body: 'Not found' };
 };
