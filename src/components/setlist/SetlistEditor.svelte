@@ -255,7 +255,7 @@
   });
 
   // total columns: drag + num + (time?) + song + musicians + actions
-  let totalCols = $derived(allMusicians.length + 4 + (localMeta.startTime ? 1 : 0));
+  let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(songs: Song[]) {
     const updated = await addSongsToSetlist(setlist.id, songs);
@@ -812,7 +812,8 @@
     background: none; border: none; cursor: pointer; font-size: 0.78rem;
     color: var(--text-muted); padding: 0 4px; margin-left: 2px;
   }
-  .break-icon { margin-right: 2px; flex-shrink: 0; }
+  .break-icon { margin-right: 2px; flex-shrink: 0; display: flex; align-items: center; }
+  .break-icon :global(img) { display: block; }
 
   .filter-search {
     padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px;
