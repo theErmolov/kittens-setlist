@@ -55,6 +55,10 @@ export async function updateSong(song: Song): Promise<Song> {
   return req(`/songs/${song.id}`, { method: 'PUT', body: JSON.stringify(song) });
 }
 
+export async function getSong(id: string): Promise<Song | null> {
+  try { return await req<Song>(`/songs/${id}`); } catch { return null; }
+}
+
 export async function deleteSong(id: string): Promise<void> {
   await req(`/songs/${id}`, { method: 'DELETE' });
 }

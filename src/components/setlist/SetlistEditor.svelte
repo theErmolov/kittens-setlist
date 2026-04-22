@@ -4,7 +4,7 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, updateSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
+  import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
@@ -301,10 +301,22 @@
     let updated = await updateEntrySong(setlist.id, entry.order, updatedSong);
     updated = await updateEntryComment(setlist.id, entry.order, updatedSong.comment ?? '');
     applyUpdate(updated);
-    // Sync progress and lengthMinutes back to the canonical backlog song
+    // Sync progress and lengthMinutes back to the canonical backlog song.
+    // Fetch fresh to avoid stale prop data and merge progress so we don't wipe
+    // keys that weren't present in the entry snapshot.
     if (entry.songId) {
-      const canonical = allSongs.find(s => s.id === entry.songId);
-      if (canonical) await updateSong({ ...canonical, progress: updatedSong.progress ?? canonical.progress, lengthMinutes: updatedSong.lengthMinutes });
+      try {
+        const canonical = await getSong(entry.songId);
+        if (canonical) {
+          await updateSong({
+            ...canonical,
+            progress: { ...(canonical.progress ?? {}), ...(updatedSong.progress ?? {}) },
+            lengthMinutes: updatedSong.lengthMinutes ?? canonical.lengthMinutes,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to sync song changes to backlog:', err);
+      }
     }
     editingEntry = null;
   }
