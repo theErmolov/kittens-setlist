@@ -815,7 +815,7 @@
     background: none; border: none; cursor: pointer; font-size: 0.78rem;
     color: var(--text-muted); padding: 0 4px; margin-left: 2px;
   }
-  .break-icon { flex-shrink: 0; line-height: 1; margin-top: 3px; }
+  .break-icon { flex-shrink: 0; line-height: 1; margin-top: 2px; }
   .break-icon :global(img) { display: block; }
 
   .filter-search {
