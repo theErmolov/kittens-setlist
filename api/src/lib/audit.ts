@@ -133,6 +133,29 @@ export function stageLabel(stage: string | null): string {
   return STAGE_LABELS[stage] ?? stage;
 }
 
+export function musiciansDiff(
+  before: Record<string, { instruments?: string[] }>,
+  after: Record<string, { instruments?: string[] }>,
+): string {
+  const parts: string[] = [];
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const name of allKeys) {
+    const b = before[name];
+    const a = after[name];
+    if (!b) {
+      const instr = a?.instruments?.length ? ` (${a.instruments.join(', ')})` : '';
+      parts.push(`+ ${name}${instr}`);
+    } else if (!a) {
+      parts.push(`- ${name}`);
+    } else if (JSON.stringify(b.instruments ?? []) !== JSON.stringify(a.instruments ?? [])) {
+      const bi = (b.instruments ?? []).join(', ') || '—';
+      const ai = (a.instruments ?? []).join(', ') || '—';
+      parts.push(`${name}: ${bi} → ${ai}`);
+    }
+  }
+  return parts.join(', ');
+}
+
 export function diffSummary(
   before: Record<string, unknown>,
   after: Record<string, unknown>,

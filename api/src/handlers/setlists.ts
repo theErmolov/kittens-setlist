@@ -2,13 +2,13 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { Setlist, SetlistEntry, Song, LearningStage, KittensUser } from '../lib/types.js';
-import { logAudit, diffSummary, stageLabel } from '../lib/audit.js';
+import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
 const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
 
 function setlistName(s: Setlist) { return s.date ? `${s.name} (${s.date})` : s.name; }
-function songName(s: Song) { return `${s.title} — ${s.artist}`; }
+function songName(s: Song) { return `${s.artist} — ${s.title}`; }
 function entryName(setlist: Setlist, entry: SetlistEntry) {
   if (entry.song) return `${setlistName(setlist)} / ${songName(entry.song)}`;
   return `${setlistName(setlist)} / перерыв`;
@@ -125,14 +125,17 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         entries: setlist.entries.map(e => e.order === order ? { ...e, song } : e),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-      const songFields = (s: Song) => ({ title: s.title, artist: s.artist, category: s.category, comment: s.comment, lengthMinutes: s.lengthMinutes, musicians: s.musicians });
-      if (JSON.stringify(songFields(before?.song ?? {} as Song)) !== JSON.stringify(songFields(song))) {
-        const beforeName = before?.song ? songName(before.song) : '?';
-        await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order + 1}: ${beforeName} → ${songName(song)}` });
+      const entryLabel = before ? entryName(setlist, before) : `${setlistName(setlist)} #${order + 1}`;
+      const scalarDiff = diffSummary(before?.song as unknown as Record<string, unknown> ?? {}, song as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes']);
+      const mDiff = musiciansDiff(before?.song?.musicians ?? {}, song.musicians ?? {});
+      if (scalarDiff !== 'no changes' || mDiff) {
+        const parts: string[] = [];
+        if (scalarDiff !== 'no changes') parts.push(scalarDiff);
+        if (mDiff) parts.push(mDiff);
+        await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: parts.join(', ') });
       }
       // Log per-musician progress changes in the snapshot
       const allMusicians = new Set([...Object.keys(before?.song?.progress ?? {}), ...Object.keys(song.progress ?? {})]);
-      const entryLabel = before ? entryName(setlist, before) : `${setlistName(setlist)} #${order + 1}`;
       for (const m of allMusicians) {
         const b = before?.song?.progress?.[m] ?? null;
         const a = song.progress?.[m] ?? null;

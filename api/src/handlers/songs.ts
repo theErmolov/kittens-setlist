@@ -2,11 +2,11 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { Song, KittensUser } from '../lib/types.js';
-import { logAudit, diffSummary, stageLabel } from '../lib/audit.js';
+import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
 const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 
-function songName(s: Song) { return `${s.title} — ${s.artist}`; }
+function songName(s: Song) { return `${s.artist} — ${s.title}`; }
 
 export async function songsHandler(event: APIGatewayProxyEventV2, path: string, user: KittensUser) {
   const method = event.requestContext.http.method;
@@ -42,6 +42,8 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
       const scalar = diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes']);
       if (scalar !== 'no changes') parts.push(scalar);
       // Diff progress per-musician
+      const mDiff = musiciansDiff(before.musicians ?? {}, body.musicians ?? {});
+      if (mDiff) parts.push(mDiff);
       const allMusicians = new Set([...Object.keys(before.progress ?? {}), ...Object.keys(body.progress ?? {})]);
       for (const m of allMusicians) {
         const b = before.progress?.[m] ?? null;
