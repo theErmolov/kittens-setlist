@@ -37,9 +37,19 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
     const body = JSON.parse(event.body ?? '{}') as Song;
     const before = await dbGet<Song>(TABLE, id);
     await dbPut(TABLE, { ...body, id } as unknown as Record<string, unknown>);
-    const summary = before
-      ? diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes'])
-      : 'обновлена';
+    const parts: string[] = [];
+    if (before) {
+      const scalar = diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes']);
+      if (scalar !== 'no changes') parts.push(scalar);
+      // Diff progress per-musician
+      const allMusicians = new Set([...Object.keys(before.progress ?? {}), ...Object.keys(body.progress ?? {})]);
+      for (const m of allMusicians) {
+        const b = before.progress?.[m] ?? null;
+        const a = body.progress?.[m] ?? null;
+        if (b !== a) parts.push(`прогресс ${m}: ${b} → ${a}`);
+      }
+    }
+    const summary = parts.length ? parts.join(', ') : 'обновлена';
     await logAudit({ action: 'song.update', actor: user, entityType: 'song', entityId: id, entityName: songName(body), summary });
     return ok(body);
   }

@@ -125,8 +125,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         entries: setlist.entries.map(e => e.order === order ? { ...e, song } : e),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-      const beforeName = before?.song ? songName(before.song) : '?';
-      await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order}: ${beforeName} → ${songName(song)}` });
+      if (JSON.stringify(before?.song) !== JSON.stringify(song)) {
+        const beforeName = before?.song ? songName(before.song) : '?';
+        await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order}: ${beforeName} → ${songName(song)}` });
+      }
       return ok(updated);
     }
     return err('Method not allowed', 405);
@@ -179,8 +181,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         entries: setlist.entries.map(e => e.order === order ? { ...e, comment } : e),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-      const entryLabel = entry ? entryName(setlist, entry) : `${setlistName(setlist)} #${order}`;
-      await logAudit({ action: 'setlist.entry_comment_update', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: `комментарий: "${before}" → "${comment}"` });
+      if (before !== comment) {
+        const entryLabel = entry ? entryName(setlist, entry) : `${setlistName(setlist)} #${order}`;
+        await logAudit({ action: 'setlist.entry_comment_update', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: `комментарий: "${before}" → "${comment}"` });
+      }
       return ok(updated);
     }
     return err('Method not allowed', 405);
