@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Setlist } from '$lib/types';
   import { t } from '$lib/i18n';
-  import { formatDuration } from '$lib/utils';
+  import { formatDuration, formatDate } from '$lib/utils';
   import { base } from '$app/paths';
 
   let { setlist, ondelete }: { setlist: Setlist; ondelete: () => void } = $props();
@@ -16,7 +16,7 @@
   <a href="{base}/setlists/{setlist.id}" class="card-link">
     <div class="card-name">{setlist.name}</div>
     <div class="card-meta">
-      {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
+      {#if setlist.date}<span class="date">{formatDate(setlist.date)}</span>{/if}
       {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}
       <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songMins + breakMins)})</span>
     </div>

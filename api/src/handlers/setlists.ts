@@ -219,7 +219,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       const newPlayed = !entry?.played;
       const entryLabel = entry?.song ? songName(entry.song) : songId;
-      await logAudit({ action: 'setlist.played_toggle', actor: user, entityType: 'setlist_entry', entityId: id, entityName: `${setlistName(setlist)} / ${entryLabel}`, summary: newPlayed ? 'отмечена сыгранной' : 'снята отметка' });
+      await logAudit({ action: 'setlist.played_toggle', actor: user, entityType: 'setlist_entry', entityId: id, entityName: `${setlistName(setlist)} / ${entryLabel}`, summary: newPlayed ? 'отмечена сыгранной' : 'отмечена несыгранной' });
       return ok(updated);
     }
     return err('Method not allowed', 405);

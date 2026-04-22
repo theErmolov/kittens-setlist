@@ -59,6 +59,12 @@ export function songReadiness(
     );
 }
 
+/** Format a YYYY-MM-DD string as a human-readable date (e.g. "2 апреля 2026"). */
+export function formatDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(y, m - 1, d));
+}
+
 /** Add `minutes` to a "HH:MM" time string, wrapping at midnight. */
 export function addMinutes(time: string, minutes: number): string {
   const [h, m] = time.split(':').map(Number);

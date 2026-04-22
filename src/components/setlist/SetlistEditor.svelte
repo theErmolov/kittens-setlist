@@ -8,7 +8,7 @@
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
-  import { formatDuration, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT } from '$lib/utils';
+  import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
 
@@ -401,7 +401,7 @@
         <div class="meta-view">
           <h1>{localMeta.name}</h1>
           <div class="meta-details">
-            {#if localMeta.date}<span class="date">{localMeta.date}</span>{/if}
+            {#if localMeta.date}<span class="date">{formatDate(localMeta.date)}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
             <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes)})</span>
             {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}

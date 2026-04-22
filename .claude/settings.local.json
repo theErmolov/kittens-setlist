@@ -17,7 +17,20 @@
       "Bash(npx tsc:*)",
       "Bash(git rm:*)",
       "Bash(npx svelte-check *)",
-      "Bash(node -e \"require\\('sharp'\\)\")"
+      "Bash(node -e \"require\\('sharp'\\)\")",
+      "Bash(node -e \"require\\('canvas'\\)\")",
+      "Bash(node -e \"require\\('svg2img'\\)\")",
+      "Bash(python3 -c \"import cairosvg\")",
+      "Bash(python3 -c \"from PIL import Image; print\\('ok'\\)\")",
+      "Bash(python3 -c \"import drawsvg; print\\('ok'\\)\")",
+      "Bash(qlmanage -t -s 180 -o /tmp/ static/favicon.svg)",
+      "Bash(sips *)",
+      "Bash(cat)",
+      "Bash(qlmanage -t -s 180 -o /tmp/ /tmp/touch-icon.svg)",
+      "Bash(qlmanage -t -s 180 -o /tmp/ /tmp/touch-icon2.svg)",
+      "Bash(brew list *)",
+      "Bash(node /tmp/icon-gen/gen.js)",
+      "Bash(git log *)"
     ]
   }
 }

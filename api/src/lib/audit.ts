@@ -36,7 +36,7 @@ export const AUDIT_ACTIONS: Record<AuditAction, boolean> = {
   'setlist.entry_song_edit': true,
   'setlist.entry_progress_update': true,
   'setlist.entry_comment_update': true,
-  'setlist.reorder': true,
+  'setlist.reorder': false,
   'user.approve': true,
   'user.reject': true,
   'user.role_change': true,
