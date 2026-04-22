@@ -39,6 +39,7 @@
   );
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
+  let addToSetlistSongDragInModal = false;
   let sortCol = $state<'artist' | 'title'>('artist');
   let sortDir = $state<1 | -1>(1);
 
@@ -271,7 +272,7 @@
 {/if}
 
 {#if addToSetlistSong}
-  <div class="modal-backdrop" onclick={e => { if ((e.target as HTMLElement).classList.contains('modal-backdrop')) addToSetlistSong = null; }} role="dialog" aria-modal="true">
+  <div class="modal-backdrop" onmousedown={e => { addToSetlistSongDragInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop'); }} onclick={e => { if (addToSetlistSongDragInModal) { addToSetlistSongDragInModal = false; return; } if ((e.target as HTMLElement).classList.contains('modal-backdrop')) addToSetlistSong = null; }} role="dialog" aria-modal="true">
     <div class="picker-modal">
       <div class="modal-header">
         <h3>{$t.addToSetlist.title}</h3>

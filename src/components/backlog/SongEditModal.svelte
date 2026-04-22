@@ -136,7 +136,14 @@
     return true;
   }
 
+  let dragStartedInModal = false;
+
+  function handleBackdropMousedown(e: MouseEvent) {
+    dragStartedInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop');
+  }
+
   function handleBackdrop(e: MouseEvent) {
+    if (dragStartedInModal) { dragStartedInModal = false; return; }
     if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal();
   }
 
@@ -181,7 +188,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={handleBackdrop}>
+<div class="modal-backdrop" onmousedown={handleBackdropMousedown} onclick={handleBackdrop}>
   <div class="modal">
     <div class="modal-header">
       <button class="back-btn" onclick={closeModal}>← {$t.song.cancel}</button>
