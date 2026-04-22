@@ -22,6 +22,7 @@ export interface Song {
   comment?: string;  // general note, copied to setlist entry on add
   musicians: Record<string, MusicianRole>;
   sortOrder?: number;
+  lengthMinutes?: number;
   progress?: Record<string, LearningStage>;  // keyed by musician name
 }
 

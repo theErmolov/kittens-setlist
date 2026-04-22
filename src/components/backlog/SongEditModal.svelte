@@ -64,6 +64,7 @@
     comment: song?.comment ?? '',
     musicians: buildInitialMusicians(),
     sortOrder: song?.sortOrder,
+    lengthMinutes: song?.lengthMinutes ?? 5,
     progress: { ...(song?.progress ?? {}) },
   });
 
@@ -309,9 +310,18 @@
 
         </div>
 
-      <div class="field">
-        <label>{$t.song.comment}</label>
-        <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
+      <div class="fields-row">
+        <div class="field" style="flex: 1">
+          <label>{$t.song.comment}</label>
+          <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
+        </div>
+        <div class="field field-length">
+          <label>{$t.song.length}</label>
+          <div class="length-wrap">
+            <input type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
+            <span class="length-unit">мин</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -480,6 +490,11 @@
     opacity: 0.5; transition: opacity 0.12s; text-align: center;
   }
   .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
+
+  .field-length { flex-shrink: 0; width: 110px; }
+  .length-wrap { display: flex; align-items: center; gap: 6px; }
+  .length-wrap input { width: 60px; }
+  .length-unit { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
 
   .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }

@@ -129,7 +129,7 @@
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="chips-row">
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().length * 5)})</span>
+      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0))})</span>
     </div>
     {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>

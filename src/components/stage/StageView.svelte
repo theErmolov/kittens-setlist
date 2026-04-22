@@ -109,7 +109,7 @@
 
   let playedCount = $derived(localEntries.filter(e => e.songId && e.played).length);
   let totalCount = $derived(localEntries.filter(e => e.songId).length);
-  let totalMinutes = $derived(totalCount * 5 + localEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+  let totalMinutes = $derived(localEntries.reduce((s, e) => s + (e.breakMinutes ?? (e.song?.lengthMinutes ?? 5)), 0));
   let visibleCount = $derived(sortedEntries().length);
 
   let filterOpen = $state(false);
@@ -122,7 +122,7 @@
     let offset = 0;
     for (const e of [...localEntries].sort((a, b) => a.order - b.order)) {
       map.set(e.order, addMinutes(setlist.startTime!, offset));
-      offset += e.breakMinutes ?? 5;
+      offset += e.breakMinutes ?? (e.song?.lengthMinutes ?? 5);
     }
     return map;
   });

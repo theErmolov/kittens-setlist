@@ -8,6 +8,7 @@
 
   let songCount = $derived(setlist.entries.filter(e => e.songId).length);
   let breakMins = $derived(setlist.entries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+  let songMins = $derived(setlist.entries.filter(e => e.songId).reduce((s, e) => s + (e.song?.lengthMinutes ?? 5), 0));
 
 </script>
 
@@ -17,7 +18,7 @@
     <div class="card-meta">
       {#if setlist.date}<span class="date">{setlist.date}</span>{/if}
       {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}
-      <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songCount * 5 + breakMins)})</span>
+      <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songMins + breakMins)})</span>
     </div>
   </a>
   <div class="card-actions">

@@ -220,7 +220,7 @@
   });
 
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
-  let totalMinutes = $derived(songCount * 5 + sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? 0), 0));
+  let totalMinutes = $derived(sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? (e.song?.lengthMinutes ?? 5)), 0));
 
   let readyCount = $derived(
     sortedEntries.filter(e =>
@@ -249,7 +249,7 @@
     let offset = 0;
     for (const entry of sortedEntries) {
       map.set(entryKey(entry), addMinutes(localMeta.startTime, offset));
-      offset += entry.breakMinutes ?? 5;
+      offset += entry.breakMinutes ?? (entry.song?.lengthMinutes ?? 5);
     }
     return map;
   });
@@ -296,10 +296,10 @@
     let updated = await updateEntrySong(setlist.id, editingEntry.order, updatedSong);
     updated = await updateEntryComment(setlist.id, editingEntry.order, updatedSong.comment ?? '');
     applyUpdate(updated);
-    // Sync progress back to the canonical backlog song
-    if (editingEntry.songId && updatedSong.progress) {
+    // Sync progress and lengthMinutes back to the canonical backlog song
+    if (editingEntry.songId) {
       const canonical = allSongs.find(s => s.id === editingEntry!.songId);
-      if (canonical) await updateSong({ ...canonical, progress: updatedSong.progress });
+      if (canonical) await updateSong({ ...canonical, progress: updatedSong.progress ?? canonical.progress, lengthMinutes: updatedSong.lengthMinutes });
     }
     editingEntry = null;
   }
