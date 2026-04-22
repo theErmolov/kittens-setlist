@@ -293,12 +293,17 @@
 
   async function handleEntrySave(updatedSong: Song) {
     if (!editingEntry) return;
-    let updated = await updateEntrySong(setlist.id, editingEntry.order, updatedSong);
-    updated = await updateEntryComment(setlist.id, editingEntry.order, updatedSong.comment ?? '');
+    const entry = editingEntry;
+    // Optimistic update — reflect changes immediately before API round-trips
+    localEntries = localEntries.map(e =>
+      e.order === entry.order ? { ...e, song: updatedSong, comment: updatedSong.comment ?? e.comment ?? '' } : e
+    );
+    let updated = await updateEntrySong(setlist.id, entry.order, updatedSong);
+    updated = await updateEntryComment(setlist.id, entry.order, updatedSong.comment ?? '');
     applyUpdate(updated);
     // Sync progress and lengthMinutes back to the canonical backlog song
-    if (editingEntry.songId) {
-      const canonical = allSongs.find(s => s.id === editingEntry!.songId);
+    if (entry.songId) {
+      const canonical = allSongs.find(s => s.id === entry.songId);
       if (canonical) await updateSong({ ...canonical, progress: updatedSong.progress ?? canonical.progress, lengthMinutes: updatedSong.lengthMinutes });
     }
     editingEntry = null;
