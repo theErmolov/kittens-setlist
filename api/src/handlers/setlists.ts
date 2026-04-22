@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { Setlist, SetlistEntry, Song, LearningStage, KittensUser } from '../lib/types.js';
-import { logAudit, diffSummary } from '../lib/audit.js';
+import { logAudit, diffSummary, stageLabel } from '../lib/audit.js';
 
 const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
@@ -125,9 +125,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         entries: setlist.entries.map(e => e.order === order ? { ...e, song } : e),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-      if (JSON.stringify(before?.song) !== JSON.stringify(song)) {
+      const songFields = (s: Song) => ({ title: s.title, artist: s.artist, category: s.category, comment: s.comment, lengthMinutes: s.lengthMinutes, musicians: s.musicians });
+      if (JSON.stringify(songFields(before?.song ?? {} as Song)) !== JSON.stringify(songFields(song))) {
         const beforeName = before?.song ? songName(before.song) : '?';
-        await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order}: ${beforeName} → ${songName(song)}` });
+        await logAudit({ action: 'setlist.entry_song_edit', actor: user, entityType: 'setlist_entry', entityId: id, entityName: setlistName(setlist), summary: `обновлена запись #${order + 1}: ${beforeName} → ${songName(song)}` });
       }
       return ok(updated);
     }
@@ -163,7 +164,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         }
       }
       const entryLabel = entry ? entryName(setlist, entry) : `${setlistName(setlist)} #${order}`;
-      await logAudit({ action: 'setlist.entry_progress_update', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: `${musicianName}: ${prevStage} → ${stage}` });
+      await logAudit({ action: 'setlist.entry_progress_update', actor: user, entityType: 'setlist_entry', entityId: id, entityName: entryLabel, summary: `${musicianName}: ${stageLabel(prevStage)} → ${stageLabel(stage)}` });
       return ok(updated);
     }
     return err('Method not allowed', 405);

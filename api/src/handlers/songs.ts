@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { Song, KittensUser } from '../lib/types.js';
-import { logAudit, diffSummary } from '../lib/audit.js';
+import { logAudit, diffSummary, stageLabel } from '../lib/audit.js';
 
 const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 
@@ -46,7 +46,7 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
       for (const m of allMusicians) {
         const b = before.progress?.[m] ?? null;
         const a = body.progress?.[m] ?? null;
-        if (b !== a) parts.push(`прогресс ${m}: ${b} → ${a}`);
+        if (b !== a) parts.push(`прогресс ${m}: ${stageLabel(JSON.parse(b))} → ${stageLabel(JSON.parse(a))}`);
       }
     }
     const summary = parts.length ? parts.join(', ') : 'обновлена';
@@ -68,7 +68,7 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
     const progress = { ...(song.progress ?? {}), [musicianName]: stage };
     const updated = { ...song, progress };
     await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-    await logAudit({ action: 'song.progress_update', actor: user, entityType: 'song', entityId: id, entityName: songName(song), summary: `${musicianName}: ${prevStage} → ${stage}` });
+    await logAudit({ action: 'song.progress_update', actor: user, entityType: 'song', entityId: id, entityName: songName(song), summary: `${musicianName}: ${stageLabel(prevStage)} → ${stageLabel(stage)}` });
     return ok(updated);
   }
 

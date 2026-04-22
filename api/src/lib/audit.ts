@@ -121,6 +121,18 @@ export async function queryAuditLog(
 
 // ─── Summary helpers ──────────────────────────────────────────────────────────
 
+const STAGE_LABELS: Record<string, string> = {
+  queue:     '⚪',
+  structure: '🟡',
+  mastering: '🟠',
+  ready:     '🟢',
+};
+
+export function stageLabel(stage: string | null): string {
+  if (!stage) return '—';
+  return STAGE_LABELS[stage] ?? stage;
+}
+
 export function diffSummary(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
