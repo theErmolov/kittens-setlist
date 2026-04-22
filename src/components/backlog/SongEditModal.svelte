@@ -317,10 +317,7 @@
         </div>
         <div class="field field-length">
           <label>{$t.song.length}</label>
-          <div class="length-wrap">
-            <input type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
-            <span class="length-unit">мин</span>
-          </div>
+          <input type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
         </div>
       </div>
     </div>
@@ -491,10 +488,7 @@
   }
   .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
 
-  .field-length { flex-shrink: 0; width: 110px; }
-  .length-wrap { display: flex; align-items: center; gap: 6px; }
-  .length-wrap input { width: 60px; }
-  .length-unit { font-size: 0.85rem; color: var(--text-muted); white-space: nowrap; }
+  .field-length { flex: 0 0 72px; }
 
   .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
