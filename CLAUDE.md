@@ -2,6 +2,11 @@
 
 Band setlist manager. SvelteKit SPA + AWS Lambda + DynamoDB.
 
+## 🚨 Hard rules — no exceptions
+
+- **NEVER run `git commit`, `git push`, `sam build`, `sam deploy`, or any deployment command** unless the user's current message explicitly asks for it (e.g. "commit", "push", "commit and push"). Do not do it as a follow-up step after finishing code changes.
+- Deployment is always through **commit → push → CI/CD**. Never invoke `sam deploy` directly.
+
 ## Memory
 
 Read at the start of every session:
