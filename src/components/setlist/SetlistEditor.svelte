@@ -797,7 +797,7 @@
   .break-inner { display: flex; align-items: flex-start; gap: 6px; }
   .break-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .break-edit-row { display: flex; align-items: center; gap: 4px; }
-  .break-remove { margin-left: auto; flex-shrink: 0; }
+  .break-remove { margin-left: auto; flex-shrink: 0; align-self: center; }
   .break-label {
     background: none; border: none; cursor: pointer; font-size: 0.82rem;
     color: var(--text-muted); font-style: italic; padding: 0; text-align: left;
