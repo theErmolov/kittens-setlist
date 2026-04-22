@@ -255,7 +255,7 @@
   });
 
   // total columns: drag + num + (time?) + song + musicians + actions
-  let totalCols = $derived(allMusicians.length + 5 + (localMeta.startTime ? 1 : 0));
+  let totalCols = $derived(allMusicians.length + 4 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(songs: Song[]) {
     const updated = await addSongsToSetlist(setlist.id, songs);
@@ -607,6 +607,7 @@
                 <td class="td-num"></td>
                 {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                 <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
+                  <div class="break-inner">
                   <span class="break-icon">⏸</span>
                   <div class="break-body">
                     {#if editingBreakOrder === entry.order}
@@ -631,6 +632,7 @@
                     />
                   </div>
                   <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
+                  </div>
                 </td>
               </tr>
             {/if}
@@ -791,7 +793,8 @@
   .td-musician { font-size: 1.17rem; white-space: nowrap; }
   .inst-slot { display: inline-block; width: 1.3em; vertical-align: middle; }
 
-  .td-break { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .td-break { font-size: 0.82rem; color: var(--text-muted); }
+  .break-inner { display: flex; align-items: flex-start; gap: 6px; }
   .break-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .break-edit-row { display: flex; align-items: center; gap: 4px; }
   .break-remove { margin-left: auto; flex-shrink: 0; }
@@ -812,7 +815,7 @@
     background: none; border: none; cursor: pointer; font-size: 0.78rem;
     color: var(--text-muted); padding: 0 4px; margin-left: 2px;
   }
-  .break-icon { margin-right: 2px; flex-shrink: 0; display: flex; align-items: center; }
+  .break-icon { flex-shrink: 0; line-height: 1; }
   .break-icon :global(img) { display: block; }
 
   .filter-search {
