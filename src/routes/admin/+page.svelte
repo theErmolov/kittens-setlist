@@ -5,6 +5,7 @@
   import { currentUser, authLoading } from '$lib/auth';
   import { getUsers, patchUser, getMusicians, getAuditLog } from '$lib/api';
   import type { KittensUser, BandMusician, UserRole, AuditLogEntry } from '$lib/types';
+  import { formatAuditSummary } from '$lib/utils';
 
   let users = $state<KittensUser[]>([]);
   let musicians = $state<BandMusician[]>([]);
@@ -232,7 +233,7 @@
                 <span class="entity-type">{entityTypeLabel[entry.entityType]}</span>
                 {entry.entityName}
               </span>
-              <span class="audit-details">{entry.summary}</span>
+              <span class="audit-details">{formatAuditSummary(entry.summary)}</span>
             </div>
           {/each}
         </div>

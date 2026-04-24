@@ -25,6 +25,18 @@ export function pctBubbleStyle(pct: number): string {
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
 
+export const INSTRUMENT_ICONS: Record<Instrument, string> = {
+  guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹',
+  cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤',
+};
+
+export function formatAuditSummary(summary: string): string {
+  return summary.replace(
+    /\b(guitar|bass|drums|keys|cajon|violin|percussion|vocals)\b/g,
+    (m) => INSTRUMENT_ICONS[m as Instrument] ?? m,
+  );
+}
+
 export function sortInstruments(instruments: Instrument[]): Instrument[] {
   return [...instruments].sort((a, b) => INSTRUMENT_ORDER.indexOf(a) - INSTRUMENT_ORDER.indexOf(b));
 }
