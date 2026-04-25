@@ -415,7 +415,7 @@
         <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ Перерыв</button>
         {#if showBreakPicker}
           <div class="break-picker">
-            {#each [10, 20, 30] as min}
+            {#each [5, 10, 20, 30] as min}
               <button class="break-opt" onclick={() => handleAddBreak(min)}>{min} мин</button>
             {/each}
           </div>
@@ -497,7 +497,7 @@
     <div class="filter-sep-h"></div>
     <div class="filter-group mob-break-group">
       <span class="mob-break-label">⏸ Перерыв:</span>
-      {#each [10, 20, 30] as min}
+      {#each [5, 10, 20, 30] as min}
         <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{min} мин</button>
       {/each}
     </div>
@@ -629,7 +629,7 @@
                   <div class="break-body">
                     {#if editingBreakOrder === entry.order}
                       <div class="break-edit-row">
-                        {#each [10, 20, 30] as min}
+                        {#each [5, 10, 20, 30] as min}
                           <button
                             class="break-opt"
                             class:break-opt-active={entry.breakMinutes === min}
