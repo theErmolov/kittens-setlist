@@ -25,6 +25,7 @@ export interface Song {
   musicians: Record<string, MusicianRole>;
   sortOrder?: number;
   progress?: Record<string, LearningStage>;
+  lyrics?: string;
 }
 
 export interface SetlistEntry {

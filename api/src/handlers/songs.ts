@@ -36,7 +36,9 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
   if (method === 'PUT') {
     const body = JSON.parse(event.body ?? '{}') as Song;
     const before = await dbGet<Song>(TABLE, id);
-    await dbPut(TABLE, { ...body, id } as unknown as Record<string, unknown>);
+    const toSave: Song = { ...body, id };
+    if (toSave.lyrics === undefined && before?.lyrics !== undefined) toSave.lyrics = before.lyrics;
+    await dbPut(TABLE, toSave as unknown as Record<string, unknown>);
     const parts: string[] = [];
     if (before) {
       const scalar = diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes']);
