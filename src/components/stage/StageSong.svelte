@@ -60,21 +60,25 @@
       <span class="position">{position}</span>
       <CategoryBadge category={song.category} iconOnly />
       <span class="title">{song.title}</span>
-      {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-inline-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick(); }} title="Текст песни">📝</button>
-      {/if}
       <span class="artist">{song.artist}</span>
       {#if startTime}<span class="start-time">{startTime}</span>{/if}
     </div>
-    <div class="musicians">
-      {#each rosterCells as cell}
-        <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
-          {#if cell.active}
-            <span class="m-icons" class:has-name={!!cell.name}>{#each sortInstruments(cell.role?.instruments ?? []) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
-            <span class="m-name">{cell.name}</span>
-          {/if}
-        </span>
-      {/each}
+    <div class="song-bottom">
+      <div class="bottom-left" class:has-lyrics={!!(song.lyrics && onlyricsclick)}>
+        {#if song.lyrics && onlyricsclick}
+          <button class="lyrics-col-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+        {/if}
+      </div>
+      <div class="musicians">
+        {#each rosterCells as cell}
+          <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
+            {#if cell.active}
+              <span class="m-icons" class:has-name={!!cell.name}>{#each sortInstruments(cell.role?.instruments ?? []) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+              <span class="m-name">{cell.name}</span>
+            {/if}
+          </span>
+        {/each}
+      </div>
     </div>
     {#if entry.comment}
       <div class="comment">{entry.comment}</div>
@@ -108,22 +112,32 @@
   .stage-song.no-mark .song-main { cursor: default; }
   .stage-song.no-mark .song-main:hover { background: transparent; }
 
-  .lyrics-inline-btn {
+  .song-bottom {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 5px;
+  }
+  .bottom-left {
+    width: 1.4em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bottom-left.has-lyrics {
+    background: var(--accent);
+    border-radius: 6px;
+  }
+  .lyrics-col-btn {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    padding: 4px 6px;
-    line-height: 1;
-    opacity: 0.6;
-    transition: opacity 0.12s, color 0.12s;
+    font-size: 1.1rem;
+    padding: 6px 4px;
+    border-radius: 6px;
     touch-action: manipulation;
-  }
-  .lyrics-inline-btn:hover { opacity: 1; color: var(--accent); }
-
-  @media (max-width: 700px) {
-    .lyrics-inline-btn { font-size: 1.1rem; padding: 6px 8px; opacity: 0.75; }
+    line-height: 1;
   }
 
   .song-top {
@@ -139,13 +153,13 @@
   .start-time { margin-left: auto; font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
 
   .musicians {
+    flex: 1;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 3px 4px;
     font-size: 0.82rem;
     color: var(--text-muted);
-    margin-top: 5px;
-    padding-left: calc(1.4em + 6px);
+    min-width: 0;
   }
   .musician {
     display: flex; align-items: center; gap: 4px;
@@ -160,7 +174,12 @@
   :global([data-theme="dark"]) .musician.highlight { background: #d97706; color: #fff; }
 
   .m-icons { flex-shrink: 0; display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 1px; line-height: 1.1; font-size: 1.17rem; }
-  .m-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .m-name {
+    overflow: hidden; white-space: nowrap; min-width: 0; flex: 1;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 16px), transparent 100%);
+  }
+  :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) .m-name { color: #d1d5db; }
   .comment {
     margin-top: 2px;
     font-size: 0.78rem;
