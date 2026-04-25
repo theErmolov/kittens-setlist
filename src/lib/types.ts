@@ -24,6 +24,7 @@ export interface Song {
   sortOrder?: number;
   lengthMinutes?: number;
   progress?: Record<string, LearningStage>;  // keyed by musician name
+  lyrics?: string;
 }
 
 export interface SetlistEntry {

@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import type { Setlist, Song, Category, SetlistEntry, BandMusician } from '$lib/types';
   import StageSong from './StageSong.svelte';
+  import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
   import { getSetlist, togglePlayed } from '$lib/api';
@@ -115,6 +116,8 @@
   let filterOpen = $state(false);
   let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '');
 
+  let lyricsForSong = $state<Song | null>(null);
+
   // Per-entry start times keyed by entry order, only when startTime is set
   let entryTimes = $derived((): Map<number, string> => {
     if (!setlist.startTime) return new Map();
@@ -172,7 +175,8 @@
           {musicians}
           {selectedMusician}
           {canMark}
-          ontoggle={() => handleToggle(item.entry.songId!)} />
+          ontoggle={() => handleToggle(item.entry.songId!)}
+          onlyricsclick={() => { lyricsForSong = item.song; }} />
       {:else}
         <div class="stage-break">
           <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
@@ -210,6 +214,10 @@
       </div>
     {/if}
   </div>
+
+  {#if lyricsForSong}
+    <LyricsOverlay song={lyricsForSong} onclose={() => { lyricsForSong = null; }} />
+  {/if}
 
   <!-- Mobile bottom bar -->
   <div class="mobile-bottom-bar">

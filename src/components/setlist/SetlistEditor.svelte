@@ -568,6 +568,7 @@
                       <span class="artist">{song.artist}</span>
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
+                      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">♪</span>{/if}
                       {#each guestTags as g}
                         {@const gStage = entryStage(entry, g.name)}
                         <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
@@ -793,6 +794,7 @@
   .artist { font-weight: 400; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
   .title { font-size: 0.9rem; font-weight: 600; }
+  .lyrics-dot { font-size: 0.8rem; color: var(--text-muted); opacity: 0.6; margin-left: 3px; vertical-align: middle; }
   .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
   .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 

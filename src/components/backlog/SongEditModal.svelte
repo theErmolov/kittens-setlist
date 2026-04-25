@@ -66,7 +66,10 @@
     sortOrder: song?.sortOrder,
     lengthMinutes: song?.lengthMinutes ?? 5,
     progress: { ...(song?.progress ?? {}) },
+    lyrics: song?.lyrics ?? '',
   });
+
+  let activeTab = $state<'details' | 'lyrics'>('details');
 
   function toggleInstrument(name: string, inst: Instrument) {
     const role = draft.musicians[name] ?? { instruments: [] };
@@ -208,6 +211,13 @@
           <input bind:value={draft.title} placeholder={$t.song.title} />
         </div>
       </div>
+
+      <div class="tab-strip">
+        <button class="tab-btn" class:active={activeTab === 'details'} onclick={() => activeTab = 'details'}>Детали</button>
+        <button class="tab-btn" class:active={activeTab === 'lyrics'} onclick={() => activeTab = 'lyrics'}>Текст</button>
+      </div>
+
+      {#if activeTab === 'details'}
       {#if mode !== 'entry'}
       <div class="cat-chips">
         {#each (['top', 'mid', 'low'] as Category[]) as cat}
@@ -320,6 +330,9 @@
           <input type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
         </div>
       </div>
+      {:else}
+      <textarea class="lyrics-editor" bind:value={draft.lyrics} placeholder="Текст и аккорды песни...&#10;&#10;Am  G  C  F&#10;Слова первого куплета"></textarea>
+      {/if}
     </div>
 
     <div class="modal-footer">
@@ -487,6 +500,47 @@
     opacity: 0.5; transition: opacity 0.12s; text-align: center;
   }
   .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
+
+  .tab-strip {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: -14px;
+    padding-bottom: 0;
+  }
+  .tab-btn {
+    padding: 6px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .lyrics-editor {
+    width: 100%;
+    min-height: 280px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+  .lyrics-editor:focus { outline: none; border-color: var(--accent); }
 
   .field-length { flex: 0 0 72px; }
 

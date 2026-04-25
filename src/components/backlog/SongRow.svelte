@@ -93,8 +93,10 @@
       <span class="mobile-artist">{song.artist}</span>
       <span class="mobile-sep">–</span>
       <span class="mobile-title">{song.title}</span>
+      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">♪</span>{/if}
     </div>
     <span class="title-text desktop-only">{song.title}</span>
+    {#if song.lyrics}<span class="lyrics-dot desktop-only" title="Есть текст">♪</span>{/if}
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
@@ -147,6 +149,7 @@
   .td-artist { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .td-title { white-space: normal; }
   .title-text { vertical-align: middle; }
+  .lyrics-dot { font-size: 0.8rem; color: var(--text-muted); opacity: 0.6; margin-left: 3px; vertical-align: middle; }
   .guest-tag {
     display: inline-flex;
     align-items: center;
