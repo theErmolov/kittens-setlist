@@ -201,5 +201,6 @@
 
   @media (max-width: 700px) {
     .stage-song { border-radius: 0; border-left: none; border-right: none; }
+    .song-main:hover { background: transparent; }
   }
 </style>

@@ -288,6 +288,7 @@
     .header-filters { display: none; }
     .song-list { padding-bottom: 74px; gap: 0; }
     .stage-break { border-radius: 0; border-left: none; border-right: none; }
+    .musician-chip:hover { border-color: var(--border); color: var(--text-muted); }
 
     .mobile-filter-panel {
       position: fixed; bottom: 64px; left: 0; right: 0; z-index: 20;
