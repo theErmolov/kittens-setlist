@@ -550,7 +550,7 @@
                   class:drag-over={isOver}
                   draggable={!isFiltered}
                   data-row-i={i}
-                  ondragstart={!isFiltered ? () => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))) : undefined}
+                  ondragstart={!isFiltered ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))); } : undefined}
                   ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
                   ondrop={!isFiltered ? onDrop : undefined}
                   ondragend={!isFiltered ? onDragEnd : undefined}

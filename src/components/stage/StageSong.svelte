@@ -59,9 +59,16 @@
     <div class="song-top">
       <span class="position">{position}</span>
       <CategoryBadge category={song.category} iconOnly />
-      <span class="title">{song.title}</span>
-      <span class="artist">{song.artist}</span>
-      {#if startTime}<span class="start-time">{startTime}</span>{/if}
+      <div class="song-top-right">
+        <div class="song-top-line">
+          <span class="title">{song.title}</span>
+          <span class="artist">{song.artist}</span>
+          {#if startTime}<span class="start-time">{startTime}</span>{/if}
+        </div>
+        {#if entry.comment}
+          <div class="comment">{entry.comment}</div>
+        {/if}
+      </div>
     </div>
     <div class="song-bottom">
       <div class="bottom-left" class:has-lyrics={!!(song.lyrics && onlyricsclick)}>
@@ -80,9 +87,6 @@
         {/each}
       </div>
     </div>
-    {#if entry.comment}
-      <div class="comment">{entry.comment}</div>
-    {/if}
   </div>
 </div>
 
@@ -117,40 +121,28 @@
     align-items: stretch;
     gap: 6px;
     margin-top: 5px;
+    margin-left: -12px;
+    margin-right: -12px;
+    margin-bottom: -8px;
   }
   .bottom-left {
-    width: 1.4em;
+    width: calc(12px + 1.4em);
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 5px 0;
   }
-  .bottom-left.has-lyrics {
-    background: var(--accent);
-    border-radius: 6px;
-  }
+  .bottom-left.has-lyrics { background: var(--accent); }
   .lyrics-col-btn {
     background: none;
     border: none;
     cursor: pointer;
     font-size: 1.1rem;
-    padding: 6px 4px;
-    border-radius: 6px;
+    padding: 4px;
     touch-action: manipulation;
     line-height: 1;
   }
-
-  .song-top {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 2px;
-  }
-  .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); min-width: 1.4em; text-align: right; }
-  .title { font-size: 1rem; font-weight: 700; color: var(--text); }
-  .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
-  .start-time { margin-left: auto; font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
 
   .musicians {
     flex: 1;
@@ -160,7 +152,27 @@
     font-size: 0.82rem;
     color: var(--text-muted);
     min-width: 0;
+    padding: 5px 12px 8px 0;
   }
+
+  .song-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+  .song-top-right { flex: 1; min-width: 0; }
+  .song-top-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); min-width: 1.4em; text-align: right; }
+  .title { font-size: 1rem; font-weight: 700; color: var(--text); }
+  .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
+  .start-time { margin-left: auto; font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+
   .musician {
     display: flex; align-items: center; gap: 4px;
     background: #fcd34d40; border-radius: 6px;

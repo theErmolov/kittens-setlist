@@ -16,8 +16,9 @@
   class="comment-input"
   bind:value
   placeholder="комментарий..."
+  draggable="false"
   onclick={(e) => e.stopPropagation()}
-  ondragstart={(e) => e.stopPropagation()}
+  ondragstart={(e) => { e.stopPropagation(); e.preventDefault(); }}
   onfocus={() => { focused = true; }}
   onblur={() => { focused = false; if (value !== (initial ?? '')) onsave(value); }}
 />
