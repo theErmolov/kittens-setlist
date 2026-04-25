@@ -891,8 +891,8 @@
     .th-actions, .td-actions { width: 32px; }
     .td-actions { vertical-align: top; }
     .td-song { white-space: normal; }
-    .table-wrap { padding: 0 8px 16px; overflow-x: hidden; }
-    .editor-header { padding: 12px; }
+    .table-wrap { padding: 0 0 16px; overflow-x: hidden; }
+    .editor-header { padding: 12px 8px; }
     .song-name { flex-wrap: wrap; }
     .meta-input { font-size: 16px; }
 

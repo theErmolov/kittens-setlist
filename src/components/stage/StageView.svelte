@@ -235,7 +235,7 @@
   .stage-header {
     position: sticky; top: 56px; z-index: 10;
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;
+    padding: 10px 8px; display: flex; flex-direction: column; gap: 8px;
   }
   .stage-title { display: flex; align-items: center; gap: 10px; }
   .back-link { text-decoration: none; color: var(--accent); font-size: 1.2rem; line-height: 1; }
@@ -261,7 +261,7 @@
   .musician-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .guest-chip { border-style: dashed; }
 
-  .song-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .song-list { padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }
 
   .mobile-filter-panel { display: none; }
@@ -286,7 +286,8 @@
 
   @media (max-width: 700px) {
     .header-filters { display: none; }
-    .song-list { padding-bottom: 74px; }
+    .song-list { padding-bottom: 74px; gap: 0; }
+    .stage-break { border-radius: 0; border-left: none; border-right: none; }
 
     .mobile-filter-panel {
       position: fixed; bottom: 64px; left: 0; right: 0; z-index: 20;

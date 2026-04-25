@@ -126,7 +126,7 @@
     margin-bottom: -8px;
   }
   .bottom-left {
-    width: calc(12px + 1.4em);
+    width: calc(12px + 2.1em);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -197,5 +197,9 @@
     font-size: 0.78rem;
     color: var(--text-muted);
     font-style: italic;
+  }
+
+  @media (max-width: 700px) {
+    .stage-song { border-radius: 0; border-left: none; border-right: none; }
   }
 </style>

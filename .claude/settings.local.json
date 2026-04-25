@@ -30,7 +30,9 @@
       "Bash(qlmanage -t -s 180 -o /tmp/ /tmp/touch-icon2.svg)",
       "Bash(brew list *)",
       "Bash(node /tmp/icon-gen/gen.js)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(gh run *)",
+      "Bash(git *)"
     ]
   }
 }
