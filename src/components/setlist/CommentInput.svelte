@@ -17,6 +17,7 @@
   bind:value
   placeholder="комментарий..."
   draggable="false"
+  onmousedown={(e) => e.stopPropagation()}
   onclick={(e) => e.stopPropagation()}
   ondragstart={(e) => { e.stopPropagation(); e.preventDefault(); }}
   onfocus={() => { focused = true; }}
