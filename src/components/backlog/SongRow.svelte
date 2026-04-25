@@ -93,10 +93,10 @@
       <span class="mobile-artist">{song.artist}</span>
       <span class="mobile-sep">–</span>
       <span class="mobile-title">{song.title}</span>
-      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">♪</span>{/if}
+      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">📝</span>{/if}
     </div>
     <span class="title-text desktop-only">{song.title}</span>
-    {#if song.lyrics}<span class="lyrics-dot desktop-only" title="Есть текст">♪</span>{/if}
+    {#if song.lyrics}<span class="lyrics-dot desktop-only" title="Есть текст">📝</span>{/if}
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}

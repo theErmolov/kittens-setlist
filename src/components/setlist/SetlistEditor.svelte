@@ -568,7 +568,7 @@
                       <span class="artist">{song.artist}</span>
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
-                      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">♪</span>{/if}
+                      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">📝</span>{/if}
                       {#each guestTags as g}
                         {@const gStage = entryStage(entry, g.name)}
                         <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>

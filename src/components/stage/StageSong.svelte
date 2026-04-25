@@ -61,7 +61,7 @@
       <CategoryBadge category={song.category} iconOnly />
       <span class="title">{song.title}</span>
       {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-inline-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick(); }} title="Текст песни">♪</button>
+        <button class="lyrics-inline-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick(); }} title="Текст песни">📝</button>
       {/if}
       <span class="artist">{song.artist}</span>
       {#if startTime}<span class="start-time">{startTime}</span>{/if}
