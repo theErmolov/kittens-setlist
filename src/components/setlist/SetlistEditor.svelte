@@ -187,10 +187,12 @@
     }
 
     if (filterNotReady) {
-      entries = entries.filter(e => {
-        if (!e.song) return false; // hide breaks when readiness filter active
-        return entryProgressPct(e) < 100;
-      });
+      entries = entries
+        .filter(e => {
+          if (!e.song) return false; // hide breaks when readiness filter active
+          return entryProgressPct(e) < 100;
+        })
+        .sort((a, b) => entryProgressPct(a) - entryProgressPct(b));
     }
 
     const q = filterText.trim().toLowerCase();
