@@ -263,7 +263,7 @@
   .logout-btn:hover { border-color: #e05252; color: #e05252; }
 
   @media (max-width: 900px) {
-    .nav { gap: 0; padding: 0 10px; overflow: hidden; }
+    .nav { gap: 0; padding: 0 10px; }
     .brand-text { display: none; }
     .nav-brand { margin-right: 4px; }
     .link-label { display: none; }
