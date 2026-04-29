@@ -796,7 +796,7 @@
   .artist { font-weight: 400; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
   .title { font-size: 0.9rem; font-weight: 600; }
-  .lyrics-dot { font-size: 0.8rem; color: var(--text-muted); opacity: 0.6; margin-left: 3px; vertical-align: middle; }
+  .lyrics-dot { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: color-mix(in srgb, var(--text-muted) 8%, transparent); border: 1px solid color-mix(in srgb, var(--text-muted) 25%, transparent); border-radius: 4px; padding: 1px 4px; line-height: 1.4; display: inline-flex; align-items: center; }
   .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
   .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 

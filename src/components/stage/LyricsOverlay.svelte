@@ -468,9 +468,9 @@
     background: none;
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 6px 9px;
+    padding: 6px 14px;
     cursor: pointer;
-    font-size: 1.05rem;
+    font-size: 1.275rem;
     color: var(--text-muted);
     line-height: 1;
     transition: background 0.15s, color 0.15s;
