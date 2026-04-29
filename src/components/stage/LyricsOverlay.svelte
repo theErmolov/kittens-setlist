@@ -322,10 +322,9 @@
               class:active={dropdownOpen}
               onclick={() => { dropdownOpen = !dropdownOpen; }}
               title="Transpose"
-              style:min-width="{maxKeyLength}ch"
             >
-              <span class="key-label">{targetKey}</span>
-              {#if transpose !== 0}<span class="offset-label">{transpose > 0 ? `+${transpose}` : transpose}</span>{/if}
+              <span class="key-label" style:min-width="{maxKeyLength}ch">{targetKey}</span>
+              <span class="offset-label" style:visibility={transpose === 0 ? 'hidden' : 'visible'}>{transpose > 0 ? `+${transpose}` : transpose}</span>
             </button>
             <button class="step-btn" onclick={transposeUp} title="Semitone up">▲</button>
           </div>
@@ -345,7 +344,7 @@
                   onclick={() => { transpose = offset; dropdownOpen = false; }}
                 >
                   <span class="d-offset">{offset > 0 ? `+${offset}` : offset}</span>
-                  <span class="d-keys">{originalKey} → {transposeChord(originalKey, offset)}</span>
+                  <span class="d-keys">{transposeChord(originalKey, offset)}</span>
                 </button>
               {/each}
             </div>
@@ -504,6 +503,8 @@
     font-size: 1.05rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    min-width: 3ch;
   }
 
   .dropdown-backdrop {
