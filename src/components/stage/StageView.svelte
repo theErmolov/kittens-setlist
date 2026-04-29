@@ -230,7 +230,7 @@
 </div>
 
 <style>
-  .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
+  .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); max-width: 100%; overflow-x: hidden; }
 
   .stage-header {
     position: sticky; top: 56px; z-index: 10;
@@ -238,7 +238,7 @@
     padding: 10px 8px; display: flex; flex-direction: column; gap: 8px;
   }
   .stage-title { display: flex; align-items: center; gap: 10px; }
-  .back-link { text-decoration: none; color: var(--accent); font-size: 1.2rem; line-height: 1; }
+  .back-link { text-decoration: none; color: var(--accent); font-size: 2.4rem; line-height: 1; }
   .name { font-size: 1.05rem; font-weight: 700; flex: 1; }
 
   .progress {

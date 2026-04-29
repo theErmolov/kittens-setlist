@@ -35,7 +35,7 @@
   .card-meta { display: flex; gap: 12px; }
   .date, .count { font-size: 0.82rem; color: var(--text-muted); }
   .card-actions { display: flex; align-items: center; gap: 8px; }
-  .stage-link { padding: 6px 12px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
+  .stage-link { padding: 12px 12px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
   .delete-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.9rem; padding: 4px 6px; border-radius: 4px; }
   .delete-btn:hover { color: #ef4444; }
 </style>
