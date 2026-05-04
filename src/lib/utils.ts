@@ -85,3 +85,10 @@ export function addMinutes(time: string, minutes: number): string {
   const mm = total % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
+
+export function isEventLongOver(date?: string, startTime?: string): boolean {
+  if (!date) return false;
+  const start = new Date(`${date}T${startTime ?? '00:00'}`);
+  if (isNaN(start.getTime())) return false;
+  return Date.now() - start.getTime() > 24 * 60 * 60 * 1000;
+}

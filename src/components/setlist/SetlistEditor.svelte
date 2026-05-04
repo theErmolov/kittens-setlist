@@ -8,7 +8,7 @@
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
-  import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT } from '$lib/utils';
+  import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
   import { base } from '$app/paths';
 
@@ -122,7 +122,7 @@
     const stopPoller = startPolling(
       async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
       pollMs,
-      () => false,
+      () => isEventLongOver(localMeta.date, localMeta.startTime),
     );
 
     const handleTouchMove = (e: TouchEvent) => {

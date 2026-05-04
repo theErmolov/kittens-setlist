@@ -9,7 +9,7 @@
   import { getSetlist, togglePlayed } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes } from '$lib/utils';
+  import { formatDuration, addMinutes, isEventLongOver } from '$lib/utils';
   import { base } from '$app/paths';
 
   let {
@@ -37,7 +37,7 @@
   onMount(() => startPolling(
     async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
     pollInterval,
-    () => false,
+    () => isEventLongOver(setlist.date, setlist.startTime),
   ));
 
   let categoryFilter = $state(new Set<Category>());
