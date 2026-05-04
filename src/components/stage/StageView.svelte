@@ -9,7 +9,7 @@
   import { getSetlist, togglePlayed } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { formatDuration, addMinutes, isEventLongOver } from '$lib/utils';
+  import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
   import { base } from '$app/paths';
 
   let {
@@ -36,7 +36,7 @@
 
   onMount(() => startPolling(
     async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
-    pollInterval,
+    isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
     () => isEventLongOver(setlist.date, setlist.startTime),
   ));
 
