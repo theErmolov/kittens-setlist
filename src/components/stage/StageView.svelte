@@ -276,6 +276,11 @@
   .break-note { font-style: italic; opacity: 0.85; }
   .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
 
+  @media (min-width: 701px) {
+    .stage-break { font-size: 1rem; padding: 8px 12px; }
+    .break-time { font-size: 0.9rem; font-weight: 700; }
+  }
+
   .login-hint {
     font-size: 0.8rem;
     color: var(--text-muted);

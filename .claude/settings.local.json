@@ -32,7 +32,8 @@
       "Bash(node /tmp/icon-gen/gen.js)",
       "Bash(git log *)",
       "Bash(gh run *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(npm --version)"
     ]
   }
 }

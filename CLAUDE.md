@@ -23,6 +23,15 @@ Read at the start of every session:
 - **No CSS framework** — plain scoped styles + CSS custom properties
 - **Always use `browser` from `$app/environment`** to guard any `localStorage` access
 
+## Local dev setup
+
+`.env` is gitignored and must be created manually on each new machine:
+```
+PUBLIC_API_URL=https://bw1e6cey18.execute-api.eu-central-1.amazonaws.com/prod
+```
+
+Then `npm install && npm run dev`.
+
 ## Local dev auth
 
 Telegram widget only works on `kittens.band`. Workaround:
