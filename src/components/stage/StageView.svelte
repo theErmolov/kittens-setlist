@@ -110,7 +110,7 @@
     if (!canMark) return;
     const entry = localEntries.find(e => e.songId === songId);
     if (!entry) return;
-    if (setlist.vibe && !entry.played) {
+    if (!setlist.vibe && !entry.played) {
       localEntries = localEntries.map(e => e.order <= entry.order && !e.played ? { ...e, played: true } : e);
       const updated = await markThrough(setlist.id, entry.order);
       applyPoll(updated.entries);
@@ -125,7 +125,7 @@
     if (!canMark) return;
     const entry = localEntries.find(e => e.order === order && e.breakMinutes !== undefined);
     if (!entry) return;
-    if (setlist.vibe && !entry.played) {
+    if (!setlist.vibe && !entry.played) {
       localEntries = localEntries.map(e => e.order <= order && !e.played ? { ...e, played: true } : e);
       const updated = await markThrough(setlist.id, order);
       applyPoll(updated.entries);
@@ -152,7 +152,7 @@
     const sorted = [...localEntries].sort((a, b) => a.order - b.order);
     const map = new Map<number, string>();
 
-    if (setlist.vibe) {
+    if (!setlist.vibe) {
       const playedWithTs = sorted.filter(e => e.played && e.playedAt);
       const lastPlayed = playedWithTs.at(-1);
       if (lastPlayed?.playedAt) {
@@ -201,7 +201,7 @@
     const finishTime = addMinutes(baseTime, remainingMinutes);
 
     let pace: number | undefined;
-    if (setlist.vibe && lastPlayed?.playedAt) {
+    if (!setlist.vibe && lastPlayed?.playedAt) {
       const scheduledStart = entryTimes().get(lastPlayed.order) ?? setlist.startTime;
       const entryDuration = lastPlayed.breakMinutes ?? (lastPlayed.song?.lengthMinutes ?? 5);
       const scheduledEnd = addMinutes(scheduledStart, entryDuration);

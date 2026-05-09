@@ -96,7 +96,7 @@ const strings = {
       stage: '🎤 Stage',
       deleteConfirm: 'Delete this setlist?',
       vibe: 'Vibe mode',
-      vibeTooltip: 'Vibe: marking a song played auto-marks everything above it. Start times recalculate in real time.',
+      vibeTooltip: 'Vibe: mark songs freely in any order. Turn off for structured mode: marking a song auto-marks everything above it and start times recalculate in real time.',
     },
     editor: {
       addSongs: '+ Add Songs',
@@ -254,7 +254,7 @@ const strings = {
       stage: '🎤 Сцена',
       deleteConfirm: 'Удалить сетлист?',
       vibe: 'Вайбовый режим',
-      vibeTooltip: 'Vibe: отметка песни автоматически отмечает всё выше. Время пересчитывается по факту.',
+      vibeTooltip: 'Вайбовый режим: отмечайте песни в любом порядке. Выключите для структурированного режима: отметка песни автоматически отметит всё выше, время пересчитается по факту.',
     },
     editor: {
       addSongs: '+ Добавить песни',
