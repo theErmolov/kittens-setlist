@@ -273,7 +273,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const before = await dbGet<Setlist>(TABLE, id);
       await dbPut(TABLE, { ...body, id } as unknown as Record<string, unknown>);
       const summary = before
-        ? diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['name', 'date', 'startTime'])
+        ? diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['name', 'date', 'startTime', 'vibe'])
         : 'обновлён';
       await logAudit({ action: 'setlist.update', actor: user, entityType: 'setlist', entityId: id, entityName: setlistName(body), summary });
       return ok(body);

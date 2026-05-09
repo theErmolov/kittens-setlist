@@ -222,10 +222,30 @@
       <a href="{base}/setlists/{setlist.id}" class="back-link">←</a>
       <span class="name">{setlist.name}</span>
       {#if timingInfo()}
+        <span class="timing-sep">·</span>
         <span class="timing-clock">{timingInfo()!.currentTime}</span>
       {/if}
       <span class="progress">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
+        {#if timingInfo()}
+          {@const info = timingInfo()!}
+          <span class="progress-sep">·</span>{$t.stage.finish}: {info.finishTime}
+          {#if info.pace !== undefined}
+            <span class="timing-pace"
+              class:on-time={Math.abs(info.pace) <= 2}
+              class:behind={info.pace > 2}
+              class:ahead={info.pace < -2}
+            >
+              {#if Math.abs(info.pace) <= 2}
+                {$t.stage.onTime} ✓
+              {:else if info.pace > 0}
+                {$t.stage.behind(info.pace)}
+              {:else}
+                {$t.stage.ahead(-info.pace)}
+              {/if}
+            </span>
+          {/if}
+        {/if}
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
       </span>
       <button
@@ -235,27 +255,6 @@
         title="Фильтры"
       >🎛️ <span class="filter-btn-label">Фильтр</span></button>
     </div>
-    {#if timingInfo()}
-      {@const info = timingInfo()}
-      <div class="timing-bar">
-        <span class="timing-finish">{$t.stage.finish}: {info!.finishTime}</span>
-        {#if info!.pace !== undefined}
-          <span class="timing-pace"
-            class:on-time={Math.abs(info!.pace) <= 2}
-            class:behind={info!.pace > 2}
-            class:ahead={info!.pace < -2}
-          >
-            {#if Math.abs(info!.pace) <= 2}
-              {$t.stage.onTime} ✓
-            {:else if info!.pace > 0}
-              {$t.stage.behind(info!.pace)}
-            {:else}
-              {$t.stage.ahead(-info!.pace)}
-            {/if}
-          </span>
-        {/if}
-      </div>
-    {/if}
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}
@@ -368,11 +367,11 @@
   }
   .filtered-count { font-size: 0.78rem; opacity: 0.75; }
 
-  .timing-bar { display: none; }
-  .timing-clock { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-  .timing-finish { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .timing-sep { color: var(--text-muted); font-size: 0.85rem; margin: 0 2px; }
+  .timing-clock { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .progress-sep { margin: 0 2px; opacity: 0.6; }
   .timing-pace {
-    padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 0.78rem;
+    padding: 1px 6px; border-radius: 10px; font-weight: 600; font-size: 0.75rem;
     background: var(--chip-bg); color: var(--text-muted);
   }
   .timing-pace.on-time { color: #16a34a; background: #dcfce7; }
@@ -415,11 +414,6 @@
   @media (min-width: 701px) {
     .stage-break { font-size: 1rem; padding: 8px 12px; }
     .break-time { font-size: 0.9rem; font-weight: 700; }
-
-    .timing-bar {
-      display: flex; align-items: center; gap: 12px;
-      font-size: 0.82rem; padding: 2px 0;
-    }
 
     .header-filter-btn {
       display: flex; align-items: center; gap: 6px;

@@ -19,6 +19,7 @@
       {#if setlist.date}<span class="date">{formatDate(setlist.date)}</span>{/if}
       {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}
       <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songMins + breakMins)})</span>
+      <span class="vibe-chip" class:structured={!setlist.vibe}>{setlist.vibe === false ? 'Структура' : 'Вайб'}</span>
     </div>
   </a>
   <div class="card-actions">
@@ -34,6 +35,11 @@
   .card-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
   .card-meta { display: flex; gap: 12px; }
   .date, .count { font-size: 0.82rem; color: var(--text-muted); }
+  .vibe-chip {
+    font-size: 0.72rem; font-weight: 600; padding: 1px 7px; border-radius: 10px;
+    background: #ede9fe; color: #7c3aed;
+  }
+  .vibe-chip.structured { background: #fef3c7; color: #b45309; }
   .card-actions { display: flex; align-items: center; gap: 8px; }
   .stage-link { padding: 12px 12px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
   .delete-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.9rem; padding: 4px 6px; border-radius: 4px; }
