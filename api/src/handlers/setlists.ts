@@ -218,7 +218,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
             : (e.songId === songId);
           if (!isTarget) return e;
           const nowPlayed = !e.played;
-          return { ...e, played: nowPlayed, ...(nowPlayed ? { playedAt: now } : { playedAt: undefined }) };
+          const entry: SetlistEntry = { ...e, played: nowPlayed };
+          if (nowPlayed) entry.playedAt = now;
+          else delete entry.playedAt;
+          return entry;
         }),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);

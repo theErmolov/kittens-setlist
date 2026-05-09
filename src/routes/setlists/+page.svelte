@@ -52,11 +52,13 @@
           <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
         </div>
       </div>
-      <label class="strict-toggle">
-        <input type="checkbox" bind:checked={newStrict} />
-        {$t.setlists.strict}
+      <div class="strict-toggle">
+        <label class="strict-label">
+          <input type="checkbox" bind:checked={newStrict} />
+          {$t.setlists.strict}
+        </label>
         <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
-      </label>
+      </div>
     </div>
   {/if}
 
@@ -92,8 +94,9 @@
   .empty p { margin-bottom: 12px; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
-  .strict-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; width: fit-content; }
-  .strict-toggle input[type="checkbox"] { cursor: pointer; }
+  .strict-toggle { display: flex; align-items: center; gap: 6px; width: fit-content; }
+  .strict-label { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; }
+  .strict-label input[type="checkbox"] { cursor: pointer; }
   .help-tip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 16px; height: 16px; border-radius: 50%;

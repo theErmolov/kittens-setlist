@@ -396,11 +396,13 @@
           <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder="Название" />
           <input class="meta-input" type="date" bind:value={draftMeta.date} />
           <input class="meta-input" type="time" bind:value={draftMeta.startTime} />
-          <label class="strict-label">
-            <input type="checkbox" bind:checked={draftMeta.strict} />
-            {$t.setlists.strict}
+          <div class="strict-row">
+            <label class="strict-label">
+              <input type="checkbox" bind:checked={draftMeta.strict} />
+              {$t.setlists.strict}
+            </label>
             <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
-          </label>
+          </div>
           <button class="btn-primary" onclick={saveMeta}>Сохранить</button>
           <button class="btn-secondary" onclick={() => { editingMeta = false; }}>Отмена</button>
         </div>
@@ -713,6 +715,7 @@
   .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .meta-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
   .meta-name { font-size: 1rem; font-weight: 600; min-width: 200px; }
+  .strict-row { display: flex; align-items: center; gap: 5px; }
   .strict-label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
   .strict-label input[type="checkbox"] { cursor: pointer; }
   .strict-badge { font-size: 0.9rem; cursor: default; }

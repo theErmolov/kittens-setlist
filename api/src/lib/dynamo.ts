@@ -8,7 +8,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
-export const db = DynamoDBDocumentClient.from(client);
+export const db = DynamoDBDocumentClient.from(client, { marshallOptions: { removeUndefinedValues: true } });
 
 export async function dbGet<T>(table: string, id: string): Promise<T | undefined> {
   const res = await db.send(new GetCommand({ TableName: table, Key: { id } }));
