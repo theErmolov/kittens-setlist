@@ -179,7 +179,7 @@
   @media (min-width: 701px) {
     .song-main {
       display: grid;
-      grid-template-columns: 64px 1.4fr 2fr 1.5fr;
+      grid-template-columns: 64px 1.4fr 1.75fr 1.75fr;
       align-items: stretch;
       padding: 0;
       min-height: 72px;
@@ -188,11 +188,11 @@
     .top-row { display: contents; }
 
     .col-meta {
-      flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px; padding: 6px 8px;
+      flex-direction: column; align-items: stretch; justify-content: flex-start;
+      gap: 0; padding: 0;
       border-right: 1px solid var(--border);
     }
-    .meta-num { flex-direction: column; gap: 4px; }
+    .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 6px 8px; flex-shrink: 0; }
     .position { font-size: 1.05rem; }
     .col-meta .lyrics-col-btn { display: none; }
 

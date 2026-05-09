@@ -140,10 +140,17 @@
         {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
       </span>
+      <button
+        class="header-filter-btn"
+        class:active={filterOpen || isFiltered}
+        onclick={() => { filterOpen = !filterOpen; }}
+        title="Фильтры"
+      >🎛️</button>
     </div>
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}
+    {#if filterOpen}
     <div class="header-filters">
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
       {#if musicians.length > 0 || guestNames().length > 0}
@@ -165,6 +172,7 @@
         </div>
       {/if}
     </div>
+    {/if}
   </div>
 
   <div class="song-list">
@@ -249,6 +257,7 @@
   }
   .filtered-count { font-size: 0.78rem; opacity: 0.75; }
 
+  .header-filter-btn { display: none; }
   .header-filters { display: flex; flex-direction: column; gap: 6px; }
   .musician-picker { display: flex; flex-wrap: wrap; gap: 6px; }
   .musician-chip {
@@ -278,6 +287,16 @@
   @media (min-width: 701px) {
     .stage-break { font-size: 1rem; padding: 8px 12px; }
     .break-time { font-size: 0.9rem; font-weight: 700; }
+
+    .header-filter-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; flex-shrink: 0;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: transparent; cursor: pointer; font-size: 1.1rem;
+      color: var(--text-muted); transition: all 0.15s;
+    }
+    .header-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .header-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   }
 
   .login-hint {
