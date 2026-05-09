@@ -87,6 +87,9 @@
       {/if}
     </div>
     <div class="col-musicians">
+      {#if song.lyrics && onlyricsclick}
+        <button class="lyrics-musicians-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+      {/if}
       <div class="musicians">
         {#each rosterCells as cell}
           <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
@@ -145,16 +148,22 @@
   .comment-mobile { margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
   .col-comment { display: none; }
 
-  .lyrics-col-btn {
-    background: none; border: none; cursor: pointer;
-    font-size: 1.1rem; padding: 4px; touch-action: manipulation; line-height: 1;
+  .lyrics-col-btn { display: none; }
+
+  .lyrics-musicians-btn {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: #7c3aed; color: #fff;
+    border: none; padding: 0;
+    font-size: 1.4rem; touch-action: manipulation; line-height: 1;
+    cursor: pointer;
   }
 
-  .col-musicians { display: flex; align-items: stretch; margin: 0 -12px -8px; }
+  .col-musicians { display: flex; align-items: stretch; margin: 0 -12px -8px; position: relative; }
   .musicians {
     flex: 1; display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 3px 4px; font-size: 0.82rem; color: var(--text-muted); min-width: 0;
-    padding: 5px 12px 8px;
+    padding: 5px 12px 8px 52px;
   }
 
   .musician {
@@ -233,6 +242,7 @@
     .start-time-desktop { display: inline; flex-shrink: 0; font-size: 0.9rem; font-weight: 700; }
     .col-musicians { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 0; }
     .musicians { flex: 1; padding: 0; }
+    .lyrics-musicians-btn { display: none; }
   }
 
   @media (max-width: 700px) {

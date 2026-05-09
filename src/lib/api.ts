@@ -128,6 +128,10 @@ export async function togglePlayed(setlistId: string, songId: string): Promise<S
   return req(`/setlists/${setlistId}/played`, { method: 'POST', body: JSON.stringify({ songId }) });
 }
 
+export async function toggleBreakPlayed(setlistId: string, breakOrder: number): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/played`, { method: 'POST', body: JSON.stringify({ breakOrder }) });
+}
+
 export async function updateEntryComment(setlistId: string, order: number, comment: string): Promise<Setlist> {
   return req(`/setlists/${setlistId}/entry-comment`, { method: 'PATCH', body: JSON.stringify({ order, comment }) });
 }

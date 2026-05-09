@@ -6,7 +6,7 @@
   import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
-  import { getSetlist, togglePlayed } from '$lib/api';
+  import { getSetlist, togglePlayed, toggleBreakPlayed } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
@@ -102,9 +102,15 @@
 
   async function handleToggle(songId: string) {
     if (!canMark) return;
-    // Optimistic update so the tap feels instant, then confirm from server
     localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
     const updated = await togglePlayed(setlist.id, songId);
+    applyPoll(updated.entries);
+  }
+
+  async function handleBreakToggle(order: number) {
+    if (!canMark) return;
+    localEntries = localEntries.map(e => e.order === order && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e);
+    const updated = await toggleBreakPlayed(setlist.id, order);
     applyPoll(updated.entries);
   }
 
@@ -145,7 +151,7 @@
         class:active={filterOpen || isFiltered}
         onclick={() => { filterOpen = !filterOpen; }}
         title="Фильтры"
-      >🎛️</button>
+      >🎛️ <span class="filter-btn-label">Фильтр</span></button>
     </div>
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
@@ -186,7 +192,9 @@
           ontoggle={() => handleToggle(item.entry.songId!)}
           onlyricsclick={() => { lyricsForSong = item.song; }} />
       {:else}
-        <div class="stage-break">
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="stage-break" class:played={item.entry.played} class:can-mark={canMark} onclick={() => handleBreakToggle(item.entry.order)}>
           <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
           {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
         </div>
@@ -279,7 +287,12 @@
     padding: 6px 12px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
     background: rgba(59, 130, 246, 0.09); letter-spacing: 0.03em;
+    transition: opacity 0.15s;
   }
+  .stage-break.can-mark { cursor: pointer; }
+  .stage-break.can-mark:hover { background: rgba(59, 130, 246, 0.16); }
+  .stage-break.played { opacity: 0.45; }
+  .stage-break.played .break-main { text-decoration: line-through; }
   .break-main { flex: 1; }
   .break-note { font-style: italic; opacity: 0.85; }
   .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
@@ -289,12 +302,13 @@
     .break-time { font-size: 0.9rem; font-weight: 700; }
 
     .header-filter-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+      height: 36px; flex-shrink: 0; padding: 0 12px;
       border: 1px solid var(--border); border-radius: 8px;
       background: transparent; cursor: pointer; font-size: 1.1rem;
       color: var(--text-muted); transition: all 0.15s;
     }
+    .filter-btn-label { font-size: 0.88rem; font-weight: 600; }
     .header-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
     .header-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   }

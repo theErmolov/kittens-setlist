@@ -206,14 +206,15 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
 
   if (afterId === '/played') {
     if (method === 'POST') {
-      const { songId } = JSON.parse(event.body ?? '{}') as { songId: string };
+      const { songId, breakOrder } = JSON.parse(event.body ?? '{}') as { songId?: string, breakOrder?: number };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
-      const entry = setlist.entries.find(e => e.songId === songId);
       const updated: Setlist = {
         ...setlist,
         entries: setlist.entries.map(e =>
-          e.songId === songId ? { ...e, played: !e.played } : e
+          breakOrder !== undefined
+            ? (e.order === breakOrder && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e)
+            : (e.songId === songId ? { ...e, played: !e.played } : e)
         ),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);

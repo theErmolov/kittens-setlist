@@ -57,8 +57,8 @@
 
   // Editable meta (name / date / startTime)
   let editingMeta = $state(false);
-  let draftMeta = $state({ name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' });
-  let localMeta = $state({ name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' });
+  let draftMeta = $state({ name: '', date: '', startTime: '' });
+  let localMeta = $state({ name: '', date: '', startTime: '' });
   $effect(() => {
     if (!editingMeta) {
       localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' };
@@ -76,7 +76,7 @@
     editingMeta = true;
   }
 
-  let localEntries = $state([...setlist.entries]);
+  let localEntries = $state<SetlistEntry[]>([]);
   $effect(() => { localEntries = [...setlist.entries]; });
 
   let showAddModal = $state(false);
