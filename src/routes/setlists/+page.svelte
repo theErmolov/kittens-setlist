@@ -12,6 +12,7 @@
   let newName = $state('');
   let newDate = $state('');
   let newStartTime = $state('');
+  let newStrict = $state(false);
   let loading = $state(true);
 
   onMount(async () => {
@@ -21,9 +22,9 @@
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined);
+    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined, newStrict || undefined);
     setlists = [...setlists, sl];
-    newName = ''; newDate = ''; newStartTime = ''; showNew = false;
+    newName = ''; newDate = ''; newStartTime = ''; newStrict = false; showNew = false;
     goto(`/setlists/${sl.id}`);
   }
 
@@ -51,6 +52,11 @@
           <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
         </div>
       </div>
+      <label class="strict-toggle">
+        <input type="checkbox" bind:checked={newStrict} />
+        {$t.setlists.strict}
+        <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
+      </label>
     </div>
   {/if}
 
@@ -86,6 +92,14 @@
   .empty p { margin-bottom: 12px; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
+  .strict-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; width: fit-content; }
+  .strict-toggle input[type="checkbox"] { cursor: pointer; }
+  .help-tip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1px solid var(--border); font-size: 0.7rem;
+    color: var(--text-muted); cursor: default; flex-shrink: 0; line-height: 1;
+  }
 
   @media (max-width: 700px) {
     .new-form input { font-size: 16px; }

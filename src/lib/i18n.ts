@@ -95,6 +95,8 @@ const strings = {
       songs: (n: number) => `${n} song${n !== 1 ? 's' : ''}`,
       stage: '🎤 Stage',
       deleteConfirm: 'Delete this setlist?',
+      strict: 'Strict mode',
+      strictTooltip: 'Strict: marking a song played auto-marks everything above it. Start times recalculate in real time.',
     },
     editor: {
       addSongs: '+ Add Songs',
@@ -116,6 +118,10 @@ const strings = {
       comment: '💬 Comment',
       shown: (n: number) => `· ${n} shown`,
       noSongs: 'No songs match current filters',
+      onTime: 'On time',
+      behind: (n: number) => `${n} min behind`,
+      ahead: (n: number) => `${n} min ahead`,
+      finish: 'Finish',
     },
     notFound: {
       message: 'Setlist not found.',
@@ -247,6 +253,8 @@ const strings = {
       songs: (n: number) => `${n} ${ruPlural(n, 'песня', 'песни', 'песен')}`,
       stage: '🎤 Сцена',
       deleteConfirm: 'Удалить сетлист?',
+      strict: 'Строгий режим',
+      strictTooltip: 'Строгий: отметка песни автоматически отмечает всё выше. Время пересчитывается по факту.',
     },
     editor: {
       addSongs: '+ Добавить песни',
@@ -270,6 +278,10 @@ const strings = {
       comment: '💬 Комментарий',
       shown: (n: number) => `· ${n} показано`,
       noSongs: 'Нет песен по фильтру',
+      onTime: 'По плану',
+      behind: (n: number) => `Отставание ${n} мин`,
+      ahead: (n: number) => `Опережение ${n} мин`,
+      finish: 'Финиш',
     },
     notFound: {
       message: 'Сетлист не найден.',

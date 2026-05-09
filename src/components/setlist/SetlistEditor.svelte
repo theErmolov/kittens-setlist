@@ -55,19 +55,19 @@
     return [...seen].sort();
   });
 
-  // Editable meta (name / date / startTime)
+  // Editable meta (name / date / startTime / strict)
   let editingMeta = $state(false);
-  let draftMeta = $state({ name: '', date: '', startTime: '' });
-  let localMeta = $state({ name: '', date: '', startTime: '' });
+  let draftMeta = $state({ name: '', date: '', startTime: '', strict: false });
+  let localMeta = $state({ name: '', date: '', startTime: '', strict: false });
   $effect(() => {
     if (!editingMeta) {
-      localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '' };
+      localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '', strict: setlist.strict ?? false };
     }
   });
 
   async function saveMeta() {
     const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries });
-    localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '' };
+    localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '', strict: updated.strict ?? false };
     editingMeta = false;
   }
 
@@ -396,12 +396,17 @@
           <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder="Название" />
           <input class="meta-input" type="date" bind:value={draftMeta.date} />
           <input class="meta-input" type="time" bind:value={draftMeta.startTime} />
+          <label class="strict-label">
+            <input type="checkbox" bind:checked={draftMeta.strict} />
+            {$t.setlists.strict}
+            <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
+          </label>
           <button class="btn-primary" onclick={saveMeta}>Сохранить</button>
           <button class="btn-secondary" onclick={() => { editingMeta = false; }}>Отмена</button>
         </div>
       {:else}
         <div class="meta-view">
-          <h1>{localMeta.name}</h1>
+          <h1>{localMeta.name}{#if localMeta.strict} <span class="strict-badge" title={$t.setlists.strictTooltip}>🔒</span>{/if}</h1>
           <div class="meta-details">
             {#if localMeta.date}<span class="date">{formatDate(localMeta.date)}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
@@ -708,6 +713,15 @@
   .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .meta-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
   .meta-name { font-size: 1rem; font-weight: 600; min-width: 200px; }
+  .strict-label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
+  .strict-label input[type="checkbox"] { cursor: pointer; }
+  .strict-badge { font-size: 0.9rem; cursor: default; }
+  .help-tip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 1px solid var(--border); font-size: 0.65rem;
+    color: var(--text-muted); cursor: default; flex-shrink: 0; line-height: 1;
+  }
   .header-actions { display: flex; gap: 8px; align-items: center; }
   .btn-secondary { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; color: var(--text); font-size: 0.88rem; }
   .btn-primary { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }

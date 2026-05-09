@@ -34,6 +34,7 @@ export interface SetlistEntry {
   breakMinutes?: number;
   order: number;
   played: boolean;
+  playedAt?: string;  // ISO 8601, set when marked played
   comment?: string;
   progress?: Record<string, LearningStage>;
 }
@@ -43,6 +44,7 @@ export interface Setlist {
   name: string;
   date?: string;
   startTime?: string;
+  strict?: boolean;
   entries: SetlistEntry[];
 }
 

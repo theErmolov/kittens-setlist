@@ -6,7 +6,7 @@
   import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
-  import { getSetlist, togglePlayed, toggleBreakPlayed } from '$lib/api';
+  import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
@@ -34,11 +34,17 @@
     localEntries = incoming;
   }
 
-  onMount(() => startPolling(
-    async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
-    isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
-    () => isEventLongOver(setlist.date, setlist.startTime),
-  ));
+  let now = $state(new Date());
+
+  onMount(() => {
+    const stopPoller = startPolling(
+      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+      isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
+      () => isEventLongOver(setlist.date, setlist.startTime),
+    );
+    const clockTimer = setInterval(() => { now = new Date(); }, 1000);
+    return () => { stopPoller(); clearInterval(clockTimer); };
+  });
 
   let categoryFilter = $state(new Set<Category>());
   let sortKey = $state<SortKey>('default');
@@ -102,16 +108,32 @@
 
   async function handleToggle(songId: string) {
     if (!canMark) return;
-    localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
-    const updated = await togglePlayed(setlist.id, songId);
-    applyPoll(updated.entries);
+    const entry = localEntries.find(e => e.songId === songId);
+    if (!entry) return;
+    if (setlist.strict && !entry.played) {
+      localEntries = localEntries.map(e => e.order <= entry.order && !e.played ? { ...e, played: true } : e);
+      const updated = await markThrough(setlist.id, entry.order);
+      applyPoll(updated.entries);
+    } else {
+      localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
+      const updated = await togglePlayed(setlist.id, songId);
+      applyPoll(updated.entries);
+    }
   }
 
   async function handleBreakToggle(order: number) {
     if (!canMark) return;
-    localEntries = localEntries.map(e => e.order === order && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e);
-    const updated = await toggleBreakPlayed(setlist.id, order);
-    applyPoll(updated.entries);
+    const entry = localEntries.find(e => e.order === order && e.breakMinutes !== undefined);
+    if (!entry) return;
+    if (setlist.strict && !entry.played) {
+      localEntries = localEntries.map(e => e.order <= order && !e.played ? { ...e, played: true } : e);
+      const updated = await markThrough(setlist.id, order);
+      applyPoll(updated.entries);
+    } else {
+      localEntries = localEntries.map(e => e.order === order && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e);
+      const updated = await toggleBreakPlayed(setlist.id, order);
+      applyPoll(updated.entries);
+    }
   }
 
   let playedCount = $derived(localEntries.filter(e => e.songId && e.played).length);
@@ -127,13 +149,70 @@
   // Per-entry start times keyed by entry order, only when startTime is set
   let entryTimes = $derived((): Map<number, string> => {
     if (!setlist.startTime) return new Map();
+    const sorted = [...localEntries].sort((a, b) => a.order - b.order);
     const map = new Map<number, string>();
+
+    if (setlist.strict) {
+      const playedWithTs = sorted.filter(e => e.played && e.playedAt);
+      const lastPlayed = playedWithTs.at(-1);
+      if (lastPlayed?.playedAt) {
+        let offset = 0;
+        for (const e of sorted) {
+          map.set(e.order, addMinutes(setlist.startTime!, offset));
+          offset += e.breakMinutes ?? (e.song?.lengthMinutes ?? 5);
+          if (e.order === lastPlayed.order) break;
+        }
+        const d = new Date(lastPlayed.playedAt);
+        let recalcBase = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        for (const e of sorted.filter(e => e.order > lastPlayed.order)) {
+          map.set(e.order, recalcBase);
+          recalcBase = addMinutes(recalcBase, e.breakMinutes ?? (e.song?.lengthMinutes ?? 5));
+        }
+        return map;
+      }
+    }
+
     let offset = 0;
-    for (const e of [...localEntries].sort((a, b) => a.order - b.order)) {
+    for (const e of sorted) {
       map.set(e.order, addMinutes(setlist.startTime!, offset));
       offset += e.breakMinutes ?? (e.song?.lengthMinutes ?? 5);
     }
     return map;
+  });
+
+  let timingInfo = $derived((): { currentTime: string; finishTime: string; pace?: number } | null => {
+    if (!setlist.startTime) return null;
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const currentTime = `${hh}:${mm}`;
+
+    const sorted = [...localEntries].sort((a, b) => a.order - b.order);
+    const playedWithTs = sorted.filter(e => e.played && e.playedAt);
+    const lastPlayed = playedWithTs.at(-1);
+
+    let baseTime = currentTime;
+    if (lastPlayed?.playedAt) {
+      const d = new Date(lastPlayed.playedAt);
+      baseTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    const remainingMinutes = sorted
+      .filter(e => !e.played)
+      .reduce((s, e) => s + (e.breakMinutes ?? (e.song?.lengthMinutes ?? 5)), 0);
+    const finishTime = addMinutes(baseTime, remainingMinutes);
+
+    let pace: number | undefined;
+    if (setlist.strict && lastPlayed?.playedAt) {
+      const scheduledStart = entryTimes().get(lastPlayed.order) ?? setlist.startTime;
+      const entryDuration = lastPlayed.breakMinutes ?? (lastPlayed.song?.lengthMinutes ?? 5);
+      const scheduledEnd = addMinutes(scheduledStart, entryDuration);
+      const d = new Date(lastPlayed.playedAt);
+      const actualEnd = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const [sh, sm] = scheduledEnd.split(':').map(Number);
+      const [ah, am] = actualEnd.split(':').map(Number);
+      pace = (ah * 60 + am) - (sh * 60 + sm);
+    }
+
+    return { currentTime, finishTime, pace };
   });
 </script>
 
@@ -153,6 +232,28 @@
         title="Фильтры"
       >🎛️ <span class="filter-btn-label">Фильтр</span></button>
     </div>
+    {#if timingInfo()}
+      {@const info = timingInfo()}
+      <div class="timing-bar">
+        <span class="timing-clock">{info!.currentTime}</span>
+        <span class="timing-finish">{$t.stage.finish}: {info!.finishTime}</span>
+        {#if info!.pace !== undefined}
+          <span class="timing-pace"
+            class:on-time={Math.abs(info!.pace) <= 2}
+            class:behind={info!.pace > 2}
+            class:ahead={info!.pace < -2}
+          >
+            {#if Math.abs(info!.pace) <= 2}
+              {$t.stage.onTime} ✓
+            {:else if info!.pace > 0}
+              {$t.stage.behind(info!.pace)}
+            {:else}
+              {$t.stage.ahead(-info!.pace)}
+            {/if}
+          </span>
+        {/if}
+      </div>
+    {/if}
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}
@@ -265,6 +366,17 @@
   }
   .filtered-count { font-size: 0.78rem; opacity: 0.75; }
 
+  .timing-bar { display: none; }
+  .timing-clock { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .timing-finish { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  .timing-pace {
+    padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 0.78rem;
+    background: var(--chip-bg); color: var(--text-muted);
+  }
+  .timing-pace.on-time { color: #16a34a; background: #dcfce7; }
+  .timing-pace.behind { color: #b45309; background: #fef3c7; }
+  .timing-pace.ahead { color: #2563eb; background: #dbeafe; }
+
   .header-filter-btn { display: none; }
   .header-filters { display: flex; flex-direction: column; gap: 6px; }
   .musician-picker { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -301,6 +413,11 @@
   @media (min-width: 701px) {
     .stage-break { font-size: 1rem; padding: 8px 12px; }
     .break-time { font-size: 0.9rem; font-weight: 700; }
+
+    .timing-bar {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.82rem; padding: 2px 0;
+    }
 
     .header-filter-btn {
       display: flex; align-items: center; gap: 6px;

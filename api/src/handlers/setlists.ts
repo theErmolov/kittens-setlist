@@ -27,8 +27,8 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       return ok(items);
     }
     if (method === 'POST') {
-      const { name, date, startTime } = JSON.parse(event.body ?? '{}') as { name: string; date?: string; startTime?: string };
-      const setlist: Setlist = { id: crypto.randomUUID(), name, date, startTime, entries: [] };
+      const { name, date, startTime, strict } = JSON.parse(event.body ?? '{}') as { name: string; date?: string; startTime?: string; strict?: boolean };
+      const setlist: Setlist = { id: crypto.randomUUID(), name, date, startTime, strict, entries: [] };
       await dbPut(TABLE, setlist as unknown as Record<string, unknown>);
       await logAudit({ action: 'setlist.create', actor: user, entityType: 'setlist', entityId: setlist.id, entityName: setlistName(setlist), summary: `создан сетлист "${setlistName(setlist)}"` });
       return ok(setlist, 201);
@@ -209,12 +209,34 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const { songId, breakOrder } = JSON.parse(event.body ?? '{}') as { songId?: string, breakOrder?: number };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
+      const now = new Date().toISOString();
+      const updated: Setlist = {
+        ...setlist,
+        entries: setlist.entries.map(e => {
+          const isTarget = breakOrder !== undefined
+            ? (e.order === breakOrder && e.breakMinutes !== undefined)
+            : (e.songId === songId);
+          if (!isTarget) return e;
+          const nowPlayed = !e.played;
+          return { ...e, played: nowPlayed, ...(nowPlayed ? { playedAt: now } : { playedAt: undefined }) };
+        }),
+      };
+      await dbPut(TABLE, updated as unknown as Record<string, unknown>);
+      return ok(updated);
+    }
+    return err('Method not allowed', 405);
+  }
+
+  if (afterId === '/mark-through') {
+    if (method === 'POST') {
+      const { targetOrder } = JSON.parse(event.body ?? '{}') as { targetOrder: number };
+      const setlist = await dbGet<Setlist>(TABLE, id);
+      if (!setlist) return err('Not found', 404);
+      const now = new Date().toISOString();
       const updated: Setlist = {
         ...setlist,
         entries: setlist.entries.map(e =>
-          breakOrder !== undefined
-            ? (e.order === breakOrder && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e)
-            : (e.songId === songId ? { ...e, played: !e.played } : e)
+          e.order <= targetOrder && !e.played ? { ...e, played: true, playedAt: now } : e
         ),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
