@@ -18,6 +18,7 @@
   const FLAT_TO_SHARP: Record<string, string> = { Db:'C#', Eb:'D#', Gb:'F#', Ab:'G#', Bb:'A#' };
 
   const CHORD_TOKEN_RE = /^[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?$/;
+  const ANNOTATION_TOKEN_RE = /^[xхх×]\d+$/i;
   const CHORD_FIND_SRC = /[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?/.source;
 
   // ── Types ──────────────────────────────────────────────────────────────────
@@ -38,7 +39,9 @@
 
   function isChordLine(line: string): boolean {
     const tokens = line.trim().split(/\s+/).filter(Boolean);
-    return tokens.length > 0 && tokens.every(t => CHORD_TOKEN_RE.test(t));
+    return tokens.length > 0
+      && tokens.some(t => CHORD_TOKEN_RE.test(t))
+      && tokens.every(t => CHORD_TOKEN_RE.test(t) || ANNOTATION_TOKEN_RE.test(t));
   }
 
   function transposeRoot(root: string, n: number): string {

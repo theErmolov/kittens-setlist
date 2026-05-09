@@ -321,7 +321,7 @@
         </div>
 
       <div class="fields-row">
-        <div class="field" style="flex: 1">
+        <div class="field" style="flex: 3">
           <label>{$t.song.comment}</label>
           <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
         </div>
@@ -362,7 +362,7 @@
   }
   .modal {
     background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+    width: 100%; max-width: 680px; height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
   }
   .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
@@ -484,7 +484,7 @@
 
   .ghost-row {
     border-style: dashed;
-    opacity: 0.55;
+    opacity: 0.75;
   }
   .row-error { border-color: #ef4444; }
   .ghost-row:focus-within {
@@ -505,7 +505,7 @@
     display: flex;
     gap: 4px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: -14px;
+    margin-bottom: -6px;
     padding-bottom: 0;
   }
   .tab-btn {
@@ -542,7 +542,7 @@
   }
   .lyrics-editor:focus { outline: none; border-color: var(--accent); }
 
-  .field-length { flex: 0 0 72px; }
+  .field-length { flex: 1; }
 
   .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }

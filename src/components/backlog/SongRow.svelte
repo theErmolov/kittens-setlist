@@ -154,8 +154,8 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    background: var(--border);
-    color: var(--text-muted);
+    background: var(--chip-bg);
+    color: var(--text);
     font-size: 0.7rem;
     padding: 1px 7px;
     border-radius: 10px;
