@@ -314,6 +314,7 @@
             ...canonical,
             progress: { ...(canonical.progress ?? {}), ...(updatedSong.progress ?? {}) },
             lengthMinutes: updatedSong.lengthMinutes ?? canonical.lengthMinutes,
+            lyrics: updatedSong.lyrics ?? canonical.lyrics,
           }, true);
         }
       } catch (err) {
