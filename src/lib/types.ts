@@ -43,7 +43,7 @@ export interface Setlist {
   name: string;
   date?: string;
   startTime?: string;  // HH:MM, 24h
-  strict?: boolean;
+  vibe?: boolean;
   entries: SetlistEntry[];
 }
 

@@ -88,8 +88,8 @@ export async function getSetlist(id: string): Promise<Setlist | undefined> {
   return req(`/setlists/${id}`);
 }
 
-export async function createSetlist(name: string, date?: string, startTime?: string, strict?: boolean): Promise<Setlist> {
-  return req('/setlists', { method: 'POST', body: JSON.stringify({ name, date, startTime, strict }) });
+export async function createSetlist(name: string, date?: string, startTime?: string, vibe?: boolean): Promise<Setlist> {
+  return req('/setlists', { method: 'POST', body: JSON.stringify({ name, date, startTime, vibe }) });
 }
 
 export async function markThrough(setlistId: string, targetOrder: number): Promise<Setlist> {

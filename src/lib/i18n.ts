@@ -95,8 +95,8 @@ const strings = {
       songs: (n: number) => `${n} song${n !== 1 ? 's' : ''}`,
       stage: '🎤 Stage',
       deleteConfirm: 'Delete this setlist?',
-      strict: 'Strict mode',
-      strictTooltip: 'Strict: marking a song played auto-marks everything above it. Start times recalculate in real time.',
+      vibe: 'Vibe mode',
+      vibeTooltip: 'Vibe: marking a song played auto-marks everything above it. Start times recalculate in real time.',
     },
     editor: {
       addSongs: '+ Add Songs',
@@ -253,8 +253,8 @@ const strings = {
       songs: (n: number) => `${n} ${ruPlural(n, 'песня', 'песни', 'песен')}`,
       stage: '🎤 Сцена',
       deleteConfirm: 'Удалить сетлист?',
-      strict: 'Строгий режим',
-      strictTooltip: 'Строгий: отметка песни автоматически отмечает всё выше. Время пересчитывается по факту.',
+      vibe: 'Вайбовый режим',
+      vibeTooltip: 'Vibe: отметка песни автоматически отмечает всё выше. Время пересчитывается по факту.',
     },
     editor: {
       addSongs: '+ Добавить песни',

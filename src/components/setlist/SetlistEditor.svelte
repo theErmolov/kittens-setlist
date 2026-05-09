@@ -55,19 +55,19 @@
     return [...seen].sort();
   });
 
-  // Editable meta (name / date / startTime / strict)
+  // Editable meta (name / date / startTime / vibe)
   let editingMeta = $state(false);
-  let draftMeta = $state({ name: '', date: '', startTime: '', strict: false });
-  let localMeta = $state({ name: '', date: '', startTime: '', strict: false });
+  let draftMeta = $state({ name: '', date: '', startTime: '', vibe: false });
+  let localMeta = $state({ name: '', date: '', startTime: '', vibe: false });
   $effect(() => {
     if (!editingMeta) {
-      localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '', strict: setlist.strict ?? false };
+      localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '', vibe: setlist.vibe ?? false };
     }
   });
 
   async function saveMeta() {
     const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries });
-    localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '', strict: updated.strict ?? false };
+    localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '', vibe: updated.vibe ?? false };
     editingMeta = false;
   }
 
@@ -396,19 +396,19 @@
           <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder="Название" />
           <input class="meta-input" type="date" bind:value={draftMeta.date} />
           <input class="meta-input" type="time" bind:value={draftMeta.startTime} />
-          <div class="strict-row">
-            <label class="strict-label">
-              <input type="checkbox" bind:checked={draftMeta.strict} />
-              {$t.setlists.strict}
+          <div class="vibe-row">
+            <label class="vibe-label">
+              <input type="checkbox" bind:checked={draftMeta.vibe} />
+              {$t.setlists.vibe}
             </label>
-            <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
+            <span class="help-tip" title={$t.setlists.vibeTooltip}>?</span>
           </div>
           <button class="btn-primary" onclick={saveMeta}>Сохранить</button>
           <button class="btn-secondary" onclick={() => { editingMeta = false; }}>Отмена</button>
         </div>
       {:else}
         <div class="meta-view">
-          <h1>{localMeta.name}{#if localMeta.strict} <span class="strict-badge" title={$t.setlists.strictTooltip}>🔒</span>{/if}</h1>
+          <h1>{localMeta.name}{#if localMeta.vibe} <span class="vibe-badge" title={$t.setlists.vibeTooltip}>Vibe</span>{/if}</h1>
           <div class="meta-details">
             {#if localMeta.date}<span class="date">{formatDate(localMeta.date)}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
@@ -715,10 +715,10 @@
   .meta-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .meta-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
   .meta-name { font-size: 1rem; font-weight: 600; min-width: 200px; }
-  .strict-row { display: flex; align-items: center; gap: 5px; }
-  .strict-label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
-  .strict-label input[type="checkbox"] { cursor: pointer; }
-  .strict-badge { font-size: 0.9rem; cursor: default; }
+  .vibe-row { display: flex; align-items: center; gap: 5px; }
+  .vibe-label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
+  .vibe-label input[type="checkbox"] { cursor: pointer; }
+  .vibe-badge { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 8px; background: var(--accent); color: #fff; cursor: default; vertical-align: middle; }
   .help-tip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 15px; height: 15px; border-radius: 50%;

@@ -44,7 +44,7 @@ export interface Setlist {
   name: string;
   date?: string;
   startTime?: string;
-  strict?: boolean;
+  vibe?: boolean;
   entries: SetlistEntry[];
 }
 

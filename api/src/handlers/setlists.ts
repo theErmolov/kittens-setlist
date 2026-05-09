@@ -27,8 +27,8 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       return ok(items);
     }
     if (method === 'POST') {
-      const { name, date, startTime, strict } = JSON.parse(event.body ?? '{}') as { name: string; date?: string; startTime?: string; strict?: boolean };
-      const setlist: Setlist = { id: crypto.randomUUID(), name, date, startTime, strict, entries: [] };
+      const { name, date, startTime, vibe } = JSON.parse(event.body ?? '{}') as { name: string; date?: string; startTime?: string; vibe?: boolean };
+      const setlist: Setlist = { id: crypto.randomUUID(), name, date, startTime, vibe, entries: [] };
       await dbPut(TABLE, setlist as unknown as Record<string, unknown>);
       await logAudit({ action: 'setlist.create', actor: user, entityType: 'setlist', entityId: setlist.id, entityName: setlistName(setlist), summary: `создан сетлист "${setlistName(setlist)}"` });
       return ok(setlist, 201);

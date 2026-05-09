@@ -12,7 +12,7 @@
   let newName = $state('');
   let newDate = $state('');
   let newStartTime = $state('');
-  let newStrict = $state(false);
+  let newVibe = $state(true);
   let loading = $state(true);
 
   onMount(async () => {
@@ -22,9 +22,9 @@
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined, newStrict || undefined);
+    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined, newVibe || undefined);
     setlists = [...setlists, sl];
-    newName = ''; newDate = ''; newStartTime = ''; newStrict = false; showNew = false;
+    newName = ''; newDate = ''; newStartTime = ''; newVibe = true; showNew = false;
     goto(`/setlists/${sl.id}`);
   }
 
@@ -52,12 +52,12 @@
           <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
         </div>
       </div>
-      <div class="strict-toggle">
-        <label class="strict-label">
-          <input type="checkbox" bind:checked={newStrict} />
-          {$t.setlists.strict}
+      <div class="vibe-toggle">
+        <label class="vibe-label">
+          <input type="checkbox" bind:checked={newVibe} />
+          {$t.setlists.vibe}
         </label>
-        <span class="help-tip" title={$t.setlists.strictTooltip}>?</span>
+        <span class="help-tip" title={$t.setlists.vibeTooltip}>?</span>
       </div>
     </div>
   {/if}
@@ -94,9 +94,9 @@
   .empty p { margin-bottom: 12px; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
-  .strict-toggle { display: flex; align-items: center; gap: 6px; width: fit-content; }
-  .strict-label { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; }
-  .strict-label input[type="checkbox"] { cursor: pointer; }
+  .vibe-toggle { display: flex; align-items: center; gap: 6px; width: fit-content; }
+  .vibe-label { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; }
+  .vibe-label input[type="checkbox"] { cursor: pointer; }
   .help-tip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 16px; height: 16px; border-radius: 50%;
