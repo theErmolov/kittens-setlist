@@ -74,11 +74,17 @@
       <div class="col-info">
         <div class="title-row">
           <span class="title">{song.title}</span>
-          <span class="artist">{song.artist}</span>
           {#if startTime}<span class="start-time start-time-mobile">{startTime}</span>{/if}
         </div>
-        {#if entry.comment}<div class="comment">{entry.comment}</div>{/if}
+        <span class="artist">{song.artist}</span>
+        {#if entry.comment}<div class="comment comment-mobile">{entry.comment}</div>{/if}
       </div>
+    </div>
+    <div class="col-comment">
+      {#if entry.comment}<span class="col-comment-text">{entry.comment}</span>{/if}
+      {#if song.lyrics && onlyricsclick}
+        <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+      {/if}
     </div>
     <div class="col-musicians">
       <div class="musicians">
@@ -127,7 +133,7 @@
   .top-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
   .col-meta { display: flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; }
   .meta-num { display: flex; align-items: center; gap: 4px; }
-  .col-info { flex: 1; min-width: 0; }
+  .col-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
   .title-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); min-width: 1.4em; text-align: right; }
@@ -136,7 +142,8 @@
   .start-time { font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
   .start-time-mobile { margin-left: auto; }
   .start-time-desktop { display: none; }
-  .comment { margin-top: 2px; font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+  .comment-mobile { margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
+  .col-comment { display: none; }
 
   .lyrics-col-btn {
     background: none; border: none; cursor: pointer;
@@ -172,35 +179,55 @@
   @media (min-width: 701px) {
     .song-main {
       display: grid;
-      grid-template-columns: 90px 3fr 2fr;
+      grid-template-columns: 64px 1.4fr 2fr 1.5fr;
       align-items: stretch;
       padding: 0;
+      min-height: 72px;
     }
-    /* flatten top-row so col-meta and col-info sit directly in the 3-col grid */
+    /* flatten top-row so col-meta and col-info sit directly in the 4-col grid */
     .top-row { display: contents; }
 
     .col-meta {
       flex-direction: column; align-items: center; justify-content: center;
-      gap: 10px; padding: 8px 10px;
+      gap: 4px; padding: 6px 8px;
       border-right: 1px solid var(--border);
     }
-    .meta-num { gap: 6px; }
-    .position { font-size: 1rem; }
-    .lyrics-col-btn {
-      font-size: 1.5rem; padding: 6px 8px;
-      background: var(--accent); border-radius: 8px; width: 100%;
-      display: flex; align-items: center; justify-content: center;
-      color: #1a1200;
-    }
+    .meta-num { flex-direction: column; gap: 4px; }
+    .position { font-size: 1.05rem; }
+    .col-meta .lyrics-col-btn { display: none; }
 
     .col-info {
       flex: unset; display: flex; flex-direction: column; justify-content: center;
-      padding: 8px 14px; border-right: 1px solid var(--border); min-width: 0;
+      gap: 2px; padding: 8px 14px; min-width: 0;
     }
     .title-row { align-items: baseline; gap: 10px; flex-wrap: nowrap; width: 100%; }
-    .title { font-size: 1.6rem; }
-    .artist { font-size: 0.9rem; }
+    .title { font-size: 1.5rem; line-height: 1.15; }
+    .artist { font-size: 0.88rem; }
     .start-time { margin-left: auto; font-size: 0.9rem; font-weight: 700; }
+
+    .comment-mobile { display: none; }
+
+    .col-comment {
+      display: flex; align-items: stretch; gap: 0;
+      padding: 0; min-width: 0;
+    }
+    .col-comment-text {
+      flex: 1; align-self: center;
+      font-size: 0.92rem; font-weight: 500; color: var(--text);
+      padding: 8px 14px;
+      word-break: break-word; overflow-wrap: break-word; white-space: normal; min-width: 0;
+    }
+    .lyrics-side-btn {
+      background: var(--accent); border: none; cursor: pointer;
+      font-size: 1.6rem; line-height: 1;
+      align-self: stretch; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 22px; min-width: 64px;
+      color: #1a1200;
+      margin-left: auto;
+      transition: filter 0.15s;
+    }
+    .lyrics-side-btn:hover { filter: brightness(1.1); }
 
     .start-time-mobile { display: none; }
     .start-time-desktop { display: inline; flex-shrink: 0; font-size: 0.9rem; font-weight: 700; }

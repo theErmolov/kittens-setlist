@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { base } from '$app/paths';
   import StageView from '$components/stage/StageView.svelte';
@@ -18,6 +19,8 @@
   let pollInterval = $derived(
     canMark ? 2000 : $currentUser?.status === 'approved' ? 10000 : 30000
   );
+
+  afterNavigate(() => { window.scrollTo(0, 0); });
 
   onMount(async () => {
     setlist = await getSetlist(id!);

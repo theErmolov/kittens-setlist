@@ -24,7 +24,7 @@
     pollInterval?: number;
   } = $props();
 
-  let localEntries = $state<SetlistEntry[]>([...setlist.entries]);
+  let localEntries = $state<SetlistEntry[]>([]);
   $effect(() => { localEntries = [...setlist.entries]; });
 
   function applyPoll(incoming: SetlistEntry[]) {
@@ -230,12 +230,13 @@
 </div>
 
 <style>
-  .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); max-width: 100%; overflow-x: hidden; }
+  .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); max-width: 100%; overflow-x: clip; }
 
   .stage-header {
     position: sticky; top: 56px; z-index: 10;
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 10px 8px; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 12px; display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   }
   .stage-title { display: flex; align-items: center; gap: 10px; }
   .back-link { text-decoration: none; color: var(--accent); font-size: 2.4rem; line-height: 1; }
@@ -248,9 +249,7 @@
   }
   .filtered-count { font-size: 0.78rem; opacity: 0.75; }
 
-  .stage-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .comment-toggle { display: flex; align-items: center; gap: 4px; font-size: 0.78rem; cursor: pointer; color: var(--text-muted); }
-
+  .header-filters { display: flex; flex-direction: column; gap: 6px; }
   .musician-picker { display: flex; flex-wrap: wrap; gap: 6px; }
   .musician-chip {
     padding: 3px 12px; border: 1px solid var(--border); border-radius: 20px;

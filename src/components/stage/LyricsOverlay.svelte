@@ -358,6 +358,7 @@
     <div
       class="lyrics-content"
       class:two-col={columns > 1}
+      class:two-col-manual={columns > 1 && userFontSize !== null}
       style:font-size="{effectiveFontSize}px"
       style:columns={columns > 1 ? columns : undefined}
     >
@@ -574,6 +575,12 @@
   .lyrics-content.two-col {
     column-fill: auto;
     height: 100%;
+  }
+
+  /* Manual zoom: balance columns and let the body scroll */
+  .lyrics-content.two-col.two-col-manual {
+    column-fill: balance;
+    height: auto;
   }
 
   .pair {
