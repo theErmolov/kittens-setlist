@@ -190,7 +190,7 @@
     const playedWithTs = sorted.filter(e => e.played && e.playedAt);
     const lastPlayed = playedWithTs.at(-1);
 
-    let baseTime = currentTime;
+    let baseTime = setlist.startTime ?? currentTime;
     if (lastPlayed?.playedAt) {
       const d = new Date(lastPlayed.playedAt);
       baseTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -221,6 +221,9 @@
     <div class="stage-title">
       <a href="{base}/setlists/{setlist.id}" class="back-link">←</a>
       <span class="name">{setlist.name}</span>
+      {#if timingInfo()}
+        <span class="timing-clock">{timingInfo()!.currentTime}</span>
+      {/if}
       <span class="progress">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
         {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
@@ -235,7 +238,6 @@
     {#if timingInfo()}
       {@const info = timingInfo()}
       <div class="timing-bar">
-        <span class="timing-clock">{info!.currentTime}</span>
         <span class="timing-finish">{$t.stage.finish}: {info!.finishTime}</span>
         {#if info!.pace !== undefined}
           <span class="timing-pace"

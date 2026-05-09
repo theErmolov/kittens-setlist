@@ -362,12 +362,12 @@
   }
   .modal {
     background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 680px; height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+    width: 100%; max-width: 680px; height: 90vh; overflow: hidden; display: flex; flex-direction: column;
   }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
   .close-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 4px 8px; }
-  .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow-y: auto; }
   .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
   .footer-left { display: flex; gap: 6px; }
   .footer-right { display: flex; gap: 8px; }
@@ -525,7 +525,8 @@
 
   .lyrics-editor {
     width: 100%;
-    min-height: 280px;
+    flex: 1;
+    min-height: 120px;
     box-sizing: border-box;
     padding: 10px 12px;
     border: 1px solid var(--border);

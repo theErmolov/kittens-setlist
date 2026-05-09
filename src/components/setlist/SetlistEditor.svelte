@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { Setlist, Song, Instrument, SetlistEntry, BandMusician, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
@@ -60,7 +60,10 @@
   let draftMeta = $state({ name: '', date: '', startTime: '', vibe: false });
   let localMeta = $state({ name: '', date: '', startTime: '', vibe: false });
   $effect(() => {
-    if (!editingMeta) {
+    // Track setlist prop only — untrack editingMeta so toggling edit mode doesn't re-run this
+    // and overwrite localMeta with stale prop data right after a save.
+    void setlist;
+    if (!untrack(() => editingMeta)) {
       localMeta = { name: setlist.name, date: setlist.date ?? '', startTime: setlist.startTime ?? '', vibe: setlist.vibe ?? false };
     }
   });
@@ -814,7 +817,7 @@
   .artist { font-weight: 400; font-size: 0.9rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
   .title { font-size: 0.9rem; font-weight: 600; }
-  .lyrics-dot { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: color-mix(in srgb, var(--text-muted) 8%, transparent); border: 1px solid color-mix(in srgb, var(--text-muted) 25%, transparent); border-radius: 4px; padding: 1px 4px; line-height: 1.4; display: inline-flex; align-items: center; }
+  .lyrics-dot { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: color-mix(in srgb, var(--accent) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; padding: 1px 4px; line-height: 1.4; display: inline-flex; align-items: center; }
   .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
   .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 
