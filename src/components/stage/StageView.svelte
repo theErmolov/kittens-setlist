@@ -284,10 +284,11 @@
   .mobile-bottom-bar { display: none; }
   .stage-break {
     display: flex; align-items: center; gap: 8px;
-    padding: 6px 12px; font-size: 0.82rem;
+    padding: 12px 14px; min-height: 48px; font-size: 0.82rem;
     color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
     background: rgba(59, 130, 246, 0.09); letter-spacing: 0.03em;
     transition: opacity 0.15s;
+    touch-action: manipulation; user-select: none;
   }
   .stage-break.can-mark { cursor: pointer; }
   .stage-break.can-mark:hover { background: rgba(59, 130, 246, 0.16); }

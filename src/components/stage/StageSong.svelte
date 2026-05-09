@@ -121,7 +121,7 @@
 
   .song-main {
     flex: 1;
-    padding: 8px 12px;
+    padding: 5px 12px;
     cursor: pointer;
     text-align: left;
     min-width: 0;
@@ -136,16 +136,17 @@
   .top-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
   .col-meta { display: flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; }
   .meta-num { display: flex; align-items: center; gap: 4px; }
-  .col-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .col-info { flex: 1; min-width: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 4px; row-gap: 0; }
 
-  .title-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .title-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: nowrap; flex-shrink: 1; min-width: 0; }
   .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); min-width: 1.4em; text-align: right; }
   .title { font-size: 1rem; font-weight: 700; color: var(--text); }
   .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
+  .artist::before { content: "·"; margin-right: 2px; }
   .start-time { font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
-  .start-time-mobile { margin-left: auto; }
+  .start-time-mobile { }
   .start-time-desktop { display: none; }
-  .comment-mobile { margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
+  .comment-mobile { flex-basis: 100%; margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
   .col-comment { display: none; }
 
   .lyrics-col-btn { display: none; }
@@ -188,10 +189,10 @@
   @media (min-width: 701px) {
     .song-main {
       display: grid;
-      grid-template-columns: 64px 1.4fr 1.75fr 1.75fr;
+      grid-template-columns: 64px 1.66fr 1.49fr 1.75fr;
       align-items: stretch;
       padding: 0;
-      min-height: 72px;
+      min-height: 60px;
     }
     /* flatten top-row so col-meta and col-info sit directly in the 4-col grid */
     .top-row { display: contents; }
@@ -201,16 +202,16 @@
       gap: 0; padding: 0;
       border-right: 1px solid var(--border);
     }
-    .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 6px 8px; flex-shrink: 0; }
+    .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 4px 8px; flex-shrink: 0; }
     .position { font-size: 1.05rem; }
     .col-meta .lyrics-col-btn { display: none; }
 
     .col-info {
       flex: unset; display: flex; flex-direction: column; justify-content: center;
-      gap: 2px; padding: 8px 14px; min-width: 0;
+      gap: 2px; padding: 5px 14px; min-width: 0;
     }
     .title-row { align-items: baseline; gap: 10px; flex-wrap: nowrap; width: 100%; }
-    .title { font-size: 1.5rem; line-height: 1.15; }
+    .title { font-size: 1.8rem; line-height: 1.15; }
     .artist { font-size: 0.88rem; }
     .start-time { margin-left: auto; font-size: 0.9rem; font-weight: 700; }
 
@@ -240,7 +241,7 @@
 
     .start-time-mobile { display: none; }
     .start-time-desktop { display: inline; flex-shrink: 0; font-size: 0.9rem; font-weight: 700; }
-    .col-musicians { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 0; }
+    .col-musicians { display: flex; align-items: center; gap: 8px; padding: 5px 12px; margin: 0; }
     .musicians { flex: 1; padding: 0; }
     .lyrics-musicians-btn { display: none; }
   }
