@@ -15,7 +15,7 @@ function ruPlural(n: number, one: string, few: string, many: string): string {
 const strings = {
   en: {
     nav: {
-      backlog: 'Backlog',
+      backlog: 'Catalog',
       setlists: 'Setlists',
       musicians: 'Musicians',
     },

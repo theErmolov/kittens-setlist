@@ -11,6 +11,10 @@ Why: User can read the diff.
 # 🚨🚨🚨 NEVER COMMIT OR PUSH UNLESS THE USER EXPLICITLY SAYS SO IN THE CURRENT MESSAGE 🚨🚨🚨
 ### This means: do NOT run `git commit`, `git push`, or any variant as part of a code change. ONLY when the user's message is literally "commit", "push", "commit and push", or equivalent. NO EXCEPTIONS. NO EXCEPTIONS. NO EXCEPTIONS.
 **Why:** User was burned by Claude auto-committing after every code change without being asked.
+
+**Deployment is fully automated via CI/CD on push — never mention it as a manual step.**
+Why: Pushing triggers automatic deployment to production. Only the user decides when to push.
+How to apply: Do not say "you'll need to deploy" or "run sam deploy" after code changes. The push IS the deploy. Never suggest `sam deploy` unless the user explicitly asks for a manual deploy.
 ---
 
 **Musicians cannot be removed from a song — only their instrument can be cleared.**

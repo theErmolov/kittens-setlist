@@ -57,39 +57,27 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="song-main" onclick={ontoggle}>
     <!--
-      .top-row becomes display:contents on desktop so col-meta and col-info
-      are direct grid children of .song-main alongside col-musicians.
-      On mobile .top-row is a normal flex row.
+      Mobile: 3-col grid — [col-meta spans rows] | [col-info / col-musicians] | [col-time]
+      Desktop: 4-col grid — [col-meta] [col-info] [col-comment] [col-musicians]
     -->
-    <div class="top-row">
-      <div class="col-meta" class:has-lyrics={!!(song.lyrics && onlyricsclick)}>
-        <div class="meta-num">
-          <span class="position">{position}</span>
-          <CategoryBadge category={song.category} iconOnly />
-        </div>
-        {#if song.lyrics && onlyricsclick}
-          <button class="lyrics-col-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
-        {/if}
+    <div class="col-meta">
+      <div class="meta-num">
+        <span class="position">{position}</span>
+        <CategoryBadge category={song.category} iconOnly />
       </div>
-      <div class="col-info">
-        <div class="title-row">
-          <span class="title">{song.title}</span>
-          {#if startTime}<span class="start-time start-time-mobile">{startTime}</span>{/if}
-        </div>
-        <span class="artist">{song.artist}</span>
-        {#if entry.comment}<div class="comment comment-mobile">{entry.comment}</div>{/if}
-      </div>
-    </div>
-    <div class="col-comment">
-      {#if entry.comment}<span class="col-comment-text">{entry.comment}</span>{/if}
       {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+        <button class="lyrics-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
       {/if}
+    </div>
+    <div class="col-info">
+      <span class="title">{song.title}</span>
+      <span class="artist">{song.artist}</span>
+      {#if entry.comment}<div class="comment-mobile">{entry.comment}</div>{/if}
+    </div>
+    <div class="col-time">
+      {#if startTime}<span class="start-time">{startTime}</span>{/if}
     </div>
     <div class="col-musicians">
-      {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-musicians-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
-      {/if}
       <div class="musicians">
         {#each rosterCells as cell}
           <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
@@ -102,13 +90,19 @@
       </div>
       {#if startTime}<span class="start-time start-time-desktop">{startTime}</span>{/if}
     </div>
+    <div class="col-comment">
+      {#if entry.comment}<span class="col-comment-text">{entry.comment}</span>{/if}
+      {#if song.lyrics && onlyricsclick}
+        <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+      {/if}
+    </div>
   </div>
 </div>
 
 <style>
   .stage-song {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -119,52 +113,100 @@
   .stage-song.played { opacity: 0.45; }
   .stage-song.played .title { text-decoration: line-through; }
 
+  /* ── Mobile: 3-column grid ── */
   .song-main {
     flex: 1;
-    padding: 5px 12px;
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    grid-template-rows: auto auto;
     cursor: pointer;
     text-align: left;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
   }
   .song-main:hover { background: var(--row-hover); }
   .stage-song.no-mark .song-main { cursor: default; }
   .stage-song.no-mark .song-main:hover { background: transparent; }
 
-  /* ── Mobile defaults ── */
-  .top-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
-  .col-meta { display: flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; }
-  .meta-num { display: flex; align-items: center; gap: 4px; }
-  .col-info { flex: 1; min-width: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 4px; row-gap: 0; }
+  /* Col 1: position + category + lyrics button, spans both rows */
+  .col-meta {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .meta-num {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 4px;
+  }
+  .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); }
+  .lyrics-btn {
+    flex: 1;
+    width: 100%;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    touch-action: manipulation;
+    line-height: 1;
+    cursor: pointer;
+    min-height: 44px;
+  }
 
-  .title-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: nowrap; flex-shrink: 1; min-width: 0; }
-  .position { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); min-width: 1.4em; text-align: right; }
+  /* Col 2 row 1: title + artist (inline) */
+  .col-info {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 4px;
+    row-gap: 0;
+    padding: 6px 8px;
+    min-width: 0;
+    align-content: center;
+  }
   .title { font-size: 1rem; font-weight: 700; color: var(--text); }
   .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
   .artist::before { content: "·"; margin-right: 2px; }
-  .start-time { font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
-  .start-time-mobile { }
-  .start-time-desktop { display: none; }
-  .comment-mobile { flex-basis: 100%; margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
-  .col-comment { display: none; }
+  .comment-mobile { margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
 
-  .lyrics-col-btn { display: none; }
-
-  .lyrics-musicians-btn {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 44px;
-    display: flex; align-items: center; justify-content: center;
-    background: #7c3aed; color: #fff;
-    border: none; padding: 0;
-    font-size: 1.4rem; touch-action: manipulation; line-height: 1;
-    cursor: pointer;
+  /* Col 3 row 1: time */
+  .col-time {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    padding: 6px 8px 6px 4px;
+    flex-shrink: 0;
   }
+  .start-time { font-size: 0.82rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .start-time-desktop { display: none; }
 
-  .col-musicians { display: flex; align-items: stretch; margin: 0 -12px -8px; position: relative; }
+  /* Col 2–3 row 2: musicians */
+  .col-comment { display: none; }
+  .col-musicians {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    display: flex;
+  }
   .musicians {
-    flex: 1; display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 3px 4px; font-size: 0.82rem; color: var(--text-muted); min-width: 0;
-    padding: 5px 12px 8px 52px;
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px 4px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    min-width: 0;
+    padding: 5px 8px 8px 8px;
   }
 
   .musician {
@@ -185,41 +227,40 @@
   }
   :global([data-theme="dark"]) .musician:not(.inactive):not(.highlight) .m-name { color: #d1d5db; }
 
-  /* ── Desktop / tablet landscape ── */
+  /* ── Desktop / tablet landscape: 4-column grid ── */
   @media (min-width: 701px) {
     .song-main {
       display: grid;
       grid-template-columns: 64px 1.66fr 1.49fr 1.75fr;
+      grid-template-rows: 1fr;
       align-items: stretch;
-      padding: 0;
       min-height: 60px;
     }
-    /* flatten top-row so col-meta and col-info sit directly in the 4-col grid */
-    .top-row { display: contents; }
 
     .col-meta {
+      grid-column: 1; grid-row: 1;
       flex-direction: column; align-items: stretch; justify-content: flex-start;
-      gap: 0; padding: 0;
       border-right: 1px solid var(--border);
     }
-    .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 4px 8px; flex-shrink: 0; }
+    .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 4px 8px; flex: 1; }
     .position { font-size: 1.05rem; }
-    .col-meta .lyrics-col-btn { display: none; }
+    .lyrics-btn { display: none; }
 
     .col-info {
-      flex: unset; display: flex; flex-direction: column; justify-content: center;
-      gap: 2px; padding: 5px 14px; min-width: 0;
+      grid-column: 2; grid-row: 1;
+      flex-direction: column; justify-content: center;
+      gap: 2px; padding: 5px 14px;
     }
-    .title-row { align-items: baseline; gap: 10px; flex-wrap: nowrap; width: 100%; }
     .title { font-size: 1.8rem; line-height: 1.15; }
     .artist { font-size: 0.88rem; }
-    .start-time { margin-left: auto; font-size: 0.9rem; font-weight: 700; }
-
     .comment-mobile { display: none; }
 
+    .col-time { display: none; }
+    .start-time-desktop { display: inline; flex-shrink: 0; font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+
     .col-comment {
-      display: flex; align-items: stretch; gap: 0;
-      padding: 0; min-width: 0;
+      grid-column: 3; grid-row: 1;
+      display: flex; align-items: stretch; gap: 0; padding: 0; min-width: 0;
     }
     .col-comment-text {
       flex: 1; align-self: center;
@@ -233,17 +274,16 @@
       align-self: stretch; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       padding: 0 22px; min-width: 64px;
-      color: #1a1200;
-      margin-left: auto;
+      color: #1a1200; margin-left: auto;
       transition: filter 0.15s;
     }
     .lyrics-side-btn:hover { filter: brightness(1.1); }
 
-    .start-time-mobile { display: none; }
-    .start-time-desktop { display: inline; flex-shrink: 0; font-size: 0.9rem; font-weight: 700; }
-    .col-musicians { display: flex; align-items: center; gap: 8px; padding: 5px 12px; margin: 0; }
+    .col-musicians {
+      grid-column: 4; grid-row: 1;
+      display: flex; align-items: center; gap: 8px; padding: 5px 12px;
+    }
     .musicians { flex: 1; padding: 0; }
-    .lyrics-musicians-btn { display: none; }
   }
 
   @media (max-width: 700px) {

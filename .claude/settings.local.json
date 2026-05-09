@@ -33,7 +33,21 @@
       "Bash(git log *)",
       "Bash(gh run *)",
       "Bash(git *)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/iermolov/**)",
+      "Bash(gh issue *)",
+      "Bash(identify /Users/iermolov/projects/kittens-setlist/static/apple-touch-icon-v2.png)",
+      "Bash(convert --version)",
+      "Bash(node *)",
+      "Bash(sort -k5 -rh)",
+      "Bash(xargs ls -lh)",
+      "Bash(aws cloudfront *)",
+      "Bash(brew install *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); cb=d['DistributionConfig']['DefaultCacheBehavior']; print\\('Compress:', cb.get\\('Compress'\\)\\); print\\('ETag:', d['ETag']\\)\")",
+      "Bash(aws configure list *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

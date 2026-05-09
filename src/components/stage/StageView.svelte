@@ -223,7 +223,7 @@
       <span class="name">{setlist.name}</span>
       {#if timingInfo()}
         <span class="timing-sep">·</span>
-        <span class="timing-clock">{timingInfo()!.currentTime}</span>
+        <span class="timing-clock">🕐 {timingInfo()!.currentTime}</span>
       {/if}
       <span class="progress">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
