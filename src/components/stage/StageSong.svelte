@@ -172,7 +172,7 @@
     row-gap: 0;
     padding: 6px 8px;
     min-width: 0;
-    align-content: center;
+    align-content: flex-start;
   }
   .title { font-size: 1rem; font-weight: 700; color: var(--text); }
   .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
@@ -240,7 +240,6 @@
     .col-meta {
       grid-column: 1; grid-row: 1;
       flex-direction: column; align-items: stretch; justify-content: flex-start;
-      border-right: 1px solid var(--border);
     }
     .meta-num { flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 4px 8px; flex: 1; }
     .position { font-size: 1.05rem; }
