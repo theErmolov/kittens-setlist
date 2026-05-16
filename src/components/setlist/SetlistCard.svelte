@@ -33,7 +33,7 @@
   .card:hover { border-color: var(--accent); }
   .card-link { flex: 1; text-decoration: none; color: inherit; }
   .card-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
-  .card-meta { display: flex; gap: 12px; }
+  .card-meta { display: flex; gap: 12px; align-items: center; }
   .date, .count { font-size: 0.82rem; color: var(--text-muted); }
   .vibe-chip {
     font-size: 0.72rem; font-weight: 600; padding: 1px 7px; border-radius: 10px;
