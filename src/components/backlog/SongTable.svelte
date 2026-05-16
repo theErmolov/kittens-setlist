@@ -2,6 +2,7 @@
   import type { Song, Setlist, Category, Instrument, BandMusician } from '$lib/types';
   import SongRow from './SongRow.svelte';
   import SongEditModal from './SongEditModal.svelte';
+  import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import { updateSong, deleteSong, addSongsToSetlist, removeSongFromSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
@@ -39,6 +40,7 @@
   );
   let editingSong = $state<Song | null>(null);
   let addToSetlistSong = $state<Song | null>(null);
+  let lyricsViewSong = $state<Song | null>(null);
   let addToSetlistSongDragInModal = false;
   let sortCol = $state<'artist' | 'title'>('artist');
   let sortDir = $state<1 | -1>(1);
@@ -200,6 +202,7 @@
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => { addToSetlistSong = song; }}
+            onlyricsclick={() => { lyricsViewSong = song; }}
           />
         {/each}
         {#if loading}
@@ -297,6 +300,10 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if lyricsViewSong}
+  <LyricsOverlay song={lyricsViewSong} onclose={() => { lyricsViewSong = null; }} />
 {/if}
 
 <style>

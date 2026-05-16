@@ -29,7 +29,8 @@
     showProgress = false,
     onedit,
     ondelete,
-    onaddtosetlist
+    onaddtosetlist,
+    onlyricsclick,
   }: {
     song: Song;
     allMusicians: string[];
@@ -37,6 +38,7 @@
     onedit: () => void;
     ondelete: () => void;
     onaddtosetlist: () => void;
+    onlyricsclick?: () => void;
   } = $props();
 
   let overallPct = $derived.by(() => {
@@ -93,10 +95,10 @@
       <span class="mobile-artist">{song.artist}</span>
       <span class="mobile-sep">–</span>
       <span class="mobile-title">{song.title}</span>
-      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">📝</span>{/if}
+      {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>{/if}
     </div>
     <span class="title-text desktop-only">{song.title}</span>
-    {#if song.lyrics}<span class="lyrics-dot desktop-only" title="Есть текст">📝</span>{/if}
+    {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline desktop-only" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>{/if}
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
@@ -146,10 +148,11 @@
   .td-cat { text-align: center; white-space: nowrap; line-height: 1.2; padding: 6px 4px; }
   .td-cat :global(.badge.icon-only) { font-size: 1rem; padding: 3px 5px; }
   .overall-pct { display: block; font-size: 0.9rem; font-weight: 600; padding: 1px 4px; border-radius: 8px; white-space: nowrap; }
-  .td-artist { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .td-artist { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.05rem; }
   .td-title { white-space: normal; }
-  .title-text { vertical-align: middle; }
-  .lyrics-dot { font-size: 0.8rem; color: var(--text-muted); opacity: 0.6; margin-left: 3px; vertical-align: middle; }
+  .title-text { vertical-align: middle; font-size: 1.05rem; }
+  .lyrics-btn-inline { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: #7c3aed; color: #fff; border: none; border-radius: 4px; padding: 4px 18px; line-height: 1.4; cursor: pointer; display: inline-flex; align-items: center; }
+  .lyrics-btn-inline:hover { background: #6d28d9; }
   .guest-tag {
     display: inline-flex;
     align-items: center;
@@ -203,9 +206,9 @@
   .mobile-song-header { display: none; line-height: 1.5; }
   .mobile-song-header .overall-pct { display: inline; padding: 1px 5px; }
   .mobile-cat { vertical-align: middle; margin-right: 2px; }
-  .mobile-artist { font-weight: 500; font-size: 0.88rem; }
+  .mobile-artist { font-weight: 500; font-size: 1.05rem; }
   .mobile-sep { color: var(--text-muted); margin: 0 2px; }
-  .mobile-title { font-weight: 600; font-size: 0.88rem; }
+  .mobile-title { font-weight: 600; font-size: 1.05rem; }
 
   @media (max-width: 700px) {
     /* Break out of table — row becomes a flex card */

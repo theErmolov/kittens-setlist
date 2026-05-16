@@ -10,15 +10,17 @@
   const MAX_FONT = 100;
   const FONT_FAMILY = `'JetBrains Mono', 'Consolas', 'Courier New', monospace`;
   const LINE_HEIGHT = 1.6;
-  const BODY_PAD_H = 40;  // left + right padding
-  const BODY_PAD_V = 32;  // top + bottom padding
+  const BODY_PAD_L = 20;     // left padding
+  const BODY_PAD_R = 20;     // right padding when no page buttons
+  const BODY_PAD_V = 32;     // top + bottom padding
   const COL_GAP = 32;
+  const PAGE_BTN_WIDTH = 96; // width of prev/next page buttons
 
   const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const FLAT_TO_SHARP: Record<string, string> = { Db:'C#', Eb:'D#', Gb:'F#', Ab:'G#', Bb:'A#' };
 
   const CHORD_TOKEN_RE = /^[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?$/;
-  const ANNOTATION_TOKEN_RE = /^[xхх×]\d+$/i;
+  const ANNOTATION_TOKEN_RE = /^[}\]|([)]*[xхх×]\d+$/i;
   const CHORD_FIND_SRC = /[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?/.source;
 
   // ── Types ──────────────────────────────────────────────────────────────────
@@ -34,6 +36,9 @@
   let columns = $state(1);
   let renderedPairs = $state<LyricsPair[]>([]);
   let lyricsBodyEl = $state<HTMLDivElement | null>(null);
+  let currentPage = $state(0);
+  let pairsPerCol = $state(0);
+  let hasPagination = $state(false);
 
   // ── Chord logic ────────────────────────────────────────────────────────────
 
@@ -116,6 +121,16 @@
   });
 
   let effectiveFontSize = $derived(userFontSize ?? autoFontSize);
+
+  let totalPages = $derived.by(() =>
+    pairsPerCol <= 0 ? 1 : Math.max(1, Math.ceil(renderedPairs.length / (pairsPerCol * columns)))
+  );
+
+  let visiblePairs = $derived.by(() => {
+    if (!hasPagination) return renderedPairs;
+    const perPage = pairsPerCol * columns;
+    return renderedPairs.slice(currentPage * perPage, (currentPage + 1) * perPage);
+  });
 
   // ── Measurement ────────────────────────────────────────────────────────────
 
@@ -221,37 +236,66 @@
 
   function recompute() {
     if (!browser || !lyricsBodyEl) return;
-    const avail = lyricsBodyEl.clientWidth - BODY_PAD_H;
+    const clientW = lyricsBodyEl.clientWidth;
     const availH = lyricsBodyEl.clientHeight - BODY_PAD_V;
-    if (avail <= 0) return;
+    if (clientW <= 0 || availH <= 0) return;
 
     const lines = transposedLines;
     const uf = userFontSize;
 
-    let fontSize: number;
-    let cols: number;
+    function computeAt(avail: number) {
+      if (avail <= 0) return null;
+      let fontSize: number;
+      let cols: number;
 
-    if (uf === null) {
-      const longestAtMin = lines.reduce((mx, l) => Math.max(mx, measureLine(l, MIN_FONT)), 0);
-      if (longestAtMin < avail / 2) {
-        const colW = (avail - COL_GAP) / 2;
-        // With 2 columns content spans 2 × availH total, so double the height budget
-        fontSize = findOptimalFontSize(lines, colW, availH * 2);
-        cols = 2;
+      if (uf === null) {
+        const longestAtMin = lines.reduce((mx, l) => Math.max(mx, measureLine(l, MIN_FONT)), 0);
+        if (longestAtMin < avail / 2) {
+          const colW = (avail - COL_GAP) / 2;
+          fontSize = findOptimalFontSize(lines, colW, availH * 2);
+          cols = 2;
+        } else {
+          fontSize = findOptimalFontSize(lines, avail, availH);
+          cols = 1;
+        }
       } else {
-        fontSize = findOptimalFontSize(lines, avail, availH);
-        cols = 1;
+        fontSize = uf;
+        const longest = lines.reduce((mx, l) => Math.max(mx, measureLine(l, uf)), 0);
+        cols = longest < avail / 2 ? 2 : 1;
       }
-      autoFontSize = fontSize;
-    } else {
-      fontSize = uf;
-      const longest = lines.reduce((mx, l) => Math.max(mx, measureLine(l, uf)), 0);
-      cols = longest < avail / 2 ? 2 : 1;
+
+      const colAvail = cols === 2 ? (avail - COL_GAP) / 2 : avail;
+      const pairs = buildPairs(lines).flatMap(p => wrapPair(p, Math.max(1, colAvail), fontSize));
+
+      const lineH = fontSize * LINE_HEIGHT;
+      let h = 0, ppc = 0;
+      for (const pair of pairs) {
+        const ph = (pair.chordLine ? 2 : 1) * lineH;
+        if (h + ph > availH && ppc > 0) break;
+        h += ph;
+        ppc++;
+      }
+      const pairsPerColumn = Math.max(1, ppc);
+      const pages = Math.max(1, Math.ceil(pairs.length / (pairsPerColumn * cols)));
+      return { fontSize, cols, pairs, pairsPerColumn, pages };
     }
 
-    columns = cols;
-    const colAvail = cols === 2 ? (avail - COL_GAP) / 2 : avail;
-    renderedPairs = buildPairs(lines).flatMap(p => wrapPair(p, Math.max(1, colAvail), fontSize));
+    const r1 = computeAt(clientW - BODY_PAD_L - BODY_PAD_R);
+    if (!r1) return;
+
+    let result = r1;
+    let withButtons = false;
+    if (r1.pages > 1) {
+      const r2 = computeAt(clientW - BODY_PAD_L - PAGE_BTN_WIDTH);
+      if (r2) { result = r2; withButtons = true; }
+    }
+
+    if (uf === null) autoFontSize = result.fontSize;
+    columns = result.cols;
+    renderedPairs = result.pairs;
+    pairsPerCol = result.pairsPerColumn;
+    hasPagination = withButtons;
+    if (!hasPagination || currentPage >= result.pages) currentPage = 0;
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -285,6 +329,13 @@
     recompute();
   });
 
+  // ── Pagination ────────────────────────────────────────────────────────────
+
+  function prevPage() { currentPage = Math.max(0, currentPage - 1); }
+  function nextPage() { currentPage = Math.min(totalPages - 1, currentPage + 1); }
+
+  $effect(() => { song; currentPage = 0; });
+
   // ── Zoom ──────────────────────────────────────────────────────────────────
 
   function zoomIn() {
@@ -311,6 +362,9 @@
       <span class="song-title">{song.title}</span>
       <span class="song-artist">{song.artist}</span>
     </div>
+    {#if hasPagination}
+      <span class="page-counter">{currentPage + 1} / {totalPages}</span>
+    {/if}
     <div class="header-controls">
       <div class="zoom-buttons">
         <button class="zoom-btn" onclick={zoomOut} title="Smaller">A−</button>
@@ -361,11 +415,10 @@
     <div
       class="lyrics-content"
       class:two-col={columns > 1}
-      class:two-col-manual={columns > 1 && userFontSize !== null}
       style:font-size="{effectiveFontSize}px"
       style:columns={columns > 1 ? columns : undefined}
     >
-      {#each renderedPairs as pair}
+      {#each visiblePairs as pair}
         <div class="pair">
           {#if pair.chordLine !== null}
             <span class="chord-line">{pair.chordLine || ' '}</span>
@@ -374,6 +427,12 @@
         </div>
       {/each}
     </div>
+    {#if hasPagination}
+      <div class="page-nav">
+        <button class="page-btn" onclick={prevPage} disabled={currentPage === 0}>←</button>
+        <button class="page-btn" onclick={nextPage} disabled={currentPage >= totalPages - 1}>→</button>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -563,6 +622,7 @@
   }
 
   .lyrics-body {
+    position: relative;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -578,12 +638,6 @@
   .lyrics-content.two-col {
     column-fill: auto;
     height: 100%;
-  }
-
-  /* Manual zoom: balance columns and let the body scroll */
-  .lyrics-content.two-col.two-col-manual {
-    column-fill: balance;
-    height: auto;
   }
 
   .pair {
@@ -612,4 +666,39 @@
   :global([data-theme="light"]) .lyric-line {
     color: #000000;
   }
+
+  .page-counter {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .page-nav {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 96px;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+  }
+
+  .page-btn {
+    flex: 1;
+    background: #7c3aed;
+    border: none;
+    color: #ffffff;
+    font-size: 2.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    line-height: 1;
+  }
+  .page-btn:first-child { border-bottom: 1px solid rgba(255,255,255,0.2); }
+  .page-btn:hover:not(:disabled) { background: #6d28d9; }
+  .page-btn:disabled { opacity: 0.25; cursor: default; }
 </style>

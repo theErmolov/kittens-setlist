@@ -10,6 +10,7 @@
   import { currentUser } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
   import CommentInput from './CommentInput.svelte';
+  import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import { base } from '$app/paths';
 
   const instrumentIcons: Record<Instrument, string> = {
@@ -88,6 +89,7 @@
   let dragIndex = $state<number | null>(null);
   let overIndex = $state<number | null>(null);
   let editingEntry = $state<SetlistEntry | null>(null);
+  let lyricsViewSong = $state<Song | null>(null);
   let selectedMusician = $state<string | null>(null);
   let filterNotReady = $state(false);
   let filterText = $state('');
@@ -412,7 +414,7 @@
         </div>
       {:else}
         <div class="meta-view">
-          <h1>{localMeta.name}{#if localMeta.vibe} <span class="vibe-badge" title={$t.setlists.vibeTooltip}>Vibe</span>{/if}</h1>
+          <h1>{localMeta.name} <span class="vibe-badge" class:no-vibe={!localMeta.vibe} title={$t.setlists.vibeTooltip}>{localMeta.vibe ? '+вайб' : '-вайб'}</span></h1>
           <div class="meta-details">
             {#if localMeta.date}<span class="date">{formatDate(localMeta.date)}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
@@ -581,7 +583,7 @@
                       <span class="artist">{song.artist}</span>
                       <span class="sep">–</span>
                       <span class="title">{song.title}</span>
-                      {#if song.lyrics}<span class="lyrics-dot" title="Есть текст">📝</span>{/if}
+                      {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewSong = song; }} title="Текст песни">📝</button>{/if}
                       {#each guestTags as g}
                         {@const gStage = entryStage(entry, g.name)}
                         <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
@@ -694,6 +696,10 @@
   />
 {/if}
 
+{#if lyricsViewSong}
+  <LyricsOverlay song={lyricsViewSong} onclose={() => { lyricsViewSong = null; }} />
+{/if}
+
 {#if editingEntry}
   <SongEditModal
     song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '' } : null}
@@ -722,7 +728,10 @@
   .vibe-row { display: flex; align-items: center; gap: 5px; }
   .vibe-label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
   .vibe-label input[type="checkbox"] { cursor: pointer; }
-  .vibe-badge { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 8px; background: var(--accent); color: #fff; cursor: default; vertical-align: middle; }
+  .vibe-badge { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 8px; background: #7c3aed; color: #fff; cursor: default; vertical-align: middle; }
+  .vibe-badge.no-vibe { background: #dc2626; }
+  .lyrics-btn-inline { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: #7c3aed; color: #fff; border: none; border-radius: 4px; padding: 4px 18px; line-height: 1.4; cursor: pointer; display: inline-flex; align-items: center; }
+  .lyrics-btn-inline:hover { background: #6d28d9; }
   .help-tip {
     display: inline-flex; align-items: center; justify-content: center;
     width: 15px; height: 15px; border-radius: 50%;
@@ -814,10 +823,9 @@
 
   .td-song { white-space: nowrap; }
   .song-name { display: flex; align-items: center; }
-  .artist { font-weight: 400; font-size: 0.9rem; }
+  .artist { font-weight: 400; font-size: 1.08rem; }
   .sep { color: var(--text-muted); margin: 0 4px; }
-  .title { font-size: 0.9rem; font-weight: 600; }
-  .lyrics-dot { font-size: 0.75rem; margin-left: 5px; vertical-align: middle; background: color-mix(in srgb, var(--accent) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; padding: 1px 4px; line-height: 1.4; display: inline-flex; align-items: center; }
+  .title { font-size: 1.08rem; font-weight: 600; }
   .song-row:hover :global(.comment-input::placeholder) { opacity: 0.5; }
   .song-row:hover :global(.comment-input) { border-bottom-color: var(--border); }
 
