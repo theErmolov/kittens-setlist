@@ -303,7 +303,14 @@
 {/if}
 
 {#if lyricsViewSong}
-  <LyricsOverlay song={lyricsViewSong} onclose={() => { lyricsViewSong = null; }} />
+  <LyricsOverlay
+    song={lyricsViewSong}
+    onclose={() => { lyricsViewSong = null; }}
+    onsongupdate={(updated) => {
+      songs = songs.map(s => s.id === updated.id ? updated : s);
+      lyricsViewSong = updated;
+    }}
+  />
 {/if}
 
 <style>

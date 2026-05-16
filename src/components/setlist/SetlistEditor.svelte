@@ -697,7 +697,11 @@
 {/if}
 
 {#if lyricsViewSong}
-  <LyricsOverlay song={lyricsViewSong} onclose={() => { lyricsViewSong = null; }} />
+  <LyricsOverlay
+    song={lyricsViewSong}
+    onclose={() => { lyricsViewSong = null; }}
+    onsongupdate={(updated) => { lyricsViewSong = updated; }}
+  />
 {/if}
 
 {#if editingEntry}

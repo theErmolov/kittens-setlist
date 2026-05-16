@@ -26,6 +26,7 @@ export interface Song {
   sortOrder?: number;
   progress?: Record<string, LearningStage>;
   lyrics?: string;
+  transpose?: number;
 }
 
 export interface SetlistEntry {

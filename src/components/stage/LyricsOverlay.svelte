@@ -1,8 +1,14 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import type { Song } from '$lib/types';
+  import { updateSong } from '$lib/api';
+  import { canWrite } from '$lib/auth';
 
-  let { song, onclose }: { song: Song; onclose: () => void } = $props();
+  let { song, onclose, onsongupdate }: {
+    song: Song;
+    onclose: () => void;
+    onsongupdate?: (song: Song) => void;
+  } = $props();
 
   // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -29,7 +35,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
 
-  let transpose = $state(0);
+  let transpose = $state(song.transpose ?? 0);
   let userFontSize = $state<number | null>(null);
   let dropdownOpen = $state(false);
   let autoFontSize = $state(MIN_FONT);
@@ -335,23 +341,51 @@
   function nextPage() { currentPage = Math.min(totalPages - 1, currentPage + 1); }
 
   $effect(() => { song; currentPage = 0; });
+  $effect(() => { song; transpose = song.transpose ?? 0; });
+  $effect(() => {
+    void song.id;
+    if (!browser) return;
+    const stored = localStorage.getItem(`lyrics_zoom_${song.id}`);
+    userFontSize = stored !== null ? Number(stored) : null;
+  });
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
 
   function zoomIn() {
-    userFontSize = Math.min((userFontSize ?? autoFontSize) + 1, 96);
+    const next = Math.min((userFontSize ?? autoFontSize) + 1, 96);
+    userFontSize = next;
+    if (browser) localStorage.setItem(`lyrics_zoom_${song.id}`, String(next));
   }
 
   function zoomOut() {
-    userFontSize = Math.max((userFontSize ?? autoFontSize) - 1, MIN_FONT);
+    const next = Math.max((userFontSize ?? autoFontSize) - 1, MIN_FONT);
+    userFontSize = next;
+    if (browser) localStorage.setItem(`lyrics_zoom_${song.id}`, String(next));
   }
+
+  // ── Transpose ─────────────────────────────────────────────────────────────
+
+  let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleSaveTranspose(value: number) {
+    if (!$canWrite) return;
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(async () => {
+      const updated = await updateSong({ ...song, transpose: value }, true);
+      onsongupdate?.(updated);
+    }, 1500);
+  }
+
+  $effect(() => () => { if (_saveTimer) clearTimeout(_saveTimer); });
 
   function transposeUp() {
     transpose = (transpose + 1) % 12;
+    scheduleSaveTranspose(transpose);
   }
 
   function transposeDown() {
     transpose = (transpose + 11) % 12;
+    scheduleSaveTranspose(transpose);
   }
 </script>
 
@@ -398,7 +432,7 @@
                 <button
                   class="dropdown-row"
                   class:selected={offset === transpose}
-                  onclick={() => { transpose = offset; dropdownOpen = false; }}
+                  onclick={() => { transpose = offset; dropdownOpen = false; scheduleSaveTranspose(offset); }}
                 >
                   <span class="d-offset">{offset > 0 ? `+${offset}` : offset}</span>
                   <span class="d-keys">{transposeChord(originalKey, offset)}</span>

@@ -334,7 +334,11 @@
   </div>
 
   {#if lyricsForSong}
-    <LyricsOverlay song={lyricsForSong} onclose={() => { lyricsForSong = null; }} />
+    <LyricsOverlay
+      song={lyricsForSong}
+      onclose={() => { lyricsForSong = null; }}
+      onsongupdate={(updated) => { lyricsForSong = updated; }}
+    />
   {/if}
 
   <!-- Mobile bottom bar -->

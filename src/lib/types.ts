@@ -25,6 +25,7 @@ export interface Song {
   lengthMinutes?: number;
   progress?: Record<string, LearningStage>;  // keyed by musician name
   lyrics?: string;
+  transpose?: number;
 }
 
 export interface SetlistEntry {
