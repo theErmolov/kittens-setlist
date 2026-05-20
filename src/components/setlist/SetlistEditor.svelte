@@ -235,6 +235,18 @@
     ).length
   );
 
+  let musicianCounts = $derived(() => {
+    const counts: Record<string, number> = {};
+    for (const name of [...allMusicians, ...guestNames]) {
+      counts[name] = sortedEntries.filter(e => {
+        if (!e.song) return false;
+        const role = e.song.musicians[name];
+        return role && role.instruments.length > 0;
+      }).length;
+    }
+    return counts;
+  });
+
   function entryStage(entry: SetlistEntry, name: string): LearningStage {
     return (entry.song?.progress?.[name]
       ?? entry.progress?.[name]
@@ -448,7 +460,7 @@
         class="filter-chip"
         class:active={selectedMusician === name}
         onclick={() => toggleMusician(name)}
-      >{name}</button>
+      >{name} ({musicianCounts()[name] ?? 0})</button>
     {/each}
     {#if guestNames.length > 0}
       <span class="filter-sep"></span>
@@ -457,7 +469,7 @@
           class="filter-chip filter-chip-guest"
           class:active={selectedMusician === name}
           onclick={() => toggleMusician(name)}
-        >{name}</button>
+        >{name} ({musicianCounts()[name] ?? 0})</button>
       {/each}
     {/if}
     {#if allMusicians.length > 0 || guestNames.length > 0}
@@ -467,7 +479,7 @@
       class="filter-chip"
       class:active={filterNotReady}
       onclick={() => { filterNotReady = !filterNotReady; }}
-    >не готово</button>
+    >не готово ({songCount - readyCount})</button>
   </div>
 
   <!-- Mobile filter panel (slides up above bottom bar) -->
@@ -483,7 +495,7 @@
             class="filter-chip"
             class:active={selectedMusician === name}
             onclick={() => toggleMusician(name)}
-          >{name}</button>
+          >{name} ({musicianCounts()[name] ?? 0})</button>
         {/each}
       </div>
     {/if}
@@ -495,7 +507,7 @@
             class="filter-chip filter-chip-guest"
             class:active={selectedMusician === name}
             onclick={() => toggleMusician(name)}
-          >{name}</button>
+          >{name} ({musicianCounts()[name] ?? 0})</button>
         {/each}
       </div>
     {/if}
@@ -507,7 +519,7 @@
         class="filter-chip"
         class:active={filterNotReady}
         onclick={() => { filterNotReady = !filterNotReady; }}
-      >не готово</button>
+      >не готово ({songCount - readyCount})</button>
     </div>
     <div class="filter-sep-h"></div>
     <div class="filter-group mob-break-group">

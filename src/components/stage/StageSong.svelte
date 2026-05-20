@@ -72,6 +72,7 @@
     <div class="col-info">
       <span class="title">{song.title}</span>
       <span class="artist">{song.artist}</span>
+
       {#if entry.comment}<div class="comment-mobile">{entry.comment}</div>{/if}
     </div>
     <div class="col-time">
@@ -80,10 +81,20 @@
     <div class="col-musicians">
       <div class="musicians">
         {#each rosterCells as cell}
-          <span class="musician" class:inactive={!cell.active} class:highlight={cell.highlight}>
+          <span
+            class="musician"
+            class:inactive={!cell.active}
+            class:highlight={cell.highlight}
+          >
             {#if cell.active}
-              <span class="m-icons" class:has-name={!!cell.name}>{#each sortInstruments(cell.role?.instruments ?? []) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
-              <span class="m-name">{cell.name}</span>
+              <span class="m-icons" class:has-name={!!cell.name}>
+                {#each sortInstruments(cell.role?.instruments ?? []) as inst (inst)}
+                  <span>{instrumentIcons[inst]}</span>
+                {/each}
+              </span>
+              <span class="m-name">
+                {cell.name}
+              </span>
             {/if}
           </span>
         {/each}
@@ -102,6 +113,7 @@
 <style>
   .stage-song {
     display: flex;
+    flex-direction: column;
     align-items: stretch;
     width: 100%;
     background: var(--surface);
@@ -289,4 +301,5 @@
     .stage-song { border-radius: 0; border-left: none; border-right: none; }
     .song-main:hover { background: transparent; }
   }
+
 </style>

@@ -4,10 +4,12 @@
 
   let {
     selected,
-    onchange
+    onchange,
+    counts
   }: {
     selected: Set<Category>;
     onchange: (v: Set<Category>) => void;
+    counts?: Record<Category, number>;
   } = $props();
 
   function toggle(cat: Category) {
@@ -33,16 +35,17 @@
     class:active={selected.size === 0}
     onclick={selectAll}
   >
-    {$t.filter.all}
+    {$t.filter.all}{counts ? ` (${Object.values(counts).reduce((a, b) => a + b, 0)})` : ''}
   </button>
   {#each (['top', 'mid', 'low'] as Category[]) as cat}
     {@const { icon, label } = splitLabel($t.filter[cat])}
+    {@const countStr = counts ? ` (${counts[cat] ?? 0})` : ''}
     <button
       class="chip chip-{cat}"
       class:active={selected.has(cat)}
       onclick={() => toggle(cat)}
     >
-      {icon}<span class="cat-label">{label}</span>
+      {icon}<span class="cat-label">{label}</span>{countStr}
     </button>
   {/each}
 </div>

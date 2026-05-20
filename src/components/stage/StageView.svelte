@@ -75,6 +75,27 @@
     return map;
   });
 
+  let categoryCounts = $derived((): Record<Category, number> => {
+    const counts: Record<Category, number> = { top: 0, mid: 0, low: 0 };
+    for (const e of localEntries) {
+      if (e.song && e.song.category in counts) counts[e.song.category]++;
+    }
+    return counts;
+  });
+
+  let musicianCounts = $derived((): Record<string, number> => {
+    const counts: Record<string, number> = {};
+    for (const name of [...musicians.map(m => m.name), ...guestNames()]) {
+      counts[name] = localEntries.filter(e => {
+        if (!e.song) return false;
+        const role = e.song.musicians[name];
+        return role && role.instruments.length > 0;
+      }).length;
+    }
+    return counts;
+  });
+
+
   type DisplayItem =
     | { kind: 'song'; entry: SetlistEntry; song: Song }
     | { kind: 'break'; entry: SetlistEntry };
@@ -260,7 +281,7 @@
     {/if}
     {#if filterOpen}
     <div class="header-filters">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
       {#if musicians.length > 0 || guestNames().length > 0}
         <div class="musician-picker">
           {#each musicians as m}
@@ -268,14 +289,14 @@
               class="musician-chip"
               class:active={selectedMusician === m.name}
               onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
-            >{m.name}</button>
+            >{m.name} ({musicianCounts()[m.name] ?? 0})</button>
           {/each}
           {#each guestNames() as name}
             <button
               class="musician-chip guest-chip"
               class:active={selectedMusician === name}
               onclick={() => { selectedMusician = selectedMusician === name ? '' : name; }}
-            >{name}</button>
+            >{name} ({musicianCounts()[name] ?? 0})</button>
           {/each}
         </div>
       {/if}

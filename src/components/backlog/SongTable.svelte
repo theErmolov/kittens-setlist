@@ -56,6 +56,25 @@
   // Fixed: cat 9% + artist 18% + title 28% + actions 9% = 64% → musicians get 36%, capped at 5%
   let musicianColPct = $derived(Math.min(5, Math.floor(36 / (permanentNames.length || 1))));
 
+  let categoryCounts = $derived(() => {
+    const counts: Record<Category, number> = { top: 0, mid: 0, low: 0 };
+    for (const s of songs) {
+      if (s.category in counts) counts[s.category]++;
+    }
+    return counts;
+  });
+
+  let musicianCounts = $derived(() => {
+    const counts: Record<string, number> = {};
+    for (const name of permanentNames) {
+      counts[name] = songs.filter(s => {
+        const role = s.musicians[name];
+        return role && role.instruments.length > 0;
+      }).length;
+    }
+    return counts;
+  });
+
   function toggleSort(col: 'artist' | 'title') {
     if (sortCol === col) sortDir = (sortDir === 1 ? -1 : 1);
     else { sortCol = col; sortDir = 1; }
@@ -130,7 +149,7 @@
   <div class="toolbar">
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="chips-row">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
       <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0))})</span>
     </div>
     {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
@@ -145,7 +164,7 @@
             class="filter-chip"
             class:active={selectedMusicians.has(name)}
             onclick={() => toggleMusician(name)}
-          >{name}</button>
+          >{name} ({musicianCounts()[name] ?? 0})</button>
         {/each}
       </div>
       <div class="filter-sep"></div>
@@ -218,7 +237,7 @@
   <div class="mobile-filter-panel" class:open={filterOpen}>
     <input class="search mobile-search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="mobile-chips-row">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
+      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
       <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)}</span>
     </div>
     <div class="filter-group">
@@ -227,7 +246,7 @@
           class="filter-chip"
           class:active={selectedMusicians.has(name)}
           onclick={() => toggleMusician(name)}
-        >{name}</button>
+        >{name} ({musicianCounts()[name] ?? 0})</button>
       {/each}
     </div>
     <div class="filter-sep-h"></div>
