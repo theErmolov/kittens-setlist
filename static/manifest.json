@@ -1,0 +1,20 @@
+{
+  "name": "Kittens Setlist",
+  "short_name": "Kittens",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "favicon-64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "apple-touch-icon-v2.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
