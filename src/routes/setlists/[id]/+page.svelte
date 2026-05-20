@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import SetlistEditor from '$components/setlist/SetlistEditor.svelte';
   import { getSetlist, getSongs, getMusicians } from '$lib/api';
@@ -12,13 +11,26 @@
   let musicians = $state<BandMusician[]>([]);
   let loading = $state(true);
 
-  onMount(async () => {
-    [setlist, allSongs, musicians] = await Promise.all([
-      getSetlist(id!),
-      getSongs(),
-      getMusicians()
-    ]);
-    loading = false;
+  $effect(() => {
+    const targetId = id;
+    if (!targetId) return;
+    loading = true;
+    Promise.all([
+      getSetlist(targetId),
+      getSongs().catch(() => []),
+      getMusicians().catch(() => [])
+    ]).then(([s, songs, mus]) => {
+      if (id !== targetId) return; // ignore stale responses
+      setlist = s;
+      allSongs = songs;
+      musicians = mus;
+      loading = false;
+    }).catch(() => {
+      if (id === targetId) {
+        setlist = undefined;
+        loading = false;
+      }
+    });
   });
 </script>
 

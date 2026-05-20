@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { base } from '$app/paths';
@@ -22,12 +21,20 @@
 
   afterNavigate(() => { window.scrollTo(0, 0); });
 
-  onMount(async () => {
-    setlist = await getSetlist(id!);
-    loading = false;
-    if ($currentUser?.status === 'approved') {
-      try { musicians = await getMusicians(); } catch { /* ignore */ }
-    }
+  $effect(() => {
+    const targetId = id;
+    if (!targetId) return;
+    loading = true;
+    getSetlist(targetId).then(s => {
+      if (id !== targetId) return;
+      setlist = s;
+      loading = false;
+    }).catch(() => {
+      if (id === targetId) {
+        setlist = undefined;
+        loading = false;
+      }
+    });
   });
 
   // Load musicians once auth resolves (in case auth finished after mount)

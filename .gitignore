@@ -26,3 +26,6 @@ vite.config.ts.timestamp-*
 .aws-sam/
 samconfig.toml.bak
 api/dist/
+
+# CLI
+.antigravitycli/
