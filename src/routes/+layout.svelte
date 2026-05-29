@@ -109,6 +109,13 @@
 <style>
   :global(*) { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Prevent automatic small zoom on focus in iOS Safari by forcing font-size to be at least 16px on mobile */
+  @media (max-width: 900px) {
+    :global(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+      font-size: 16px !important;
+    }
+  }
+
   :global(:root), :global([data-theme="light"]) {
     --bg: #f5f4f8;
     --surface: #ffffff;
