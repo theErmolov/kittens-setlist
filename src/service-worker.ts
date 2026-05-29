@@ -1,13 +1,14 @@
 /// <reference lib="webworker" />
 /// <reference types="@sveltejs/kit" />
-import { build, files, version } from '$service-worker';
+import { base, build, files, version } from '$service-worker';
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 const CACHE_NAME = `cache-${version}`;
 
 const ASSETS = [
 	...build, // the app itself
-	...files  // everything in `static`
+	...files,  // everything in `static`
+	`${base}/200.html` // SvelteKit SPA fallback shell
 ];
 
 worker.addEventListener('install', (event) => {
@@ -38,6 +39,24 @@ worker.addEventListener('fetch', (event) => {
 	async function respond() {
 		const url = new URL(event.request.url);
 		const cache = await caches.open(CACHE_NAME);
+
+		// Avoid caching chrome-extension:// or other custom protocols
+		if (!url.protocol.startsWith('http')) return fetch(event.request);
+
+		// If it's a navigation request (page refresh/URL entry), try network first, fallback to SPA shell 200.html
+		if (event.request.mode === 'navigate') {
+			try {
+				const response = await fetch(event.request);
+				if (response instanceof Response) {
+					return response;
+				}
+			} catch (err) {
+				const response = await cache.match(`${base}/200.html`);
+				if (response) {
+					return response;
+				}
+			}
+		}
 
 		// `build`/`files` can always be served from the cache
 		if (ASSETS.includes(url.pathname)) {
@@ -77,3 +96,4 @@ worker.addEventListener('fetch', (event) => {
 
 	event.respondWith(respond());
 });
+
