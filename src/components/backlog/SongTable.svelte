@@ -136,6 +136,7 @@
   async function handleToggleSetlist(sl: Setlist) {
     if (!addToSetlistSong) return;
     const song = addToSetlistSong;
+    addToSetlistSong = null;
     const inSetlist = sl.entries.some(e => e.songId === song.id);
     const updated = inSetlist
       ? await removeSongFromSetlist(sl.id, song.id)

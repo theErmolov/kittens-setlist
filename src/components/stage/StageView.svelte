@@ -118,13 +118,21 @@
           : a.song.title.localeCompare(b.song.title));
     }
 
-    return sorted.flatMap((e): DisplayItem[] => {
+    const items = sorted.flatMap((e): DisplayItem[] => {
       if (e.breakMinutes) return [{ kind: 'break', entry: e }];
       if (!e.song) return [];
       if (categoryFilter.size > 0 && !categoryFilter.has(e.song.category)) return [];
       if (onlyWithComment && !e.comment) return [];
       return [{ kind: 'song', entry: e, song: e.song }];
     });
+
+    if (unplayedToBottom && setlist.vibe) {
+      const played = items.filter(item => item.entry.played);
+      const unplayed = items.filter(item => !item.entry.played);
+      return [...played, ...unplayed];
+    }
+
+    return items;
   });
 
   async function handleToggle(songId: string) {
@@ -163,7 +171,8 @@
   let visibleCount = $derived(sortedEntries().length);
 
   let filterOpen = $state(false);
-  let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '');
+  let unplayedToBottom = $state(false);
+  let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '' || unplayedToBottom);
 
   let lyricsForSong = $state<Song | null>(null);
 
@@ -300,6 +309,13 @@
           {/each}
         </div>
       {/if}
+      {#if setlist.vibe}
+        <button
+          class="musician-chip"
+          class:active={unplayedToBottom}
+          onclick={() => { unplayedToBottom = !unplayedToBottom; }}
+        >↓ Несыгранные вниз</button>
+      {/if}
     </div>
     {/if}
   </div>
@@ -352,6 +368,16 @@
         {/each}
       </div>
     {/if}
+    {#if setlist.vibe}
+      <div class="filter-sep-h"></div>
+      <div class="filter-group">
+        <button
+          class="musician-chip"
+          class:active={unplayedToBottom}
+          onclick={() => { unplayedToBottom = !unplayedToBottom; }}
+        >↓ Несыгранные вниз</button>
+      </div>
+    {/if}
   </div>
 
   {#if lyricsForSong}
@@ -369,6 +395,13 @@
       class:active={filterOpen || isFiltered}
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ Фильтр</button>
+    {#if setlist.vibe}
+      <button
+        class="bottom-btn"
+        class:active={unplayedToBottom}
+        onclick={() => { unplayedToBottom = !unplayedToBottom; }}
+      >↓ Несыгранные вниз</button>
+    {/if}
   </div>
 </div>
 

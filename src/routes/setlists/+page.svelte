@@ -8,6 +8,12 @@
   import { canWrite } from '$lib/auth';
 
   let setlists = $state<Setlist[]>([]);
+  let sortedSetlists = $derived([...setlists].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  }));
   let showNew = $state(false);
   let newName = $state('');
   let newDate = $state('');
@@ -73,7 +79,7 @@
     </div>
   {:else}
     <div class="cards">
-      {#each setlists as sl (sl.id)}
+      {#each sortedSetlists as sl (sl.id)}
         <SetlistCard setlist={sl} ondelete={() => handleDelete(sl.id)} />
       {/each}
     </div>
