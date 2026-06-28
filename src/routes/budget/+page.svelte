@@ -143,7 +143,7 @@
             </div>
             <div class="row-actions">
               {#if e.kind === 'expense' && e.receiptKey}
-                <button class="icon-btn" onclick={() => openReceipt(e)} title={$t.budget.viewReceipt}>📋</button>
+                <button class="icon-btn" onclick={() => openReceipt(e)} title={$t.budget.viewReceipt}>🧾</button>
               {/if}
               {#if e.kind === 'debt'}
                 <button class="icon-btn" onclick={() => togglePaid(e)} title={$t.budget.markPaid}>{e.paid ? '✕' : '✓'}</button>

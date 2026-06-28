@@ -33,7 +33,7 @@ type: project
 - Entries optionally assign to a setlist (`setlistId`); modal suggests the event within −24h/+72h of now
 - Expense **receipts** in S3 bucket `kittens-receipts-${AccountId}` (template.yaml) via presigned PUT/GET URLs; `api/src/lib/s3.ts`, route `/budget/:id/receipt-url`. Needs `@aws-sdk/client-s3` + `s3-request-presigner`
 - Files: `api/src/handlers/budget.ts`, `src/routes/budget/+page.svelte`, `src/components/budget/BudgetEntryModal.svelte`
-- Emoji note: 💰/🧾 SVGs not vendored (egress policy blocks jsdelivr); reused existing 📊 (nav) + 📋 (receipt) from `static/emoji/`
+- Emoji: 💰 (`1f4b0`, nav) + 🧾 (`1f9fe`, receipts) vendored in `static/emoji/`
 
 ## Known data issues
 

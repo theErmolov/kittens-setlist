@@ -93,7 +93,7 @@
   </a>
   {#if $currentUser?.isAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
-      <span class="link-icon">📊</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
+      <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
     </a>
     <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
       <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
