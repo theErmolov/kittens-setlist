@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { musiciansHandler } from './handlers/musicians.js';
 import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
+import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
 import { err } from './lib/response.js';
 import type { KittensUser } from './lib/types.js';
@@ -47,6 +48,11 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     if (user.role !== 'writer' && !user.isAdmin && method !== 'GET') return err('Forbidden', 403);
   }
 
+  // Budget is admin-only — even for reads (financial data)
+  if (path.startsWith('/budget')) {
+    if (!user!.isAdmin) return err('Forbidden', 403);
+    return budgetHandler(event, path, user!);
+  }
   if (path.startsWith('/musicians')) return musiciansHandler(event, path, user!);
   if (path.startsWith('/songs')) return songsHandler(event, path, user!);
   if (path.startsWith('/setlists')) return setlistsHandler(event, path, user!);

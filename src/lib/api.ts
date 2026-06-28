@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage, AuditLogEntry } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -158,4 +158,39 @@ export async function getAuditLog(limit: number, cursor?: string): Promise<{ ite
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
   return req(`/auth/audit-log?${params}`);
+}
+
+// ─── Budget (admin only) ────────────────────────────────────────────────────────
+
+export async function getBudget(): Promise<BudgetEntry[]> {
+  return req('/budget');
+}
+
+export async function addBudgetEntry(entry: Omit<BudgetEntry, 'id' | 'createdAt' | 'createdBy'>): Promise<BudgetEntry> {
+  return req('/budget', { method: 'POST', body: JSON.stringify(entry) });
+}
+
+export async function updateBudgetEntry(entry: BudgetEntry): Promise<BudgetEntry> {
+  return req(`/budget/${entry.id}`, { method: 'PUT', body: JSON.stringify(entry) });
+}
+
+export async function deleteBudgetEntry(id: string): Promise<void> {
+  await req(`/budget/${id}`, { method: 'DELETE' });
+}
+
+/** Upload a receipt file to S3 via a presigned URL; returns the stored object key. */
+export async function uploadReceipt(entryId: string, file: File): Promise<string> {
+  const { url, key } = await req<{ url: string; key: string }>(
+    `/budget/${entryId}/receipt-url`,
+    { method: 'POST', body: JSON.stringify({ contentType: file.type || 'application/octet-stream' }) },
+  );
+  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+  if (!res.ok) throw new Error(`Receipt upload failed → ${res.status}`);
+  return key;
+}
+
+/** Get a short-lived presigned URL to view a stored receipt. */
+export async function getReceiptUrl(entryId: string): Promise<string> {
+  const { url } = await req<{ url: string }>(`/budget/${entryId}/receipt-url`);
+  return url;
 }

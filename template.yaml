@@ -16,6 +16,8 @@ Globals:
         USERS_TABLE: !Ref UsersTable
         SESSIONS_TABLE: !Ref SessionsTable
         AUDIT_LOG_TABLE: !Ref AuditLogTable
+        BUDGET_TABLE: !Ref BudgetTable
+        RECEIPTS_BUCKET: !Ref ReceiptsBucket
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
 
 Parameters:
@@ -71,6 +73,10 @@ Resources:
             TableName: !Ref SessionsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AuditLogTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BudgetTable
+        - S3CrudPolicy:
+            BucketName: !Ref ReceiptsBucket
       Events:
         ApiRoot:
           Type: HttpApi
@@ -172,6 +178,37 @@ Resources:
           KeyType: HASH
         - AttributeName: sk
           KeyType: RANGE
+
+  BudgetTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: kittens-budget
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  # ─── S3 — expense receipts (admin-only, accessed via presigned URLs) ──────────
+  ReceiptsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub 'kittens-receipts-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [GET, PUT]
+            AllowedOrigins: ['*']
+            AllowedHeaders: ['*']
+            MaxAge: 3000
 
   # Frontend (S3 + CloudFront) is managed outside this template.
   # Bucket: kittens-setlist-frontend-540966180378

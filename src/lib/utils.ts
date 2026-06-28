@@ -1,4 +1,4 @@
-import type { Instrument, LearningStage, MusicianRole } from '$lib/types';
+import type { Instrument, LearningStage, MusicianRole, BudgetEntry, Setlist } from '$lib/types';
 
 export const STAGE_PCT: Record<LearningStage, number> = {
   queue: 0, structure: 25, mastering: 75, ready: 100
@@ -98,4 +98,76 @@ export function isEventFarFuture(date?: string, startTime?: string): boolean {
   const start = new Date(`${date}T${startTime ?? '00:00'}`);
   if (isNaN(start.getTime())) return false;
   return start.getTime() - Date.now() > 24 * 60 * 60 * 1000;
+}
+
+// ─── Budget ───────────────────────────────────────────────────────────────────
+
+/** Format integer EUR cents as a localized currency string, e.g. 2710 → "27,10 €". */
+export function formatEUR(cents: number): string {
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+}
+
+/** Plain (no symbol) two-decimal format, used in the copy-paste report. e.g. 2710 → "27,10". */
+export function formatAmount(cents: number): string {
+  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+}
+
+/** Parse a user-typed EUR amount ("27,10" / "27.10" / "27") into integer cents. */
+export function parseEUR(input: string): number {
+  const normalized = input.trim().replace(/\s/g, '').replace(',', '.');
+  const value = Number.parseFloat(normalized);
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100);
+}
+
+export interface BudgetTotals {
+  cash: number;      // cents on hand in cash
+  transfer: number;  // cents on hand via transfers
+  onHand: number;    // cash + transfer
+  debts: number;     // outstanding (unpaid) debts
+  balance: number;   // onHand − debts
+}
+
+/** Cumulative current financial state across all entries (all amounts in cents). */
+export function budgetTotals(entries: BudgetEntry[]): BudgetTotals {
+  let cash = 0;
+  let transfer = 0;
+  let debts = 0;
+  for (const e of entries) {
+    if (e.kind === 'income') {
+      if (e.method === 'cash') cash += e.amount; else transfer += e.amount;
+    } else if (e.kind === 'expense') {
+      if (e.method === 'cash') cash -= e.amount; else transfer -= e.amount;
+    } else if (e.kind === 'debt' && !e.paid) {
+      debts += e.amount;
+    }
+  }
+  return { cash, transfer, onHand: cash + transfer, debts, balance: cash + transfer - debts };
+}
+
+/** Build the copy-paste «По баблу» report from the current cumulative state. */
+export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[]): string {
+  const t = budgetTotals(entries);
+  const setlistName = (id?: string) => setlists.find(s => s.id === id)?.name;
+
+  const lines: string[] = [];
+  lines.push('Рубрика «По баблу»:');
+  lines.push('');
+  lines.push(`Наличка — ${formatAmount(t.cash)}`);
+  lines.push(`Переводы — ${formatAmount(t.transfer)}`);
+  lines.push(`Итого на руках — ${formatAmount(t.onHand)}`);
+
+  const debts = entries.filter((e): e is Extract<BudgetEntry, { kind: 'debt' }> => e.kind === 'debt' && !e.paid);
+  if (debts.length > 0) {
+    const items = debts.map(d => {
+      const note = d.comment || d.description || setlistName(d.setlistId);
+      return `${formatAmount(d.amount)}${note ? ` (${note})` : ''}`;
+    });
+    lines.push('');
+    lines.push(`Долги: ${items.join(' + ')} = ${formatAmount(t.debts)}`);
+  }
+
+  lines.push('');
+  lines.push(`Итого наш баланс пока: ${formatAmount(t.balance)}`);
+  return lines.join('\n');
 }
