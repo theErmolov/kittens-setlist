@@ -13,7 +13,6 @@
   let loading = $state(true);
   let dataLoaded = $state(false);
 
-  let activeTab = $state<BudgetKind>('income');
   let modalKind = $state<BudgetKind | null>(null);
   let editEntry = $state<BudgetEntry | null>(null);
 
@@ -22,9 +21,7 @@
 
   const totals = $derived(budgetTotals(entries));
   const visible = $derived(
-    entries
-      .filter(e => e.kind === activeTab)
-      .sort((a, b) => b.date.localeCompare(a.date))
+    [...entries].sort((a, b) => b.date.localeCompare(a.date))
   );
 
   // Admin-only guard + data load (mirrors the admin page)
@@ -97,25 +94,24 @@
   {#if loading}
     <p class="loading">…</p>
   {:else}
-    <!-- Dashboard -->
+    <!-- Dashboard: Наличка + Переводы = На руках − Долги = Баланс -->
     <div class="dash">
       <div class="card"><span class="card-lbl">{$t.budget.dash.cash}</span><span class="card-val">{formatEUR(totals.cash)}</span></div>
+      <span class="op">+</span>
       <div class="card"><span class="card-lbl">{$t.budget.dash.transfer}</span><span class="card-val">{formatEUR(totals.transfer)}</span></div>
+      <span class="op">=</span>
       <div class="card accent"><span class="card-lbl">{$t.budget.dash.onHand}</span><span class="card-val">{formatEUR(totals.onHand)}</span></div>
+      <span class="op">−</span>
       <div class="card"><span class="card-lbl">{$t.budget.dash.debts}</span><span class="card-val neg">{formatEUR(totals.debts)}</span></div>
+      <span class="op">=</span>
       <div class="card accent"><span class="card-lbl">{$t.budget.dash.balance}</span><span class="card-val" class:neg={totals.balance < 0}>{formatEUR(totals.balance)}</span></div>
     </div>
 
-    <!-- Tabs + add -->
+    <!-- Add buttons -->
     <div class="toolbar">
-      <div class="tabs">
-        <button class:active={activeTab === 'income'} onclick={() => activeTab = 'income'}>{$t.budget.tabs.income}</button>
-        <button class:active={activeTab === 'expense'} onclick={() => activeTab = 'expense'}>{$t.budget.tabs.expense}</button>
-        <button class:active={activeTab === 'debt'} onclick={() => activeTab = 'debt'}>{$t.budget.tabs.debt}</button>
-      </div>
-      <button class="btn-primary" onclick={() => openAdd(activeTab)}>
-        {activeTab === 'income' ? $t.budget.addIncome : activeTab === 'expense' ? $t.budget.addExpense : $t.budget.addDebt}
-      </button>
+      <button class="btn-add income" onclick={() => openAdd('income')}>{$t.budget.addIncome}</button>
+      <button class="btn-add expense" onclick={() => openAdd('expense')}>{$t.budget.addExpense}</button>
+      <button class="btn-add debt" onclick={() => openAdd('debt')}>{$t.budget.addDebt}</button>
     </div>
 
     <!-- Entries -->
@@ -126,7 +122,10 @@
         {#each visible as e (e.id)}
           <div class="row" class:paid={e.kind === 'debt' && e.paid}>
             <div class="row-main">
-              <span class="row-amount" class:neg={e.kind !== 'income'}>{formatEUR(e.amount)}</span>
+              <span class="badge {e.kind}">{$t.budget.kind[e.kind]}</span>
+              <span class="row-amount" class:pos={e.kind === 'income'} class:neg={e.kind === 'expense'} class:debt={e.kind === 'debt'}>
+                {e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}{formatEUR(e.amount)}
+              </span>
               <span class="row-who">
                 {#if e.kind === 'income'}{e.person || '—'}
                 {:else if e.kind === 'expense'}{e.description || e.spentBy || '—'}
@@ -179,24 +178,32 @@
   h1 { font-size: 1.4rem; margin-bottom: 16px; }
   .loading, .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 
-  .dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-  .card.accent { border-color: var(--accent); }
+  .dash { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .card { flex: 1 1 110px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .card.accent { border-color: var(--accent); background: var(--chip-bg); }
   .card-lbl { font-size: 0.78rem; color: var(--text-muted); }
   .card-val { font-size: 1.1rem; font-weight: 700; }
   .card-val.neg { color: #e05252; }
+  .op { flex: 0 0 auto; font-size: 1.2rem; font-weight: 700; color: var(--text-muted); }
 
-  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-  .tabs { display: flex; gap: 4px; }
-  .tabs button { padding: 6px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: 6px; cursor: pointer; font-size: 0.88rem; }
-  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .btn-add { flex: 1 1 auto; padding: 8px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem; border-left-width: 4px; }
+  .btn-add.income { border-left-color: #3a9e5c; }
+  .btn-add.expense { border-left-color: #e05252; }
+  .btn-add.debt { border-left-color: #d98a1f; }
 
   .rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
   .row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; }
   .row.paid { opacity: 0.55; }
   .row-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 6px; color: #fff; }
+  .badge.income { background: #3a9e5c; }
+  .badge.expense { background: #e05252; }
+  .badge.debt { background: #d98a1f; }
   .row-amount { font-weight: 700; font-size: 1rem; }
+  .row-amount.pos { color: #3a9e5c; }
   .row-amount.neg { color: #e05252; }
+  .row-amount.debt { color: #d98a1f; }
   .row-who { color: var(--text); }
   .chip { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: var(--chip-bg); color: var(--text-muted); }
   .row-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; }
