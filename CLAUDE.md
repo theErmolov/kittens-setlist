@@ -67,6 +67,7 @@ Find the codepoint from the emoji character (e.g. `U+1F3B8` → `1f3b8`). Drop v
 - **Breaks** — stored as `SetlistEntry` with `breakMinutes` set and no `songId`; hidden in setlist editor while musician filter is active
 - **Setlist polling** — smart merge skips no-ops and protects drag state (3 s); stage polling skips update if entries are identical (2 s)
 - **Category labels** — `top`=💩 По говну, `mid`=🎵 Середняк, `low`=🧪 Андеграунд
+- **Add-to-setlist flow** (`SongTable`/`SongRow`) — only "open" setlists are offered (`isSetlistOpen`: not more than 24h past `date`+`startTime`; no date = always open). Exactly 1 open setlist → auto-add, no popup; 0 or >1 → picker popup. Adding is idempotent (skips if song already in setlist) but always plays a 1 s green checkmark flash on the row (`.add-flash`). Picker is add-only (no toggle/remove). Mobile has a togglable "📋 В сетлист" mode in the bottom bar (row tap adds instead of edits); desktop uses the per-row 📋 button. Mobile Progress toggle lives inside the filter panel.
 
 ## Key files
 

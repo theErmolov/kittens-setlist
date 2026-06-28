@@ -36,7 +36,8 @@
   .card-meta { display: flex; gap: 12px; align-items: center; }
   .date, .count { font-size: 0.82rem; color: var(--text-muted); }
   .vibe-chip {
-    font-size: 0.72rem; font-weight: 600; padding: 1px 7px; border-radius: 10px;
+    display: inline-flex; align-items: center; line-height: 1;
+    font-size: 0.72rem; font-weight: 600; padding: 3px 7px; border-radius: 10px;
     background: #ede9fe; color: #7c3aed;
   }
   .vibe-chip.no-vibe { background: #fee2e2; color: #dc2626; }

@@ -4,7 +4,7 @@
   import SongEditModal from './SongEditModal.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
-  import { updateSong, deleteSong, addSongsToSetlist, removeSongFromSetlist } from '$lib/api';
+  import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
   import { t } from '$lib/i18n';
   import { canWrite } from '$lib/auth';
@@ -35,6 +35,18 @@
   let selectedInstruments = $state(new Set<Instrument>());
   let showProgress = $state(false);
   let filterOpen = $state(false);
+  let additionMode = $state(false);
+  // Song ids currently showing the green "added" flash
+  let flashing = $state(new Set<string>());
+
+  // Setlists still relevant for adding: not more than 24h past their start time
+  function isSetlistOpen(sl: Setlist): boolean {
+    if (!sl.date) return true;
+    const start = new Date(`${sl.date}T${sl.startTime || '00:00'}`);
+    if (isNaN(start.getTime())) return true;
+    return Date.now() - start.getTime() < 24 * 60 * 60 * 1000;
+  }
+  let openSetlists = $derived(localSetlists.filter(isSetlistOpen));
   let hasActiveFilters = $derived(
     search.length > 0 || categoryFilter.size > 0 || selectedMusicians.size > 0 || selectedInstruments.size > 0
   );
@@ -133,15 +145,40 @@
     songs = songs.filter(s => s.id !== id);
   }
 
-  async function handleToggleSetlist(sl: Setlist) {
+  function flashSong(id: string) {
+    const next = new Set(flashing);
+    next.add(id);
+    flashing = next;
+    setTimeout(() => {
+      const n = new Set(flashing);
+      n.delete(id);
+      flashing = n;
+    }, 1000);
+  }
+
+  // Add a song to a setlist, skipping if it's already there. Always shows green feedback.
+  async function addSongToSetlist(sl: Setlist, song: Song) {
+    flashSong(song.id);
+    if (sl.entries.some(e => e.songId === song.id)) return;
+    const updated = await addSongsToSetlist(sl.id, [song]);
+    localSetlists = localSetlists.map(s => s.id === sl.id ? updated : s);
+  }
+
+  // Entry point from a row/button: auto-add when exactly one open setlist, else show picker.
+  function startAddFlow(song: Song) {
+    const open = openSetlists;
+    if (open.length === 1) {
+      addSongToSetlist(open[0], song);
+    } else {
+      addToSetlistSong = song;
+    }
+  }
+
+  async function handlePickSetlist(sl: Setlist) {
     if (!addToSetlistSong) return;
     const song = addToSetlistSong;
     addToSetlistSong = null;
-    const inSetlist = sl.entries.some(e => e.songId === song.id);
-    const updated = inSetlist
-      ? await removeSongFromSetlist(sl.id, song.id)
-      : await addSongsToSetlist(sl.id, [song]);
-    localSetlists = localSetlists.map(s => s.id === sl.id ? updated : s);
+    await addSongToSetlist(sl, song);
   }
 </script>
 
@@ -219,9 +256,11 @@
             {song}
             allMusicians={permanentNames}
             {showProgress}
+            {additionMode}
+            flashAdded={flashing.has(song.id)}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
-            onaddtosetlist={() => { addToSetlistSong = song; }}
+            onaddtosetlist={() => startAddFlow(song)}
             onlyricsclick={() => { lyricsViewSong = song; }}
           />
         {/each}
@@ -261,6 +300,12 @@
         >{instrumentIcons[inst]}</button>
       {/each}
     </div>
+    <div class="filter-sep-h"></div>
+    <button
+      class="filter-chip progress-chip-mobile"
+      class:active={showProgress}
+      onclick={() => { showProgress = !showProgress; }}
+    >📊 {$t.backlog.progress}</button>
   </div>
 
   <!-- Mobile bottom bar -->
@@ -270,11 +315,11 @@
       class:active={filterOpen || hasActiveFilters}
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ {$t.backlog.filterBtn}</button>
-    <button
+    {#if $canWrite}<button
       class="bottom-btn"
-      class:active={showProgress}
-      onclick={() => { showProgress = !showProgress; }}
-    >📊 {$t.backlog.progress}</button>
+      class:active={additionMode}
+      onclick={() => { additionMode = !additionMode; }}
+    >📋 {$t.backlog.addMode}</button>{/if}
     {#if $canWrite}<button class="bottom-add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>
 </div>
@@ -290,7 +335,7 @@
       await deleteSong(id);
       songs = songs.filter(s => s.id !== id);
     }}
-    onaddtosetlist={() => { addToSetlistSong = editingSong; }}
+    onaddtosetlist={() => { if (editingSong) startAddFlow(editingSong); }}
   />
 {/if}
 
@@ -303,12 +348,12 @@
       </div>
       <div class="modal-body">
         <p class="song-name">"{addToSetlistSong.artist} – {addToSetlistSong.title}"</p>
-        {#if localSetlists.length === 0}
+        {#if openSetlists.length === 0}
           <p class="empty">{$t.addToSetlist.noSetlists} <a href="/setlists">{$t.addToSetlist.createLink}</a></p>
         {:else}
-          {#each localSetlists as sl}
+          {#each openSetlists as sl}
             {@const inSetlist = sl.entries.some(e => e.songId === addToSetlistSong!.id)}
-            <button class="setlist-option" class:in-setlist={inSetlist} onclick={() => handleToggleSetlist(sl)}>
+            <button class="setlist-option" class:in-setlist={inSetlist} onclick={() => handlePickSetlist(sl)}>
               <span class="sl-name">{sl.name}</span>
               <span class="sl-right">
                 {#if sl.date}<span class="sl-date">{sl.date}</span>{/if}
@@ -422,6 +467,7 @@
     .mobile-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .mobile-chips-row .song-count { margin-left: auto; }
     .filter-sep-h { height: 1px; background: var(--border); }
+    .progress-chip-mobile { align-self: flex-start; }
 
     /* Mobile bottom bar */
     .mobile-bottom-bar {

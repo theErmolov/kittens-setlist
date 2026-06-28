@@ -27,6 +27,8 @@
     song,
     allMusicians,
     showProgress = false,
+    additionMode = false,
+    flashAdded = false,
     onedit,
     ondelete,
     onaddtosetlist,
@@ -35,6 +37,8 @@
     song: Song;
     allMusicians: string[];
     showProgress?: boolean;
+    additionMode?: boolean;
+    flashAdded?: boolean;
     onedit: () => void;
     ondelete: () => void;
     onaddtosetlist: () => void;
@@ -76,7 +80,7 @@
   });
 </script>
 
-<tr class="song-row" onclick={$canWrite ? onedit : undefined}>
+<tr class="song-row" class:flash-added={flashAdded} onclick={$canWrite ? (additionMode ? onaddtosetlist : onedit) : undefined}>
   <td class="td-cat desktop-only">
     {#if showProgress && overallPct !== null}
       <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
@@ -86,6 +90,7 @@
   </td>
   <td class="td-artist desktop-only">{song.artist}</td>
   <td class="td-title">
+    {#if flashAdded}<span class="add-flash" aria-hidden="true">✓</span>{/if}
     <div class="mobile-song-header">
       {#if showProgress && overallPct !== null}
         <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
@@ -137,7 +142,23 @@
 </tr>
 
 <style>
-  .song-row { border-bottom: 1px solid var(--border); }
+  .song-row { border-bottom: 1px solid var(--border); position: relative; }
+
+  /* Green "added to setlist" flash — 1s full animation */
+  .add-flash {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 200, 0, 0.28);
+    color: #005909; font-size: 1.7rem; font-weight: 800;
+    pointer-events: none;
+    animation: addFlash 1s ease forwards;
+  }
+  @keyframes addFlash {
+    0% { opacity: 0; }
+    18% { opacity: 1; }
+    65% { opacity: 1; }
+    100% { opacity: 0; }
+  }
   @media (hover: hover) {
     .song-row:hover { background: var(--row-hover); }
   }
