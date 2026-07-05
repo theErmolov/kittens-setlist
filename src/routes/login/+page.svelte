@@ -3,18 +3,40 @@
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { page } from '$app/state';
   import { PUBLIC_API_URL, PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
   import { t } from '$lib/i18n';
-  import { currentUser, authLoading, setToken } from '$lib/auth';
+  import { currentUser, authLoading, setToken, getToken } from '$lib/auth';
   import type { KittensUser } from '$lib/types';
   import LogoCat from '$components/shared/LogoCat.svelte';
 
   let status: 'idle' | 'loading' | 'pending' | 'rejected' | 'error' = $state('idle');
 
+  // Only this exact external callback is allowed — prevents /login?return= from
+  // becoming an open redirect to an arbitrary origin.
+  const ALLOWED_RETURN = 'https://media.kittens.band/callback';
+
+  function allowedReturn(): string | null {
+    const value = page.url.searchParams.get('return');
+    return value === ALLOWED_RETURN ? value : null;
+  }
+
+  function afterLogin(token: string) {
+    const returnTo = allowedReturn();
+    if (returnTo) {
+      window.location.href = `${returnTo}#token=${encodeURIComponent(token)}`;
+    } else {
+      goto(`${base}/backlog`);
+    }
+  }
+
   // Redirect away if already authenticated
   $effect(() => {
     if ($authLoading) return;
-    if ($currentUser?.status === 'approved') goto(`${base}/backlog`);
+    if ($currentUser?.status !== 'approved') return;
+    const token = getToken();
+    if (token) afterLogin(token);
+    else goto(`${base}/backlog`);
   });
 
   // Called by Telegram widget via global callback
@@ -34,7 +56,7 @@
       setToken(token);
       currentUser.set(user);
       if (user.status === 'approved') {
-        goto(`${base}/backlog`);
+        afterLogin(token);
       } else if (user.status === 'rejected') {
         status = 'rejected';
       } else {
