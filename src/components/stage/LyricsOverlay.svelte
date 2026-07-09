@@ -233,7 +233,7 @@
     const p = findSplitPos(pair.lyricLine, maxW, sizePx);
     const q = findWordBoundary(pair.lyricLine, p);
     if (!q || q >= pair.lyricLine.length) return [pair];
-    const p1: LyricsPair = { chordLine: null, lyricLine: pair.lyricLine.slice(0, q).trimEnd() };
+    const p1: LyricsPair = { chordLine: pair.chordLine, lyricLine: pair.lyricLine.slice(0, q).trimEnd() };
     const p2: LyricsPair = { chordLine: null, lyricLine: pair.lyricLine.slice(q).trimStart() };
     return [p1, ...wrapPair(p2, maxW, sizePx)];
   }
