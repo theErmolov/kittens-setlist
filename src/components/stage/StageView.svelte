@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import type { Setlist, Song, Category, SetlistEntry, BandMusician } from '$lib/types';
+  import type { Setlist, Song, Category, SetlistEntry, SetlistSubset, BandMusician } from '$lib/types';
   import StageSong from './StageSong.svelte';
   import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
@@ -25,20 +25,24 @@
   } = $props();
 
   let localEntries = $state<SetlistEntry[]>([]);
+  let localSubsets = $state<SetlistSubset[]>([]);
   $effect(() => { localEntries = [...setlist.entries]; });
+  $effect(() => { localSubsets = [...(setlist.subsets ?? [])]; });
 
-  function applyPoll(incoming: SetlistEntry[]) {
-    const sorted = [...incoming].sort((a, b) => a.order - b.order);
+  function applyPoll(incoming: Setlist) {
+    const sorted = [...incoming.entries].sort((a, b) => a.order - b.order);
     const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
-    if (JSON.stringify(sorted) === JSON.stringify(localSorted)) return;
-    localEntries = incoming;
+    const subsetsIncoming = incoming.subsets ?? [];
+    if (JSON.stringify(sorted) === JSON.stringify(localSorted) && JSON.stringify(subsetsIncoming) === JSON.stringify(localSubsets)) return;
+    localEntries = incoming.entries;
+    localSubsets = subsetsIncoming;
   }
 
   let now = $state(new Date());
 
   onMount(() => {
     const stopPoller = startPolling(
-      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },
       isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
       () => isEventLongOver(setlist.date, setlist.startTime),
     );
@@ -142,11 +146,11 @@
     if (!setlist.vibe && !entry.played) {
       localEntries = localEntries.map(e => e.order <= entry.order && !e.played ? { ...e, played: true } : e);
       const updated = await markThrough(setlist.id, entry.order);
-      applyPoll(updated.entries);
+      applyPoll(updated);
     } else {
       localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
       const updated = await togglePlayed(setlist.id, songId);
-      applyPoll(updated.entries);
+      applyPoll(updated);
     }
   }
 
@@ -157,11 +161,11 @@
     if (!setlist.vibe && !entry.played) {
       localEntries = localEntries.map(e => e.order <= order && !e.played ? { ...e, played: true } : e);
       const updated = await markThrough(setlist.id, order);
-      applyPoll(updated.entries);
+      applyPoll(updated);
     } else {
       localEntries = localEntries.map(e => e.order === order && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e);
       const updated = await toggleBreakPlayed(setlist.id, order);
-      applyPoll(updated.entries);
+      applyPoll(updated);
     }
   }
 
@@ -322,22 +326,33 @@
 
   <div class="song-list">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
-      {#if item.kind === 'song'}
-        <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
-          startTime={entryTimes().get(item.entry.order)}
-          {musicians}
-          {selectedMusician}
-          {canMark}
-          ontoggle={() => handleToggle(item.entry.songId!)}
-          onlyricsclick={() => { lyricsForSong = item.song; }} />
-      {:else}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="stage-break" class:played={item.entry.played} class:can-mark={canMark} onclick={() => handleBreakToggle(item.entry.order)}>
-          <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
-          {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
-        </div>
+      {@const subsetId = sortKey === 'default' && item.kind === 'song' ? item.entry.subsetId : undefined}
+      {@const prevItem = i > 0 ? sortedEntries()[i - 1] : undefined}
+      {@const prevSubsetId = sortKey === 'default' && prevItem?.kind === 'song' ? prevItem.entry.subsetId : undefined}
+      {#if subsetId && subsetId !== prevSubsetId}
+        {@const subset = localSubsets.find(s => s.id === subsetId)}
+        {#if subset}
+          <div class="stage-subset-header">⏭ {subset.name}</div>
+        {/if}
       {/if}
+      <div class="stage-entry-wrap" class:in-subset={!!subsetId}>
+        {#if item.kind === 'song'}
+          <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
+            startTime={entryTimes().get(item.entry.order)}
+            {musicians}
+            {selectedMusician}
+            {canMark}
+            ontoggle={() => handleToggle(item.entry.songId!)}
+            onlyricsclick={() => { lyricsForSong = item.song; }} />
+        {:else}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="stage-break" class:played={item.entry.played} class:can-mark={canMark} onclick={() => handleBreakToggle(item.entry.order)}>
+            <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
+            {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
+          </div>
+        {/if}
+      </div>
     {/each}
     {#if sortedEntries().length === 0}
       <p class="empty">{$t.stage.noSongs}</p>
@@ -450,6 +465,12 @@
 
   .song-list { padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
   .empty { text-align: center; color: var(--text-muted); padding: 40px; }
+
+  .stage-subset-header {
+    font-size: 0.8rem; font-weight: 700; color: #7c3aed;
+    padding: 4px 8px; margin-top: 4px;
+  }
+  .stage-entry-wrap.in-subset { border-left: 3px solid #7c3aed; padding-left: 4px; }
 
   .mobile-filter-panel { display: none; }
   .mobile-bottom-bar { display: none; }

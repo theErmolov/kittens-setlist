@@ -35,6 +35,13 @@ type: project
 - Files: `api/src/handlers/budget.ts`, `src/routes/budget/+page.svelte`, `src/components/budget/BudgetEntryModal.svelte`
 - Emoji: 💰 (`1f4b0`, nav) + 🧾 (`1f9fe`, receipts) vendored in `static/emoji/`
 
+## Setlist subsets ("сеты") — in progress, NOT YET DEPLOYED
+
+- Built 2026-07-12: quick on-stage-break workflow to pick the next 7-10 songs from a big unsorted +vibe setlist, with auto-sort to minimize instrument changes (vocals excluded; a musician skipping 2+ songs resets the "change" count to 0). See CLAUDE.md "Non-obvious design decisions" for the invariant and algorithm summary.
+- Files: `src/lib/subsetSort.ts` (new), `src/components/setlist/SetlistEditor.svelte` (editing UI), `src/components/stage/StageView.svelte` (display-only grouping), `api/src/handlers/setlists.ts` (`/order` now accepts optional `subsets`), types in both `src/lib/types.ts` and `api/src/lib/types.ts`.
+- **Backend must be deployed (push) before the frontend feature is usable** — until then `PUT /order`'s `subsets` field is silently ignored by the live Lambda and any subset created in the editor will vanish on the next poll/reconcile (old handler never returns `subsets`, so `applyUpdate`/`applyPoll` reset local state to `[]`). Ship backend+frontend together.
+- Not yet verified end-to-end in a real browser (no browser-automation tool available in that session, and local dev auth needs a token copied from kittens.band on a real device). Verified: `subsetSort.ts` cost model against brute-force for n≤8, `npm run check`/`npm run build` (frontend), `tsc --noEmit` (backend, clean for the touched files).
+
 ## Known data issues
 
 - Old setlist entries without `.song` snapshot show nothing in stage/editor until re-added

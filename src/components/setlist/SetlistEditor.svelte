@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import type { Setlist, Song, Instrument, SetlistEntry, BandMusician, LearningStage } from '$lib/types';
+  import type { Setlist, Song, Instrument, SetlistEntry, SetlistSubset, BandMusician, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
@@ -9,6 +9,7 @@
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
+  import { sortSubset } from '$lib/subsetSort';
   import CommentInput from './CommentInput.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import { base } from '$app/paths';
@@ -70,7 +71,7 @@
   });
 
   async function saveMeta() {
-    const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries });
+    const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries, subsets: localSubsets });
     localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '', vibe: updated.vibe ?? false };
     editingMeta = false;
   }
@@ -81,7 +82,9 @@
   }
 
   let localEntries = $state<SetlistEntry[]>([]);
+  let localSubsets = $state<SetlistSubset[]>([]);
   $effect(() => { localEntries = [...setlist.entries]; });
+  $effect(() => { localSubsets = [...(setlist.subsets ?? [])]; });
 
   let showAddModal = $state(false);
   let showBreakPicker = $state(false);
@@ -94,6 +97,7 @@
   let filterNotReady = $state(false);
   let filterText = $state('');
   let filterOpen = $state(false);
+  let activeSubsetId = $state<string | null>(null);
 
   function toggleMusician(name: string) {
     selectedMusician = selectedMusician === name ? null : name;
@@ -102,30 +106,186 @@
   // Full replace after own mutations — always authoritative
   function applyUpdate(updated: Setlist) {
     localEntries = [...updated.entries];
+    localSubsets = [...(updated.subsets ?? [])];
   }
 
   // Smart merge for poll updates — preserve drag state
-  function applyPoll(incoming: SetlistEntry[]) {
-    const sorted = [...incoming].sort((a, b) => a.order - b.order);
+  function applyPoll(incoming: Setlist) {
+    const sorted = [...incoming.entries].sort((a, b) => a.order - b.order);
     const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
+    const subsetsIncoming = incoming.subsets ?? [];
+    const entriesChanged = JSON.stringify(sorted) !== JSON.stringify(localSorted);
+    const subsetsChanged = JSON.stringify(subsetsIncoming) !== JSON.stringify(localSubsets);
 
-    if (JSON.stringify(sorted) === JSON.stringify(localSorted)) return;
+    if (!entriesChanged && !subsetsChanged) return;
 
     if (dragIndex !== null) {
-      localEntries = localEntries.map(e => {
-        const fresh = incoming.find(i => i.order === e.order);
-        return fresh ?? e;
-      });
+      if (entriesChanged) {
+        localEntries = localEntries.map(e => {
+          const fresh = incoming.entries.find(i => i.order === e.order);
+          return fresh ?? e;
+        });
+      }
+      if (subsetsChanged) localSubsets = subsetsIncoming;
     } else {
-      localEntries = incoming;
+      localEntries = incoming.entries;
+      localSubsets = subsetsIncoming;
     }
+
+    if (activeSubsetId && !localSubsets.some(s => s.id === activeSubsetId)) activeSubsetId = null;
+  }
+
+  // Rebuilds the entries array so subset blocks sit contiguously at the top,
+  // in `subsets` order, followed by the unassigned pool — then renumbers 0..N.
+  // `overrides` lets a caller supply the exact intra-block order for a subset
+  // being actively edited, instead of deriving it from existing `order` values.
+  function rebuildEntries(
+    entries: SetlistEntry[],
+    subsets: SetlistSubset[],
+    overrides?: Map<string, SetlistEntry[]>
+  ): SetlistEntry[] {
+    const sorted = [...entries].sort((a, b) => a.order - b.order);
+    const bySubset = new Map<string, SetlistEntry[]>();
+    const pool: SetlistEntry[] = [];
+    for (const e of sorted) {
+      if (e.subsetId) {
+        if (!bySubset.has(e.subsetId)) bySubset.set(e.subsetId, []);
+        bySubset.get(e.subsetId)!.push(e);
+      } else {
+        pool.push(e);
+      }
+    }
+    const out: SetlistEntry[] = [];
+    for (const subset of subsets) {
+      out.push(...(overrides?.get(subset.id) ?? bySubset.get(subset.id) ?? []));
+    }
+    out.push(...pool);
+    return out.map((e, i) => ({ ...e, order: i }));
+  }
+
+  async function persistSubsets(entries: SetlistEntry[], subsets: SetlistSubset[]) {
+    localEntries = entries;
+    localSubsets = subsets;
+    applyUpdate(await reorderEntries(setlist.id, entries, subsets));
+  }
+
+  // Up to 2 songs (oldest→most recent) this subset should chain after: the tail
+  // of the previous subset, or — for the first subset — the most recently played songs.
+  function computeAnchors(subsetId: string): Song[] {
+    const idx = localSubsets.findIndex(s => s.id === subsetId);
+    if (idx > 0) {
+      const prevMembers = sortedEntries.filter(e => e.subsetId === localSubsets[idx - 1].id);
+      return prevMembers.slice(-2).map(e => e.song).filter((s): s is Song => !!s);
+    }
+    const played = sortedEntries
+      .filter(e => e.played && e.song)
+      .sort((a, b) => {
+        const at = a.playedAt ? Date.parse(a.playedAt) : -Infinity;
+        const bt = b.playedAt ? Date.parse(b.playedAt) : -Infinity;
+        return at !== bt ? at - bt : a.order - b.order;
+      });
+    return played.slice(-2).map(e => e.song).filter((s): s is Song => !!s);
+  }
+
+  function entriesInSubset(subsetId: string): number {
+    return localEntries.filter(e => e.subsetId === subsetId && e.songId).length;
+  }
+
+  async function handleNewSubset() {
+    const subset: SetlistSubset = { id: crypto.randomUUID(), name: $t.editor.subsetDefaultName(localSubsets.length + 1) };
+    const newSubsets = [...localSubsets, subset];
+    activeSubsetId = subset.id;
+    await persistSubsets(rebuildEntries(localEntries, newSubsets), newSubsets);
+  }
+
+  function toggleSubsetMode(subsetId: string) {
+    activeSubsetId = activeSubsetId === subsetId ? null : subsetId;
+  }
+
+  async function dissolveSubset(subsetId: string) {
+    const newSubsets = localSubsets.filter(s => s.id !== subsetId);
+    const newEntries = localEntries.map(e => e.subsetId === subsetId ? { ...e, subsetId: undefined } : e);
+    if (activeSubsetId === subsetId) activeSubsetId = null;
+    await persistSubsets(rebuildEntries(newEntries, newSubsets), newSubsets);
+  }
+
+  async function toggleSubsetMembership(entry: SetlistEntry) {
+    if (activeSubsetId === null || !entry.songId) return;
+    if (entry.subsetId && entry.subsetId !== activeSubsetId) return; // belongs to another subset
+    const subsetId = activeSubsetId;
+    const subset = localSubsets.find(s => s.id === subsetId);
+    if (!subset) return;
+
+    if (entry.subsetId === subsetId) {
+      const newEntries = localEntries.map(e => e.songId === entry.songId ? { ...e, subsetId: undefined } : e);
+      await persistSubsets(rebuildEntries(newEntries, localSubsets), localSubsets);
+      return;
+    }
+
+    const taggedEntries = localEntries.map(e => e.songId === entry.songId ? { ...e, subsetId } : e);
+    const members = taggedEntries.filter(e => e.subsetId === subsetId).sort((a, b) => a.order - b.order);
+    let overrideList = members;
+    if (!subset.manualSort) {
+      const anchors = computeAnchors(subsetId);
+      const sortedSongs = sortSubset(members.map(e => e.song!), anchors);
+      const bySongId = new Map(members.map(e => [e.songId!, e]));
+      overrideList = sortedSongs.map(s => bySongId.get(s.id)!);
+    }
+    await persistSubsets(rebuildEntries(taggedEntries, localSubsets, new Map([[subsetId, overrideList]])), localSubsets);
+  }
+
+  function handleRowClick(e: MouseEvent, entry: SetlistEntry) {
+    if (activeSubsetId === null || !entry.songId) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, button, a')) return;
+    toggleSubsetMembership(entry);
+  }
+
+  type RenderItem =
+    | { kind: 'header'; subset: SetlistSubset }
+    | { kind: 'hint'; subset: SetlistSubset }
+    | { kind: 'divider' }
+    | { kind: 'entry'; entry: SetlistEntry; index: number };
+
+  let renderItems = $derived((): RenderItem[] => {
+    const display = displayEntries();
+    if (isFiltered) {
+      return display.map((entry, index) => ({ kind: 'entry' as const, entry, index }));
+    }
+    const bySubset = new Map<string, { entry: SetlistEntry; index: number }[]>();
+    const pool: { entry: SetlistEntry; index: number }[] = [];
+    display.forEach((entry, index) => {
+      if (entry.subsetId) {
+        if (!bySubset.has(entry.subsetId)) bySubset.set(entry.subsetId, []);
+        bySubset.get(entry.subsetId)!.push({ entry, index });
+      } else {
+        pool.push({ entry, index });
+      }
+    });
+    const items: RenderItem[] = [];
+    for (const subset of localSubsets) {
+      items.push({ kind: 'header', subset });
+      if (activeSubsetId === subset.id) items.push({ kind: 'hint', subset });
+      for (const { entry, index } of bySubset.get(subset.id) ?? []) {
+        items.push({ kind: 'entry', entry, index });
+      }
+    }
+    if (localSubsets.length > 0 && pool.length > 0) items.push({ kind: 'divider' });
+    for (const { entry, index } of pool) items.push({ kind: 'entry', entry, index });
+    return items;
+  });
+
+  function renderItemKey(item: RenderItem): string {
+    if (item.kind === 'entry') return entryKey(item.entry);
+    if (item.kind === 'divider') return 'divider';
+    return `${item.kind}-${item.subset.id}`;
   }
 
   onMount(() => {
     const u = $currentUser;
     const pollMs = (u?.isAdmin || u?.role === 'writer') ? 3000 : 15000;
     const stopPoller = startPolling(
-      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s.entries); },
+      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },
       pollMs,
       () => isEventLongOver(localMeta.date, localMeta.startTime),
     );
@@ -358,10 +518,20 @@
     }
     const list = [...sortedEntries];
     const [item] = list.splice(dragIndex, 1);
-    list.splice(overIndex, 0, item);
+    const insertAt = overIndex;
+    const prevItem = list[insertAt - 1];
+    const nextItem = list[insertAt];
+    const newSubsetId =
+      prevItem?.subsetId && (prevItem.subsetId === nextItem?.subsetId || !nextItem) ? prevItem.subsetId
+      : (!prevItem?.subsetId && nextItem?.subsetId) ? nextItem.subsetId
+      : undefined;
+    list.splice(insertAt, 0, { ...item, subsetId: newSubsetId });
     const reordered = list.map((e, i) => ({ ...e, order: i }));
+    const finalSubsets = newSubsetId
+      ? localSubsets.map(s => s.id === newSubsetId ? { ...s, manualSort: true } : s)
+      : localSubsets;
     dragIndex = null; overIndex = null;
-    applyUpdate(await reorderEntries(setlist.id, reordered));
+    await persistSubsets(reordered, finalSubsets);
   }
 
   function onDragEnd() { dragIndex = null; overIndex = null; }
@@ -374,6 +544,7 @@
   // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
   function handleDragHandleTouchStart(e: TouchEvent, i: number) {
     e.stopPropagation();
+    if (activeSubsetId !== null) return;
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     if (!isFiltered) touchStartIndex = i;
@@ -449,6 +620,7 @@
         {/if}
       </div>
       <button class="btn-secondary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongs}</button>
+      <button class="btn-secondary" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
       <a href="{base}/setlists/{setlist.id}/stage" class="btn-stage">{$t.editor.stageView}</a>
     </div>
   </div>
@@ -538,6 +710,7 @@
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ Фильтр</button>
     <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">🎤 На сцену</a>
+    <button class="bottom-btn bottom-subset" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
     <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>+ Добавить</button>
   </div>
 
@@ -562,124 +735,155 @@
           </tr>
         </thead>
         <tbody>
-          {#each displayEntries() as entry, i (entryKey(entry))}
-            {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
-            {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
-            {@const songNum = displayEntries().slice(0, i + 1).filter(e => e.songId).length}
-            {#if entry.songId}
-              {@const song = entry.song}
-              {#if song}
-                {@const guestTags = guestTagsFor(song)}
-                {@const mobBubbles = mobileEntryBubbles(entry, song)}
-                <tr
-                  class="song-row"
-                  class:dragging={isDragging}
-                  class:drag-over={isOver}
-                  draggable={!isFiltered}
-                  data-row-i={i}
-                  ondragstart={!isFiltered ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))); } : undefined}
-                  ondragover={!isFiltered ? (e => onDragOver(e, i)) : undefined}
-                  ondrop={!isFiltered ? onDrop : undefined}
-                  ondragend={!isFiltered ? onDragEnd : undefined}
-                >
-                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
-                  <td class="td-num">
-                    {songNum}
-                    <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
-                    {#if localMeta.startTime}<span class="entry-time-mob">{entryTimes().get(entryKey(entry)) ?? ''}</span>{/if}
-                  </td>
-                  {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
-                  <td class="td-song">
-                    <div class="song-name">
-                      <span class="cat-inline"><CategoryBadge category={song.category} iconOnly /></span>
-                      <span class="artist">{song.artist}</span>
-                      <span class="sep">–</span>
-                      <span class="title">{song.title}</span>
-                      {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewSong = song; }} title="Текст песни">📝</button>{/if}
-                      {#each guestTags as g}
-                        {@const gStage = entryStage(entry, g.name)}
-                        <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
-                      {/each}
-                    </div>
-                    {#if mobBubbles.length > 0}
-                      <div class="mobile-musicians">
-                        {#each mobBubbles as b}
-                          <span class="mob-bubble" class:mob-guest={b.isGuest} style="background: {b.progBg}">
-                            <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
-                            <span class="mob-name" style="color: {b.progColor}">{b.name}</span>
-                          </span>
-                        {/each}
-                      </div>
-                    {/if}
-                    <CommentInput
-                      value={entry.comment ?? ''}
-                      onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
-                    />
-                  </td>
-                  {#each allMusicians as name, i}
-                    {@const role = song.musicians[name]}
-                    {@const stage = entryStage(entry, name)}
-                    {@const progBg = (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
-                    <td
-                      class="td-musician progress-delim"
-                      class:musician-alt={i % 2 === 0 && !progBg}
-                      style={progBg ? `background: ${progBg}` : ''}
-                    >
-                      {#if role?.instruments?.length}
-                        <span class="inst-slot">{#each sortInstruments(role.instruments) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+          {#each renderItems() as item (renderItemKey(item))}
+            {#if item.kind === 'header'}
+              <tr class="subset-header" class:active={activeSubsetId === item.subset.id} onclick={() => toggleSubsetMode(item.subset.id)}>
+                <td colspan={totalCols}>
+                  <span class="subset-header-name">⏭ {item.subset.name}</span>
+                  <span class="subset-header-count">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</span>
+                  <button class="subset-dissolve" onclick={(e) => { e.stopPropagation(); dissolveSubset(item.subset.id); }} title={$t.editor.subsetDissolve}>✕</button>
+                </td>
+              </tr>
+            {:else if item.kind === 'hint'}
+              <tr class="subset-hint-row">
+                <td colspan={totalCols}>
+                  <span class="subset-hint-text">{$t.editor.subsetHint}</span>
+                  <button class="subset-done-btn" onclick={() => { activeSubsetId = null; }}>{$t.editor.subsetDone}</button>
+                </td>
+              </tr>
+            {:else if item.kind === 'divider'}
+              <tr class="subset-rest-divider"><td colspan={totalCols}>{$t.editor.subsetRest}</td></tr>
+            {:else}
+              {@const entry = item.entry}
+              {@const i = item.index}
+              {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
+              {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
+              {@const songNum = displayEntries().slice(0, i + 1).filter(e => e.songId).length}
+              {@const canDrag = !isFiltered && activeSubsetId === null}
+              {#if entry.songId}
+                {@const song = entry.song}
+                {#if song}
+                  {@const guestTags = guestTagsFor(song)}
+                  {@const mobBubbles = mobileEntryBubbles(entry, song)}
+                  <tr
+                    class="song-row"
+                    class:dragging={isDragging}
+                    class:drag-over={isOver}
+                    class:subset-member={!!entry.subsetId}
+                    class:subset-active-member={activeSubsetId !== null && entry.subsetId === activeSubsetId}
+                    draggable={canDrag}
+                    data-row-i={i}
+                    onclick={(e) => handleRowClick(e, entry)}
+                    ondragstart={canDrag ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))); } : undefined}
+                    ondragover={canDrag ? (e => onDragOver(e, i)) : undefined}
+                    ondrop={canDrag ? onDrop : undefined}
+                    ondragend={canDrag ? onDragEnd : undefined}
+                  >
+                    <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}>
+                      {#if activeSubsetId !== null}
+                        <span class="subset-tap-indicator">{entry.subsetId === activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
+                      {:else}
+                        <span class="drag-handle">⠿</span>
                       {/if}
                     </td>
-                  {/each}
-                  <td class="td-actions">
-                    <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
-                    <button class="remove-btn desktop-only" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                    <td class="td-num">
+                      {songNum}
+                      <span class="entry-pct" style={pctBubbleStyle(entryProgressPct(entry))}>{entryProgressPct(entry)}%</span>
+                      {#if localMeta.startTime}<span class="entry-time-mob">{entryTimes().get(entryKey(entry)) ?? ''}</span>{/if}
+                    </td>
+                    {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
+                    <td class="td-song">
+                      <div class="song-name">
+                        <span class="cat-inline"><CategoryBadge category={song.category} iconOnly /></span>
+                        <span class="artist">{song.artist}</span>
+                        <span class="sep">–</span>
+                        <span class="title">{song.title}</span>
+                        {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewSong = song; }} title="Текст песни">📝</button>{/if}
+                        {#each guestTags as g}
+                          {@const gStage = entryStage(entry, g.name)}
+                          <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
+                        {/each}
+                      </div>
+                      {#if mobBubbles.length > 0}
+                        <div class="mobile-musicians">
+                          {#each mobBubbles as b}
+                            <span class="mob-bubble" class:mob-guest={b.isGuest} style="background: {b.progBg}">
+                              <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+                              <span class="mob-name" style="color: {b.progColor}">{b.name}</span>
+                            </span>
+                          {/each}
+                        </div>
+                      {/if}
+                      <CommentInput
+                        value={entry.comment ?? ''}
+                        onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
+                      />
+                    </td>
+                    {#each allMusicians as name, mi}
+                      {@const role = song.musicians[name]}
+                      {@const stage = entryStage(entry, name)}
+                      {@const progBg = (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
+                      <td
+                        class="td-musician progress-delim"
+                        class:musician-alt={mi % 2 === 0 && !progBg}
+                        style={progBg ? `background: ${progBg}` : ''}
+                      >
+                        {#if role?.instruments?.length}
+                          <span class="inst-slot">{#each sortInstruments(role.instruments) as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
+                        {/if}
+                      </td>
+                    {/each}
+                    <td class="td-actions">
+                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                      <button class="remove-btn desktop-only" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                    </td>
+                  </tr>
+                {/if}
+              {:else}
+                <tr
+                  class="break-row"
+                  class:dragging={isDragging}
+                  class:drag-over={isOver}
+                  draggable={activeSubsetId === null}
+                  data-row-i={i}
+                  ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
+                  ondragover={e => onDragOver(e, i)}
+                  ondrop={onDrop}
+                  ondragend={onDragEnd}
+                >
+                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
+                  <td class="td-num"></td>
+                  {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
+                  <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
+                    <div class="break-inner">
+                    <span class="break-icon">⏸</span>
+                    <div class="break-body">
+                      {#if editingBreakOrder === entry.order}
+                        <div class="break-edit-row">
+                          {#each [5, 10, 20, 30] as min}
+                            <button
+                              class="break-opt"
+                              class:break-opt-active={entry.breakMinutes === min}
+                              onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
+                            >{min} мин</button>
+                          {/each}
+                          <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
+                        </div>
+                      {:else}
+                        <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
+                          Перерыв — {entry.breakMinutes} мин
+                        </button>
+                      {/if}
+                      <CommentInput
+                        value={entry.comment ?? ''}
+                        onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
+                      />
+                    </div>
+                    <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
+                    </div>
                   </td>
                 </tr>
               {/if}
-            {:else}
-              <tr
-                class="break-row"
-                class:dragging={isDragging}
-                class:drag-over={isOver}
-                draggable="true"
-                data-row-i={i}
-                ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
-                ondragover={e => onDragOver(e, i)}
-                ondrop={onDrop}
-                ondragend={onDragEnd}
-              >
-                <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
-                <td class="td-num"></td>
-                {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
-                <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
-                  <div class="break-inner">
-                  <span class="break-icon">⏸</span>
-                  <div class="break-body">
-                    {#if editingBreakOrder === entry.order}
-                      <div class="break-edit-row">
-                        {#each [5, 10, 20, 30] as min}
-                          <button
-                            class="break-opt"
-                            class:break-opt-active={entry.breakMinutes === min}
-                            onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
-                          >{min} мин</button>
-                        {/each}
-                        <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
-                      </div>
-                    {:else}
-                      <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
-                        Перерыв — {entry.breakMinutes} мин
-                      </button>
-                    {/if}
-                    <CommentInput
-                      value={entry.comment ?? ''}
-                      onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
-                    />
-                  </div>
-                  <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
-                  </div>
-                </td>
-              </tr>
             {/if}
           {/each}
           {#if dragIndex !== null}
@@ -828,6 +1032,46 @@
 
   .drop-end-row td { height: 28px; border-radius: 8px; }
   .drop-end-active td { outline: 2px dashed var(--accent); }
+
+  .subset-header { cursor: pointer; user-select: none; }
+  .subset-header td {
+    background: rgba(124, 58, 237, 0.12);
+    border-top: 2px solid #7c3aed;
+    padding: 6px 10px;
+    font-size: 0.86rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .subset-header:hover td { background: rgba(124, 58, 237, 0.18); }
+  .subset-header.active td { background: rgba(124, 58, 237, 0.24); }
+  .subset-header-name { font-weight: 700; color: #7c3aed; }
+  .subset-header-count { color: var(--text-muted); font-size: 0.8rem; }
+  .subset-dissolve {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.82rem; padding: 2px 6px; border-radius: 4px;
+  }
+  .subset-dissolve:hover { color: #ef4444; }
+
+  .subset-hint-row td {
+    background: rgba(124, 58, 237, 0.06);
+    padding: 6px 10px; font-size: 0.8rem; color: var(--text-muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .subset-done-btn {
+    margin-left: auto; padding: 4px 14px; border: 1px solid #7c3aed; border-radius: 14px;
+    background: #7c3aed; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600;
+  }
+
+  .subset-rest-divider td {
+    padding: 4px 10px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--text-muted); border-top: 1px solid var(--border);
+  }
+
+  .song-row.subset-member td { background: rgba(124, 58, 237, 0.05); }
+  .song-row.subset-member:hover td { background: rgba(124, 58, 237, 0.1); }
+  .song-row.subset-active-member td { background: rgba(124, 58, 237, 0.1); }
+  .subset-tap-indicator {
+    display: block; text-align: center; font-size: 1rem; font-weight: 700; color: #7c3aed;
+  }
 
   .drag-handle { color: var(--text-muted); font-size: 1rem; cursor: grab; opacity: 0.4; display: block; text-align: center; }
   .song-row:hover .drag-handle, .break-row:hover .drag-handle { opacity: 1; }
@@ -982,6 +1226,7 @@
       background: transparent; font-size: 0.9rem; font-weight: 500; color: var(--text-muted);
       white-space: nowrap;
     }
+    .bottom-subset { padding: 10px 12px; border-color: #7c3aed; color: #7c3aed; font-size: 0.82rem; }
     .bottom-add-btn {
       margin-left: auto; padding: 10px 20px;
       background: var(--accent); color: #fff; border: none; border-radius: 20px;

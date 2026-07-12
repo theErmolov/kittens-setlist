@@ -38,6 +38,13 @@ export interface SetlistEntry {
   playedAt?: string;  // ISO 8601, set when marked played
   comment?: string;
   progress?: Record<string, LearningStage>;
+  subsetId?: string;  // groups entry into a sub-setlist block (top of the list)
+}
+
+export interface SetlistSubset {
+  id: string;
+  name: string;
+  manualSort?: boolean;  // true once user drag-sorts inside → auto-sort disabled
 }
 
 export interface Setlist {
@@ -47,6 +54,7 @@ export interface Setlist {
   startTime?: string;
   vibe?: boolean;
   entries: SetlistEntry[];
+  subsets?: SetlistSubset[];
 }
 
 export type UserStatus = 'pending' | 'approved' | 'rejected';

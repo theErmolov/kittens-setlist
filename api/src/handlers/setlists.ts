@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { Setlist, SetlistEntry, Song, LearningStage, KittensUser } from '../lib/types.js';
+import type { Setlist, SetlistEntry, SetlistSubset, Song, LearningStage, KittensUser } from '../lib/types.js';
 import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
 const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
@@ -250,10 +250,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
 
   if (afterId === '/order') {
     if (method === 'PUT') {
-      const { entries } = JSON.parse(event.body ?? '{}') as { entries: SetlistEntry[] };
+      const { entries, subsets } = JSON.parse(event.body ?? '{}') as { entries: SetlistEntry[]; subsets?: SetlistSubset[] };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
-      const updated: Setlist = { ...setlist, entries };
+      const updated: Setlist = { ...setlist, entries, ...(subsets !== undefined ? { subsets } : {}) };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       await logAudit({ action: 'setlist.reorder', actor: user, entityType: 'setlist', entityId: id, entityName: setlistName(setlist), summary: `порядок изменён (${entries.length} позиций)` });
       return ok(updated);

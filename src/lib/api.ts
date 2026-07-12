@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, BandMusician, KittensUser, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, KittensUser, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -140,8 +140,8 @@ export async function updateEntryComment(setlistId: string, order: number, comme
   return req(`/setlists/${setlistId}/entry-comment`, { method: 'PATCH', body: JSON.stringify({ order, comment }) });
 }
 
-export async function reorderEntries(setlistId: string, entries: SetlistEntry[]): Promise<Setlist> {
-  return req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify({ entries }) });
+export async function reorderEntries(setlistId: string, entries: SetlistEntry[], subsets?: SetlistSubset[]): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/order`, { method: 'PUT', body: JSON.stringify(subsets !== undefined ? { entries, subsets } : { entries }) });
 }
 
 // ─── Auth (admin) ──────────────────────────────────────────────────────────────

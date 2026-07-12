@@ -37,6 +37,13 @@ export interface SetlistEntry {
   playedAt?: string;      // ISO 8601, set when marked played
   comment?: string;       // per-setlist note on this song
   progress?: Record<string, LearningStage>;  // per-entry progress (all musicians incl. guests)
+  subsetId?: string;      // groups entry into a sub-setlist block (top of the list)
+}
+
+export interface SetlistSubset {
+  id: string;
+  name: string;
+  manualSort?: boolean;  // true once user drag-sorts inside → auto-sort disabled
 }
 
 export interface Setlist {
@@ -46,6 +53,7 @@ export interface Setlist {
   startTime?: string;  // HH:MM, 24h
   vibe?: boolean;
   entries: SetlistEntry[];
+  subsets?: SetlistSubset[];
 }
 
 export interface AuditLogEntry {
