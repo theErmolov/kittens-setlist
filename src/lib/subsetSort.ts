@@ -19,10 +19,15 @@ function activeMusicianNames(songs: Song[]): string[] {
 
 /**
  * Cost of placing `next` right after `prev` (with `prev2` before `prev`).
- * A musician contributes 1 if their effective instrument set changes between
- * `next` and the nearest preceding song they also play — but only if that
- * nearest song is `prev` (distance 1) or `prev2` (distance 2, i.e. exactly one
- * skipped song between them). Skipping 2+ songs resets the count to 0.
+ * For a musician active in `next`, look at the nearest preceding song they're
+ * also active in:
+ *  - adjacent (`prev`, distance 1): cost 1 only if the instrument actually changes
+ *    — they're playing continuously, so only a literal swap is disruptive.
+ *  - one song back (`prev2`, distance 2, i.e. they sat out exactly one song):
+ *    cost 1 unconditionally — stepping off stage and back on is disruptive even
+ *    if they pick the same instrument back up.
+ *  - further back (2+ songs skipped) or no prior occurrence: cost 0 — a real
+ *    break, no re-entry penalty.
  */
 function transitionCost(prev2: Song | null, prev: Song | null, next: Song, musicians: string[]): number {
   let cost = 0;
@@ -36,10 +41,7 @@ function transitionCost(prev2: Song | null, prev: Song | null, next: Song, music
         continue;
       }
     }
-    if (prev2 !== null) {
-      const prev2Key = effectiveKey(prev2, name);
-      if (prev2Key !== null && prev2Key !== nextKey) cost++;
-    }
+    if (prev2 !== null && effectiveKey(prev2, name) !== null) cost++;
   }
   return cost;
 }

@@ -461,6 +461,16 @@
     applyUpdate(await removeSongFromSetlist(setlist.id, songId));
   }
 
+  // While editing a subset, ✕ on one of its members removes it from the subset
+  // instead of deleting it from the setlist entirely.
+  async function handleRemoveClick(entry: SetlistEntry) {
+    if (activeSubsetId !== null && entry.subsetId === activeSubsetId) {
+      await toggleSubsetMembership(entry);
+      return;
+    }
+    await handleRemove(entry.songId!);
+  }
+
   async function handleRemoveBreak(order: number) {
     applyUpdate(await removeBreakFromSetlist(setlist.id, order));
   }
@@ -521,8 +531,12 @@
     const insertAt = overIndex;
     const prevItem = list[insertAt - 1];
     const nextItem = list[insertAt];
+    // Landing right after the last member of a subset (nextItem has no subsetId,
+    // e.g. the pool boundary, or there's nothing after at all) still counts as
+    // "inside" that subset — otherwise dropping a subset's last song back near
+    // its own tail kicks it out into the pool.
     const newSubsetId =
-      prevItem?.subsetId && (prevItem.subsetId === nextItem?.subsetId || !nextItem) ? prevItem.subsetId
+      prevItem?.subsetId && (!nextItem?.subsetId || prevItem.subsetId === nextItem.subsetId) ? prevItem.subsetId
       : (!prevItem?.subsetId && nextItem?.subsetId) ? nextItem.subsetId
       : undefined;
     list.splice(insertAt, 0, { ...item, subsetId: newSubsetId });
@@ -544,7 +558,6 @@
   // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
   function handleDragHandleTouchStart(e: TouchEvent, i: number) {
     e.stopPropagation();
-    if (activeSubsetId !== null) return;
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     if (!isFiltered) touchStartIndex = i;
@@ -710,7 +723,7 @@
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ Фильтр</button>
     <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">🎤 На сцену</a>
-    <button class="bottom-btn bottom-subset" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
+    <button class="bottom-subset" onclick={handleNewSubset} title={$t.editor.newSubset}>⏭</button>
     <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>+ Добавить</button>
   </div>
 
@@ -739,16 +752,20 @@
             {#if item.kind === 'header'}
               <tr class="subset-header" class:active={activeSubsetId === item.subset.id} onclick={() => toggleSubsetMode(item.subset.id)}>
                 <td colspan={totalCols}>
-                  <span class="subset-header-name">⏭ {item.subset.name}</span>
-                  <span class="subset-header-count">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</span>
-                  <button class="subset-dissolve" onclick={(e) => { e.stopPropagation(); dissolveSubset(item.subset.id); }} title={$t.editor.subsetDissolve}>✕</button>
+                  <div class="subset-header-inner">
+                    <span class="subset-header-name">⏭ {item.subset.name}</span>
+                    <span class="subset-header-count">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</span>
+                    <button class="subset-dissolve" onclick={(e) => { e.stopPropagation(); dissolveSubset(item.subset.id); }} title={$t.editor.subsetDissolve}>✕</button>
+                  </div>
                 </td>
               </tr>
             {:else if item.kind === 'hint'}
               <tr class="subset-hint-row">
                 <td colspan={totalCols}>
-                  <span class="subset-hint-text">{$t.editor.subsetHint}</span>
-                  <button class="subset-done-btn" onclick={() => { activeSubsetId = null; }}>{$t.editor.subsetDone}</button>
+                  <div class="subset-hint-inner">
+                    <span class="subset-hint-text">{$t.editor.subsetHint}</span>
+                    <button class="subset-done-btn" onclick={() => { activeSubsetId = null; }}>{$t.editor.subsetDone}</button>
+                  </div>
                 </td>
               </tr>
             {:else if item.kind === 'divider'}
@@ -759,7 +776,7 @@
               {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
               {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
               {@const songNum = displayEntries().slice(0, i + 1).filter(e => e.songId).length}
-              {@const canDrag = !isFiltered && activeSubsetId === null}
+              {@const canDrag = !isFiltered}
               {#if entry.songId}
                 {@const song = entry.song}
                 {#if song}
@@ -835,7 +852,7 @@
                     {/each}
                     <td class="td-actions">
                       <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
-                      <button class="remove-btn desktop-only" onclick={() => handleRemove(entry.songId!)} title={$t.editor.remove}>✕</button>
+                      <button class="remove-btn desktop-only" onclick={() => handleRemoveClick(entry)} title={activeSubsetId !== null && entry.subsetId === activeSubsetId ? $t.editor.subsetRemove : $t.editor.remove}>✕</button>
                     </td>
                   </tr>
                 {/if}
@@ -844,7 +861,7 @@
                   class="break-row"
                   class:dragging={isDragging}
                   class:drag-over={isOver}
-                  draggable={activeSubsetId === null}
+                  draggable="true"
                   data-row-i={i}
                   ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
                   ondragover={e => onDragOver(e, i)}
@@ -1037,9 +1054,12 @@
   .subset-header td {
     background: rgba(124, 58, 237, 0.12);
     border-top: 2px solid #7c3aed;
-    padding: 6px 10px;
-    font-size: 0.86rem;
+    padding: 0;
+    width: 100%;
+  }
+  .subset-header-inner {
     display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; font-size: 0.86rem;
   }
   .subset-header:hover td { background: rgba(124, 58, 237, 0.18); }
   .subset-header.active td { background: rgba(124, 58, 237, 0.24); }
@@ -1051,10 +1071,10 @@
   }
   .subset-dissolve:hover { color: #ef4444; }
 
-  .subset-hint-row td {
-    background: rgba(124, 58, 237, 0.06);
-    padding: 6px 10px; font-size: 0.8rem; color: var(--text-muted);
+  .subset-hint-row td { background: rgba(124, 58, 237, 0.06); padding: 0; width: 100%; }
+  .subset-hint-inner {
     display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; font-size: 0.8rem; color: var(--text-muted);
   }
   .subset-done-btn {
     margin-left: auto; padding: 4px 14px; border: 1px solid #7c3aed; border-radius: 14px;
@@ -1213,22 +1233,27 @@
     .mobile-bottom-bar {
       position: fixed; bottom: 0; left: 0; right: 0; height: 64px; z-index: 21;
       background: var(--surface); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 8px; padding: 0 12px;
+      display: flex; align-items: center; gap: 6px; padding: 0 8px;
     }
     .bottom-btn {
-      padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 500;
-      color: var(--text-muted); white-space: nowrap;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; cursor: pointer; font-size: 0.86rem; font-weight: 500;
+      color: var(--text-muted); white-space: nowrap; min-width: 0;
     }
     .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .bottom-stage {
-      text-decoration: none; padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; font-size: 0.9rem; font-weight: 500; color: var(--text-muted);
-      white-space: nowrap;
+      text-decoration: none; padding: 10px 12px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; font-size: 0.86rem; font-weight: 500; color: var(--text-muted);
+      white-space: nowrap; min-width: 0;
     }
-    .bottom-subset { padding: 10px 12px; border-color: #7c3aed; color: #7c3aed; font-size: 0.82rem; }
+    .bottom-subset {
+      flex-shrink: 0; width: 40px; height: 40px; padding: 0;
+      border: 1px solid #7c3aed; border-radius: 50%;
+      background: transparent; color: #7c3aed; font-size: 1.15rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
     .bottom-add-btn {
-      margin-left: auto; padding: 10px 20px;
+      margin-left: auto; flex-shrink: 0; padding: 10px 16px;
       background: var(--accent); color: #fff; border: none; border-radius: 20px;
       cursor: pointer; font-weight: 600; font-size: 0.95rem;
     }
