@@ -41,7 +41,7 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
     await dbPut(TABLE, toSave as unknown as Record<string, unknown>);
     const parts: string[] = [];
     if (before) {
-      const scalar = diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes']);
+      const scalar = diffSummary(before as unknown as Record<string, unknown>, body as unknown as Record<string, unknown>, ['title', 'artist', 'category', 'comment', 'lengthMinutes', 'archived']);
       if (scalar !== 'no changes') parts.push(scalar);
       // Diff progress per-musician
       const mDiff = musiciansDiff(before.musicians ?? {}, body.musicians ?? {});

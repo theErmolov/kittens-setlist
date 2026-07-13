@@ -23,6 +23,7 @@
   let filtered = $derived(songs
     .filter(s => {
       if (existingIds.has(s.id)) return false;
+      if (s.archived) return false;
       if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
       const q = search.toLowerCase();
       return !q || s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q);

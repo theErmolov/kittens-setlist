@@ -52,6 +52,7 @@ const strings = {
       filterBtn: 'Filter',
       addMode: 'To setlist',
       empty: 'No songs found',
+      archivedFilter: 'Archive',
       shown: (n: number, total: number) =>
         n === total ? `${n} song${n !== 1 ? 's' : ''}` : `${n} / ${total} songs`,
     },
@@ -75,6 +76,8 @@ const strings = {
       remove: 'Remove',
       cancel: 'Cancel',
       save: 'Save',
+      archive: 'Archive',
+      unarchive: 'Restore',
     },
     instrument: {
       guitar: 'Guitar',
@@ -260,6 +263,7 @@ const strings = {
       filterBtn: 'Фильтр',
       addMode: 'В сетлист',
       empty: 'Ничего не найдено',
+      archivedFilter: 'Архив',
       shown: (n: number, total: number) => {
         const word = ruPlural(total, 'песня', 'песни', 'песен');
         return n === total ? `${n} ${word}` : `${n} / ${total} ${word}`;
@@ -285,6 +289,8 @@ const strings = {
       remove: 'Удалить',
       cancel: 'Отмена',
       save: 'Сохранить',
+      archive: 'В архив',
+      unarchive: 'Вернуть из архива',
     },
     instrument: {
       guitar: 'Гитара',

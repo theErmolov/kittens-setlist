@@ -34,6 +34,7 @@
   let selectedMusicians = $state(new Set<string>());
   let selectedInstruments = $state(new Set<Instrument>());
   let showProgress = $state(false);
+  let showArchived = $state(false);
   let filterOpen = $state(false);
   let additionMode = $state(false);
   // Song ids currently showing the green "added" flash
@@ -68,9 +69,12 @@
   // Fixed: cat 9% + artist 18% + title 28% + actions 9% = 64% → musicians get 36%, capped at 5%
   let musicianColPct = $derived(Math.min(5, Math.floor(36 / (permanentNames.length || 1))));
 
+  // Songs in scope for the current archive view (hides archived by default)
+  let scoped = $derived(() => songs.filter(s => showArchived ? !!s.archived : !s.archived));
+
   let categoryCounts = $derived(() => {
     const counts: Record<Category, number> = { top: 0, mid: 0, low: 0 };
-    for (const s of songs) {
+    for (const s of scoped()) {
       if (s.category in counts) counts[s.category]++;
     }
     return counts;
@@ -79,7 +83,7 @@
   let musicianCounts = $derived(() => {
     const counts: Record<string, number> = {};
     for (const name of permanentNames) {
-      counts[name] = songs.filter(s => {
+      counts[name] = scoped().filter(s => {
         const role = s.musicians[name];
         return role && role.instruments.length > 0;
       }).length;
@@ -93,7 +97,7 @@
   }
 
   let filtered = $derived(() => {
-    const f = songs.filter(s => {
+    const f = scoped().filter(s => {
     const q = search.toLowerCase();
     if (q && !s.artist.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q)) return false;
     if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
@@ -188,7 +192,7 @@
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="chips-row">
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0))})</span>
+      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0))})</span>
     </div>
     {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>
@@ -217,6 +221,11 @@
         {/each}
       </div>
     </div>
+    <button
+      class="filter-chip archive-toggle"
+      class:active={showArchived}
+      onclick={() => { showArchived = !showArchived; }}
+    >📦 {$t.backlog.archivedFilter}</button>
     <button
       class="filter-chip progress-toggle"
       class:active={showProgress}
@@ -301,6 +310,11 @@
       {/each}
     </div>
     <div class="filter-sep-h"></div>
+    <button
+      class="filter-chip archive-chip-mobile"
+      class:active={showArchived}
+      onclick={() => { showArchived = !showArchived; }}
+    >📦 {$t.backlog.archivedFilter}</button>
     <button
       class="filter-chip progress-chip-mobile"
       class:active={showProgress}
@@ -426,7 +440,7 @@
   .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
   .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .filter-chip-inst { padding: 3px 9px; font-size: 0.95rem; }
-  .progress-toggle { margin-left: auto; }
+  .archive-toggle { margin-left: auto; }
 
   .scroll-wrap { overflow-x: auto; overflow-y: auto; flex: 1; }
   table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
@@ -467,6 +481,7 @@
     .mobile-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .mobile-chips-row .song-count { margin-left: auto; }
     .filter-sep-h { height: 1px; background: var(--border); }
+    .archive-chip-mobile { align-self: flex-start; }
     .progress-chip-mobile { align-self: flex-start; }
 
     /* Mobile bottom bar */

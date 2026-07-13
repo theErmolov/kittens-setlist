@@ -67,6 +67,7 @@
     lengthMinutes: song?.lengthMinutes ?? 5,
     progress: { ...(song?.progress ?? {}) },
     lyrics: song?.lyrics ?? '',
+    archived: song?.archived ?? false,
   });
 
   let activeTab = $state<'details' | 'lyrics'>('details');
@@ -138,6 +139,11 @@
     }
     onsave({ ...draft, musicians: allMusicians, progress: allProgress });
     return true;
+  }
+
+  function toggleArchive() {
+    draft.archived = !draft.archived;
+    if (handleSave()) closeModal();
   }
 
   let dragStartedInModal = false;
@@ -342,6 +348,9 @@
         {/if}
         {#if onaddtosetlist}
           <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
+        {/if}
+        {#if mode !== 'entry' && song?.id}
+          <button class="btn-icon" onclick={toggleArchive} title={draft.archived ? $t.song.unarchive : $t.song.archive}>{draft.archived ? '📤' : '📦'}</button>
         {/if}
         {#if onremove}
           <button class="btn-remove-setlist danger" onclick={() => { if (confirm('Убрать из сетлиста?')) { onremove!(); closeModal(); } }} title="Убрать из сетлиста">− из сетлиста</button>

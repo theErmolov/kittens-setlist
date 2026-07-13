@@ -47,6 +47,15 @@ type: project
 - **Backend must be deployed (push) before the frontend feature is usable** — until then `PUT /order`'s `subsets` field is silently ignored by the live Lambda and any subset created in the editor will vanish on the next poll/reconcile (old handler never returns `subsets`, so `applyUpdate`/`applyPoll` reset local state to `[]`). Ship backend+frontend together.
 - Verified: `subsetSort.ts` cost model against brute-force for n≤8 plus a regression test built from the real skip-play-skip-play screenshot; `npm run check`/`npm run build` (frontend); `tsc --noEmit` (backend, clean for touched files). Not yet verified end-to-end in a real browser session by Claude (no browser-automation tool available) — the user is verifying visually via screenshots instead.
 
+## Song archive (2026-07-13)
+
+- `Song.archived?: boolean` — added to both `src/lib/types.ts` and `api/src/lib/types.ts`; no backend route changes needed since `PUT /songs/:id` already saves the whole song object. Added to the audit `diffSummary` field list in `api/src/handlers/songs.ts` so archive/unarchive shows up in the change log.
+- Archiving never touches setlists — `SetlistEntry.song` is a frozen snapshot (existing invariant), so archived-ness of the catalog song has no effect on any setlist.
+- `SongTable.svelte`: new `showArchived` toggle chip (📦, next to the 📊 progress toggle, both desktop filter-bar and mobile filter panel). `scoped()` derived filters `songs` by `archived` before category/search/musician/instrument filtering feeds off it — archived hidden by default, chip flips to an archive-only view (not a combined view).
+- Toggle button lives in `SongEditModal.svelte` footer (📦/📤, only when `mode !== 'entry'` and an existing song is being edited — never in the setlist-entry snapshot editor). Flips `draft.archived` and immediately saves+closes via the existing `onsave` flow.
+- `AddSongsModal.svelte` (setlist song picker) excludes archived songs from its list so they can't be added to a new setlist.
+- Verified end-to-end with Playwright against a mocked API (real AWS backend/Telegram auth not reachable from this sandbox): default view hides archived, archive toggle shows only archived, modal archive button flips the flag and the song disappears from the default list immediately.
+
 ## Known data issues
 
 - Old setlist entries without `.song` snapshot show nothing in stage/editor until re-added

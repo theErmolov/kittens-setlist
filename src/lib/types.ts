@@ -26,6 +26,7 @@ export interface Song {
   progress?: Record<string, LearningStage>;  // keyed by musician name
   lyrics?: string;
   transpose?: number;
+  archived?: boolean;  // moved out of active backlog; setlist snapshots are unaffected
 }
 
 export interface SetlistEntry {
