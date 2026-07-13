@@ -287,7 +287,7 @@
     <input class="search mobile-search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="mobile-chips-row">
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, songs.length)}</span>
+      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)}</span>
     </div>
     <div class="filter-group">
       {#each permanentNames as name}
@@ -310,16 +310,18 @@
       {/each}
     </div>
     <div class="filter-sep-h"></div>
-    <button
-      class="filter-chip archive-chip-mobile"
-      class:active={showArchived}
-      onclick={() => { showArchived = !showArchived; }}
-    >📦 {$t.backlog.archivedFilter}</button>
-    <button
-      class="filter-chip progress-chip-mobile"
-      class:active={showProgress}
-      onclick={() => { showProgress = !showProgress; }}
-    >📊 {$t.backlog.progress}</button>
+    <div class="filter-group">
+      <button
+        class="filter-chip archive-chip-mobile"
+        class:active={showArchived}
+        onclick={() => { showArchived = !showArchived; }}
+      >📦 {$t.backlog.archivedFilter}</button>
+      <button
+        class="filter-chip progress-chip-mobile"
+        class:active={showProgress}
+        onclick={() => { showProgress = !showProgress; }}
+      >📊 {$t.backlog.progress}</button>
+    </div>
   </div>
 
   <!-- Mobile bottom bar -->
@@ -481,8 +483,6 @@
     .mobile-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .mobile-chips-row .song-count { margin-left: auto; }
     .filter-sep-h { height: 1px; background: var(--border); }
-    .archive-chip-mobile { align-self: flex-start; }
-    .progress-chip-mobile { align-self: flex-start; }
 
     /* Mobile bottom bar */
     .mobile-bottom-bar {
