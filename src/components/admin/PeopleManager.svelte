@@ -288,6 +288,7 @@
     <div class="people-table">
       <div class="people-header">
         <span>{$t.admin.person}</span>
+        <span>{$t.admin.role}</span>
         <span>{$t.admin.telegramAccess}</span>
         <span>{$t.musicians.title}</span>
       </div>
@@ -308,33 +309,35 @@
             <div class="identity-text">
               <span class="name">{displayName(user)}</span>
               {#if user.username}<span class="hint">@{user.username}</span>{/if}
-              {#if user.isAdmin}<span class="badge admin-badge">admin</span>{/if}
+              {#if user.isAdmin}
+                <span class="badge admin-badge">admin</span>
+              {:else if user.telegramId}
+                <span class="badge status" class:pending={user.status === 'pending'} class:rejected={user.status === 'rejected'}>{statusLabel(user)}</span>
+              {/if}
             </div>
           </div>
 
+          <div class="role-cell">
+            {#if user.telegramId && !user.isAdmin}
+              <select bind:value={roleSelections[user.id]} class="role-select" disabled={saving === user.id}
+                onchange={() => user.status === 'approved' && saveRole(user)}>
+                <option value="writer">Writer</option><option value="reader">Reader</option>
+              </select>
+            {/if}
+          </div>
+
           <div class="access-cell">
-            {#if user.telegramId}
-              <div class="access-heading">
-                <span class="badge status" class:pending={user.status === 'pending'} class:rejected={user.status === 'rejected'}>{statusLabel(user)}</span>
-              </div>
-              {#if !user.isAdmin}
-                <select bind:value={roleSelections[user.id]} class="role-select" disabled={saving === user.id}
-                  onchange={() => user.status === 'approved' && saveRole(user)}>
-                  <option value="writer">Writer</option><option value="reader">Reader</option>
-                </select>
-                <div class="access-actions">
-                  {#if user.status === 'pending'}
-                    <button class="btn approve" disabled={saving === user.id || (approvalMusicianSelections[user.id] === '__new__' && !approvalMusicianNames[user.id]?.trim())}
-                      onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
-                    <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.reject}</button>
-                  {:else if user.status === 'approved'}
-                    <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.revoke}</button>
-                  {:else}
-                    <button class="btn approve" disabled={saving === user.id} onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
-                  {/if}
-                </div>
+            {#if user.telegramId && !user.isAdmin}
+              {#if user.status === 'pending'}
+                <button class="btn approve" disabled={saving === user.id || (approvalMusicianSelections[user.id] === '__new__' && !approvalMusicianNames[user.id]?.trim())}
+                  onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
+                <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.reject}</button>
+              {:else if user.status === 'approved'}
+                <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.revoke}</button>
+              {:else}
+                <button class="btn approve" disabled={saving === user.id} onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
               {/if}
-            {:else}
+            {:else if !user.telegramId}
               <span class="hint">{$t.admin.noTelegramAccess}</span>
             {/if}
           </div>
@@ -419,11 +422,11 @@
   .people-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   h2 { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
   .people-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .people-header, .people-row { display: grid; grid-template-columns: minmax(190px, 1.15fr) minmax(175px, 0.9fr) minmax(250px, 1.35fr); gap: 14px; align-items: center; }
+  .people-header, .people-row { display: grid; grid-template-columns: minmax(190px, 1.2fr) minmax(90px, 0.5fr) minmax(120px, 0.65fr) minmax(250px, 1.35fr); gap: 12px; align-items: center; }
   .people-header { padding: 8px 12px; background: var(--surface); color: var(--text-muted); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
   .people-row { padding: 11px 12px; border-top: 1px solid var(--border); background: var(--bg); }
   .people-row.drag-over { box-shadow: inset 0 2px var(--accent); }
-  .identity, .access-heading, .access-actions, .musician-cell, .musician-summary, .musician-actions, .instrument-list, .editor-actions { display: flex; align-items: center; }
+  .identity, .role-cell, .musician-cell, .musician-summary, .musician-actions, .instrument-list, .editor-actions { display: flex; align-items: center; }
   .identity { gap: 9px; min-width: 0; }
   .identity-text { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
@@ -435,8 +438,9 @@
   .status { background: #22c55e22; color: #16a34a; }
   .status.pending { background: #f59e0b22; color: #d97706; }
   .status.rejected { background: #ef444422; color: #dc2626; }
+  .role-cell { min-width: 0; }
   .access-cell, .approval-musician, .musician-editor { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; }
-  .access-actions, .musician-actions, .editor-actions { gap: 6px; }
+  .musician-actions, .editor-actions { gap: 6px; }
   .musician-cell { justify-content: space-between; gap: 8px; min-width: 0; }
   .musician-summary { min-width: 0; gap: 9px; flex-wrap: wrap; }
   .instrument-list { gap: 4px; flex-wrap: wrap; }
@@ -453,7 +457,7 @@
   .btn.secondary { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
   .btn.approve { background: #22c55e; color: #fff; }
   .btn.reject { background: #e05252; color: #fff; }
-  .icon-btn { background: none; border: 0; cursor: pointer; padding: 4px 5px; opacity: 0.7; }
+  .icon-btn { width: 50px; height: 50px; box-sizing: border-box; background: none; border: 0; cursor: pointer; padding: 6px; font-size: 2.4rem; line-height: 1; opacity: 0.7; }
   .icon-btn:hover { opacity: 1; }
   .icon-btn.delete:hover { color: #ef4444; }
   .error { color: #dc2626; font-size: 0.82rem; margin-bottom: 8px; }
