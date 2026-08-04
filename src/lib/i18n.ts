@@ -30,6 +30,7 @@ const strings = {
       save: 'Save',
       cancel: 'Cancel',
       deleteConfirm: 'Delete this musician?',
+      removeConfirm: 'Remove musician status? Telegram access will remain.',
       noInstrument: '(free)',
     },
     filter: {
@@ -160,6 +161,10 @@ const strings = {
     admin: {
       title: 'Admin',
       users: 'Users',
+      person: 'Person',
+      telegramAccess: 'Telegram access',
+      noTelegramAccess: 'No Telegram access',
+      makeMusician: 'Add musician identity',
       pending: 'Pending',
       approved: 'Approved',
       rejected: 'Rejected',
@@ -244,6 +249,7 @@ const strings = {
       save: 'Сохранить',
       cancel: 'Отмена',
       deleteConfirm: 'Удалить музыканта?',
+      removeConfirm: 'Убрать статус музыканта? Доступ Telegram сохранится.',
       noInstrument: '(свободен)',
     },
     filter: {
@@ -378,6 +384,10 @@ const strings = {
     admin: {
       title: 'Администрация',
       users: 'Пользователи',
+      person: 'Человек',
+      telegramAccess: 'Доступ Telegram',
+      noTelegramAccess: 'Нет доступа Telegram',
+      makeMusician: 'Сделать музыкантом',
       pending: 'Ожидает',
       approved: 'Одобрен',
       rejected: 'Отклонён',
