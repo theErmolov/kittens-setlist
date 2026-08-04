@@ -1,14 +1,14 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { Song, KittensUser } from '../lib/types.js';
+import type { Song, User } from '../lib/types.js';
 import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
 const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 
 function songName(s: Song) { return `${s.artist} — ${s.title}`; }
 
-export async function songsHandler(event: APIGatewayProxyEventV2, path: string, user: KittensUser) {
+export async function songsHandler(event: APIGatewayProxyEventV2, path: string, user: User) {
   const method = event.requestContext.http.method;
   const parts = path.split('/').filter(Boolean); // ['songs'] or ['songs', 'id']
   const id = parts[1] ?? null;

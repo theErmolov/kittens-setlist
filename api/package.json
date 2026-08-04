@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --outfile=dist/index.js",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "tsc && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",

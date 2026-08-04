@@ -7,7 +7,7 @@
   import { PUBLIC_API_URL, PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
   import { t } from '$lib/i18n';
   import { currentUser, authLoading, setToken, getToken } from '$lib/auth';
-  import type { KittensUser } from '$lib/types';
+  import type { User } from '$lib/types';
   import LogoCat from '$components/shared/LogoCat.svelte';
 
   let status: 'idle' | 'loading' | 'pending' | 'rejected' | 'error' = $state('idle');
@@ -52,7 +52,7 @@
         status = 'error';
         return;
       }
-      const { token, user } = await res.json() as { token: string; user: KittensUser };
+      const { token, user } = await res.json() as { token: string; user: User };
       setToken(token);
       currentUser.set(user);
       if (user.status === 'approved') {

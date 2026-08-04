@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { Setlist, SetlistEntry, SetlistSubset, Song, LearningStage, KittensUser } from '../lib/types.js';
+import type { Setlist, SetlistEntry, SetlistSubset, Song, LearningStage, User } from '../lib/types.js';
 import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
 const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
@@ -14,7 +14,7 @@ function entryName(setlist: Setlist, entry: SetlistEntry) {
   return `${setlistName(setlist)} / перерыв`;
 }
 
-export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPath: string, user: KittensUser) {
+export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPath: string, user: User) {
   const method = event.requestContext.http.method;
   const rawPath = strippedPath;
   const parts = strippedPath.split('/').filter(Boolean); // ['setlists'] or ['setlists', id, ...]

@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, KittensUser, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -146,12 +146,22 @@ export async function reorderEntries(setlistId: string, entries: SetlistEntry[],
 
 // ─── Auth (admin) ──────────────────────────────────────────────────────────────
 
-export async function getUsers(): Promise<KittensUser[]> {
+export async function getUsers(): Promise<User[]> {
   return req('/auth/users');
 }
 
-export async function patchUser(telegramId: string, patch: { status?: string; musicianId?: string | null; role?: string | null }): Promise<KittensUser> {
-  return req(`/auth/users/${telegramId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+export interface UserPatch {
+  status?: UserStatus;
+  role?: UserRole | null;
+  musicianName?: string | null;
+  defaultInstruments?: Instrument[];
+  sortOrder?: number;
+  guest?: boolean;
+  mergeIntoUserId?: string;
+}
+
+export async function patchUser(id: string, patch: UserPatch): Promise<User> {
+  return req(`/auth/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
 export async function getAuditLog(limit: number, cursor?: string): Promise<{ items: AuditLogEntry[]; nextCursor?: string }> {

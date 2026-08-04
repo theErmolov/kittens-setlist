@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { randomUUID } from 'crypto';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
-import type { BudgetEntry, KittensUser } from '../lib/types.js';
+import type { BudgetEntry, User } from '../lib/types.js';
 import { logAudit, diffSummary } from '../lib/audit.js';
 import { getReceiptUploadUrl, getReceiptDownloadUrl } from '../lib/s3.js';
 
@@ -19,7 +19,7 @@ function entryName(e: BudgetEntry): string {
   return `${KIND_LABEL[e.kind] ?? e.kind} ${amount}€${who ? ` (${who})` : ''}`;
 }
 
-export async function budgetHandler(event: APIGatewayProxyEventV2, path: string, user: KittensUser) {
+export async function budgetHandler(event: APIGatewayProxyEventV2, path: string, user: User) {
   const method = event.requestContext.http.method;
   const parts = path.split('/').filter(Boolean); // ['budget'] | ['budget', id] | ['budget', id, 'receipt-url']
   const id = parts[1] ?? null;
@@ -54,7 +54,7 @@ export async function budgetHandler(event: APIGatewayProxyEventV2, path: string,
         ...body,
         id: randomUUID(),
         createdAt: new Date().toISOString(),
-        createdBy: user.telegramId,
+        createdBy: user.telegramId ?? user.id,
       } as BudgetEntry;
       await dbPut(TABLE, entry as unknown as Record<string, unknown>);
       await logAudit({ action: 'budget.create', actor: user, entityType: 'budget', entityId: entry.id, entityName: entryName(entry), summary: `добавлен ${entryName(entry)}` });

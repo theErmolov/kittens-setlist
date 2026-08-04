@@ -72,18 +72,22 @@ export interface AuditLogEntry {
 export type UserStatus = 'pending' | 'approved' | 'rejected';
 export type UserRole = 'writer' | 'reader';
 
-export interface KittensUser {
-  telegramId: string;
-  firstName: string;
+export interface User {
+  id: string;
+  telegramId?: string;
+  firstName?: string;
   lastName?: string;
   username?: string;
   photoUrl?: string;
-  status: UserStatus;
+  status?: UserStatus;
   role?: UserRole;
-  musicianId?: string;
   isAdmin?: boolean;
-  createdAt: string;
+  createdAt?: string;
   approvedAt?: string;
+  musicianName?: string;
+  defaultInstruments?: Instrument[];
+  sortOrder?: number;
+  guest?: boolean;
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────

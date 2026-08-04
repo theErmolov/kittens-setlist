@@ -5,6 +5,8 @@ import {
   PutCommand,
   DeleteCommand,
   ScanCommand,
+  QueryCommand,
+  TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
@@ -41,4 +43,33 @@ export async function dbScan<T>(table: string): Promise<T[]> {
     lastKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
   } while (lastKey);
   return items;
+}
+
+export async function dbQueryIndex<T>(
+  table: string,
+  indexName: string,
+  keyName: string,
+  keyValue: string,
+): Promise<T[]> {
+  const res = await db.send(new QueryCommand({
+    TableName: table,
+    IndexName: indexName,
+    KeyConditionExpression: '#key = :value',
+    ExpressionAttributeNames: { '#key': keyName },
+    ExpressionAttributeValues: { ':value': keyValue },
+  }));
+  return (res.Items ?? []) as T[];
+}
+
+export async function dbTransactPutAndDelete(
+  table: string,
+  item: Record<string, unknown>,
+  deleteId?: string,
+): Promise<void> {
+  await db.send(new TransactWriteCommand({
+    TransactItems: [
+      { Put: { TableName: table, Item: item } },
+      ...(deleteId ? [{ Delete: { TableName: table, Key: { id: deleteId } } }] : []),
+    ],
+  }));
 }

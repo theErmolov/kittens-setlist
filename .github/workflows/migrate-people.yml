@@ -1,0 +1,75 @@
+name: Migrate People
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Validate only, or migrate after validation
+        required: true
+        type: choice
+        options: [validate, migrate, parity]
+        default: validate
+      confirmation:
+        description: Type migrate-kittens-people to enable migrate
+        required: false
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  AWS_REGION: eu-central-1
+  EXPECTED_PEOPLE_COUNT: '7'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+      - name: Validate source or post-cutover parity without writes
+        working-directory: api
+        run: |
+          if [ "${{ inputs.action }}" = "parity" ]; then
+            node scripts/migrate-people.mjs parity
+          else
+            node scripts/migrate-people.mjs validate
+          fi
+
+  migrate:
+    if: inputs.action == 'migrate' && inputs.confirmation == 'migrate-kittens-people'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: people-migration
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+      - name: Lock, migrate, verify, and cut over
+        working-directory: api
+        run: node scripts/migrate-people.mjs migrate

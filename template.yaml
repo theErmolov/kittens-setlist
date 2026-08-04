@@ -14,6 +14,7 @@ Globals:
         SETLISTS_TABLE: !Ref SetlistsTable
         MUSICIANS_TABLE: !Ref MusiciansTable
         USERS_TABLE: !Ref UsersTable
+        PEOPLE_TABLE: !Ref PeopleTable
         SESSIONS_TABLE: !Ref SessionsTable
         AUDIT_LOG_TABLE: !Ref AuditLogTable
         BUDGET_TABLE: !Ref BudgetTable
@@ -69,6 +70,8 @@ Resources:
             TableName: !Ref MusiciansTable
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PeopleTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SessionsTable
         - DynamoDBCrudPolicy:
@@ -145,6 +148,32 @@ Resources:
       KeySchema:
         - AttributeName: telegramId
           KeyType: HASH
+
+  # Canonical identity store. Legacy users/musicians tables remain retained for rollback.
+  PeopleTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: kittens-people
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: telegramId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: telegramId-index
+          KeySchema:
+            - AttributeName: telegramId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   SessionsTable:
     Type: AWS::DynamoDB::Table

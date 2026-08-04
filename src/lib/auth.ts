@@ -1,11 +1,11 @@
 import { browser } from '$app/environment';
 import { writable, derived, get } from 'svelte/store';
-import type { KittensUser } from '$lib/types';
+import type { User } from '$lib/types';
 import { PUBLIC_API_URL } from '$env/static/public';
 
 const TOKEN_KEY = 'auth_token';
 
-export const currentUser = writable<KittensUser | null>(null);
+export const currentUser = writable<User | null>(null);
 export const authLoading = writable(true);
 
 export function getToken(): string | null {
@@ -39,7 +39,7 @@ export async function initAuth(): Promise<void> {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      const user = await res.json() as KittensUser;
+      const user = await res.json() as User;
       currentUser.set(user);
     } else {
       clearToken();

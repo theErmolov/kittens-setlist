@@ -6,7 +6,7 @@ import { setlistsHandler } from './handlers/setlists.js';
 import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
 import { err } from './lib/response.js';
-import type { KittensUser } from './lib/types.js';
+import type { User } from './lib/types.js';
 
 export const handler = async (event: APIGatewayProxyEventV2) => {
   // API Gateway HTTP API prepends the stage name to rawPath (e.g. /prod/songs).
@@ -37,7 +37,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     event.requestContext.http.method === 'GET' &&
     /^\/setlists\/[^/]+$/.test(path);
 
-  let user: KittensUser | null = null;
+  let user: User | null = null;
   if (!isPublicSetlistGet) {
     // All other routes require an authenticated, approved user
     user = await resolveAuth(event);

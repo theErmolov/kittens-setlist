@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { db } from './dynamo.js';
 import { QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
-import type { KittensUser } from './types.js';
+import type { User } from './types.js';
 
 const TABLE = process.env.AUDIT_LOG_TABLE ?? 'kittens-audit-log';
 
@@ -13,7 +13,7 @@ export type AuditAction =
   | 'setlist.break_add' | 'setlist.break_remove' | 'setlist.break_update'
   | 'setlist.entry_song_edit' | 'setlist.entry_progress_update' | 'setlist.entry_comment_update'
   | 'setlist.reorder'
-  | 'user.approve' | 'user.reject' | 'user.role_change' | 'user.musician_assign'
+  | 'user.approve' | 'user.reject' | 'user.role_change' | 'user.merge' | 'user.musician_remove'
   | 'budget.create' | 'budget.update' | 'budget.delete';
 
 // Flip any action to false to silence it without changing handler code
@@ -41,7 +41,8 @@ export const AUDIT_ACTIONS: Record<AuditAction, boolean> = {
   'user.approve': true,
   'user.reject': true,
   'user.role_change': true,
-  'user.musician_assign': true,
+  'user.merge': true,
+  'user.musician_remove': true,
   'budget.create': true,
   'budget.update': true,
   'budget.delete': true,
@@ -65,7 +66,7 @@ export interface AuditLogEntry {
 
 export interface LogAuditParams {
   action: AuditAction;
-  actor: KittensUser;
+  actor: User;
   entityType: EntityType;
   entityId: string;
   entityName: string;
@@ -78,13 +79,13 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
   try {
     const timestamp = new Date().toISOString();
     const sk = `${timestamp}#${randomUUID()}`;
-    const actorName = [params.actor.firstName, params.actor.lastName].filter(Boolean).join(' ');
+    const actorName = [params.actor.firstName, params.actor.lastName].filter(Boolean).join(' ') || params.actor.musicianName || params.actor.id;
     const item: AuditLogEntry = {
       pk: 'audit',
       sk,
       timestamp,
       action: params.action,
-      actorTelegramId: params.actor.telegramId,
+      actorTelegramId: params.actor.telegramId ?? params.actor.id,
       actorName,
       entityType: params.entityType,
       entityId: params.entityId,

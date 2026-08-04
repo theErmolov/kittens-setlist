@@ -88,9 +88,6 @@
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
-  <a href="{base}/musicians" class="nav-link" class:active={path.startsWith('/musicians')}>
-    <span class="link-icon">🎸</span><span class="link-label">{$lang === 'ru' ? 'Музыканты' : 'Musicians'}</span>
-  </a>
   {#if $currentUser?.isAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
       <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
