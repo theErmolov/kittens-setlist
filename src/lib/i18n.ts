@@ -292,7 +292,7 @@ const strings = {
       category: 'Категория',
       musicians: 'Музыканты',
       comment: 'Комментарий',
-      commentPlaceholder: 'напр. Саша (перкуссия), особые пожелания…',
+      commentPlaceholder: 'напр. АртурНиколаич (рот), особые пожелания…',
       musicianPlaceholder: 'Имя музыканта',
       addMusician: '+ Добавить',
       length: 'Длительность',
