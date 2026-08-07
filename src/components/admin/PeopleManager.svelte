@@ -43,7 +43,6 @@
 
   $effect(() => {
     for (const user of users) {
-      if (roleSelections[user.id] === undefined) roleSelections[user.id] = user.role ?? 'reader';
       if (approvalMusicianSelections[user.id] === undefined) approvalMusicianSelections[user.id] = '';
       if (approvalMusicianNames[user.id] === undefined) approvalMusicianNames[user.id] = '';
       if (approvalMusicianInstruments[user.id] === undefined) approvalMusicianInstruments[user.id] = [];
@@ -109,7 +108,7 @@
     try {
       const patch: Parameters<typeof patchUser>[1] = {
         status,
-        role: roleSelections[user.id] ?? 'reader',
+        role: roleSelections[user.id] ?? user.role ?? 'reader',
       };
       const choice = approvalMusicianSelections[user.id] ?? '';
       if (status === 'approved' && !user.musicianName && choice === '__new__') {
@@ -130,17 +129,24 @@
     }
   }
 
-  async function saveRole(user: User) {
+  async function saveRole(user: User, role: UserRole) {
     saving = user.id;
     error = '';
     try {
-      await patchUser(user.id, { role: roleSelections[user.id] ?? 'reader' });
+      await patchUser(user.id, { role });
       await refresh();
     } catch (errorValue) {
+      roleSelections[user.id] = user.role ?? 'reader';
       error = message(errorValue);
     } finally {
       saving = null;
     }
+  }
+
+  function handleRoleChange(user: User, event: Event) {
+    const role = (event.currentTarget as HTMLSelectElement).value as UserRole;
+    roleSelections[user.id] = role;
+    if (user.status === 'approved') void saveRole(user, role);
   }
 
   function startStandaloneMusician() {
@@ -319,8 +325,8 @@
 
           <div class="role-cell">
             {#if user.telegramId && !user.isAdmin}
-              <select bind:value={roleSelections[user.id]} class="role-select" disabled={saving === user.id}
-                onchange={() => user.status === 'approved' && saveRole(user)}>
+              <select value={roleSelections[user.id] ?? user.role ?? 'reader'} class="role-select" disabled={saving === user.id}
+                onchange={event => handleRoleChange(user, event)}>
                 <option value="writer">Writer</option><option value="reader">Reader</option>
               </select>
             {/if}
