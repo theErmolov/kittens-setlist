@@ -469,10 +469,35 @@
   .error { color: #dc2626; font-size: 0.82rem; margin-bottom: 8px; }
 
   @media (max-width: 760px) {
+    .people-section { margin-bottom: 18px; }
+    .people-title { gap: 8px; margin-bottom: 8px; }
+    .people-title .btn { padding: 5px 8px; font-size: 0.7rem; }
     .people-header { display: none; }
-    .people-row { grid-template-columns: 1fr; gap: 12px; }
+    .people-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        "identity role access"
+        "musician musician musician";
+      column-gap: 6px;
+      row-gap: 7px;
+      padding: 8px 9px;
+    }
     .people-row:first-child { border-top: 0; }
-    .access-cell, .musician-cell { padding-left: 0; }
-    .musician-editor input, .approval-musician input, .musician-select, .role-select { font-size: 16px; }
+    .identity { grid-area: identity; gap: 7px; }
+    .avatar { width: 32px; height: 32px; }
+    .identity-text { gap: 0; }
+    .name, .musician-name { font-size: 0.82rem; }
+    .identity .hint { font-size: 0.7rem; line-height: 1.1; }
+    .badge { padding: 1px 5px; font-size: 0.56rem; }
+    .role-cell { grid-area: role; align-self: start; }
+    .access-cell { grid-area: access; align-self: start; gap: 4px; }
+    .musician-cell { grid-area: musician; min-height: 30px; padding-left: 0; }
+    .musician-summary { gap: 7px; }
+    .instrument-list { gap: 3px; font-size: 0.95rem; }
+    .musician-actions { gap: 2px; }
+    .icon-btn { width: 30px; height: 30px; padding: 4px; font-size: 1.2rem; }
+    .access-cell .btn { min-height: 30px; padding: 4px 7px; font-size: 0.7rem; }
+    .musician-editor input, .approval-musician input, .musician-select { font-size: 16px; }
+    .role-select { width: 78px; height: 30px; padding: 2px 5px; font-size: 16px; }
   }
 </style>
