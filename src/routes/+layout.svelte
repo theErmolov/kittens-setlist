@@ -88,6 +88,15 @@
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
+  <a
+    href="https://media.kittens.band"
+    class="nav-link"
+    target="_blank"
+    rel="noopener noreferrer"
+    title={$lang === 'ru' ? 'Медиахранилище' : 'Media storage'}
+  >
+    <span class="link-icon">📷</span><span class="link-label">{$lang === 'ru' ? 'Медиа' : 'Media'}</span>
+  </a>
   {#if $currentUser?.isAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
       <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
@@ -95,6 +104,15 @@
     <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
       <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
       {#if hasPending}<span class="pending-dot"></span>{/if}
+    </a>
+    <a
+      href="https://antispam.kittens.band/"
+      class="nav-link"
+      target="_blank"
+      rel="noopener noreferrer"
+      title={$lang === 'ru' ? 'Антиспам' : 'Anti-spam'}
+    >
+      <span class="link-icon">🛡️</span><span class="link-label">{$lang === 'ru' ? 'Антиспам' : 'Anti-spam'}</span>
     </a>
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
@@ -274,8 +292,8 @@
     .brand-text { display: none; }
     .nav-brand { margin-right: 4px; }
     .link-label { display: none; }
-    .nav-link { padding: 0 16px; font-size: 1.2rem; }
-    .link-icon { font-size: 1.45rem; }
+    .nav-link { padding: 0 5px; font-size: 1.2rem; }
+    .link-icon { font-size: 1.25rem; }
     .lang-toggle { margin-left: auto; padding: 4px 7px; }
   }
 </style>
