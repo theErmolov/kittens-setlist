@@ -107,9 +107,18 @@ export function formatEUR(cents: number): string {
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 }
 
-/** Plain (no symbol) two-decimal format, used in the copy-paste report. e.g. 2710 → "27,10". */
+/** Plain report-entry format: whole euros omit decimals, cents keep two digits. */
 export function formatAmount(cents: number): string {
-  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+  const fractionDigits = cents % 100 === 0 ? 0 : 2;
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(cents / 100);
+}
+
+/** Calculated report totals omit insignificant trailing zeroes. */
+function formatReportTotal(cents: number): string {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(cents / 100);
 }
 
 /** Parse a user-typed EUR amount ("27,10" / "27.10" / "27") into integer cents. */
@@ -146,28 +155,59 @@ export function budgetTotals(entries: BudgetEntry[]): BudgetTotals {
 }
 
 /** Build the copy-paste «По баблу» report from the current cumulative state. */
-export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[]): string {
+export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], now = Date.now()): string {
   const t = budgetTotals(entries);
   const setlistName = (id?: string) => setlists.find(s => s.id === id)?.name;
+
+  const latestPastSetlist = setlists
+    .map(setlist => {
+      if (!setlist.date) return null;
+      const startsAt = new Date(`${setlist.date}T${setlist.startTime ?? '00:00'}`).getTime();
+      return Number.isNaN(startsAt) || startsAt > now ? null : { setlist, startsAt };
+    })
+    .filter((item): item is { setlist: Setlist; startsAt: number } => item !== null)
+    .sort((a, b) => b.startsAt - a.startsAt)[0]?.setlist;
+
+  const recentDonations = entries
+    .filter((entry): entry is Extract<BudgetEntry, { kind: 'income' }> => (
+      entry.kind === 'income' && entry.setlistId === latestPastSetlist?.id
+    ))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const recentDonationTotal = recentDonations.reduce((sum, entry) => sum + entry.amount, 0);
 
   const lines: string[] = [];
   lines.push('Рубрика «По баблу»:');
   lines.push('');
-  lines.push(`Наличка — ${formatAmount(t.cash)}`);
-  lines.push(`Переводы — ${formatAmount(t.transfer)}`);
-  lines.push(`Итого на руках — ${formatAmount(t.onHand)}`);
+
+  for (const donation of recentDonations) {
+    const label = donation.person?.trim() || (donation.method === 'cash' ? 'Наличка' : 'Пейпал');
+    lines.push(`${label} — ${formatAmount(donation.amount)}`);
+  }
+
+  if (recentDonations.length > 0) lines.push('');
+  lines.push(`Котятский банк — ${formatReportTotal(t.onHand - recentDonationTotal)}`);
+  lines.push(`Итого на руках — ${formatReportTotal(t.onHand)}`);
 
   const debts = entries.filter((e): e is Extract<BudgetEntry, { kind: 'debt' }> => e.kind === 'debt' && !e.paid);
   if (debts.length > 0) {
-    const items = debts.map(d => {
-      const note = d.comment || d.description || setlistName(d.setlistId);
-      return `${formatAmount(d.amount)}${note ? ` (${note})` : ''}`;
-    });
     lines.push('');
-    lines.push(`Долги: ${items.join(' + ')} = ${formatAmount(t.debts)}`);
+
+    const debtsByCreditor = new Map<string, typeof debts>();
+    for (const debt of [...debts].sort((a, b) => a.date.localeCompare(b.date))) {
+      const creditor = debt.creditor?.trim() ?? '';
+      debtsByCreditor.set(creditor, [...(debtsByCreditor.get(creditor) ?? []), debt]);
+    }
+
+    for (const [creditor, creditorDebts] of debtsByCreditor) {
+      const items = creditorDebts.map(debt => {
+        const note = debt.description || debt.comment || setlistName(debt.setlistId);
+        return `${formatAmount(debt.amount)}${note ? ` ${note}` : ''}`;
+      });
+      lines.push(`Долг${creditor ? ` ${creditor}` : ''}: ${items.join(' + ')}`);
+    }
   }
 
   lines.push('');
-  lines.push(`Итого наш баланс пока: ${formatAmount(t.balance)}`);
+  lines.push(`Итого наш баланс пока: ${formatReportTotal(t.balance)}`);
   return lines.join('\n');
 }

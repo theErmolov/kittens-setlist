@@ -292,7 +292,7 @@
     .brand-text { display: none; }
     .nav-brand { margin-right: 4px; }
     .link-label { display: none; }
-    .nav-link { padding: 0 5px; font-size: 1.2rem; }
+    .nav-link { flex: 1 1 0; justify-content: center; min-width: 0; padding: 0; font-size: 1.2rem; }
     .link-icon { font-size: 1.25rem; }
     .lang-toggle { margin-left: auto; padding: 4px 7px; }
   }
