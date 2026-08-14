@@ -329,8 +329,22 @@
   function updateDropTargetAtPoint(clientX: number, clientY: number) {
     const el = document.elementFromPoint(clientX, clientY);
     if (draggedSubsetId !== null) {
-      const header = el?.closest('[data-subset-id]') as HTMLElement | null;
-      if (header) overSubsetId = header.dataset.subsetId ?? null;
+      const blockRow = el?.closest('[data-subset-block-id]') as HTMLElement | null;
+      if (blockRow) {
+        overSubsetId = blockRow.dataset.subsetBlockId ?? null;
+        return;
+      }
+
+      const headers = tableWrapEl
+        ? [...tableWrapEl.querySelectorAll<HTMLElement>('.subset-header[data-subset-block-id]')]
+        : [];
+      const nearest = headers.reduce<HTMLElement | null>((best, header) => {
+        if (!best) return header;
+        const headerDistance = Math.abs(header.getBoundingClientRect().top - clientY);
+        const bestDistance = Math.abs(best.getBoundingClientRect().top - clientY);
+        return headerDistance < bestDistance ? header : best;
+      }, null);
+      overSubsetId = nearest?.dataset.subsetBlockId ?? null;
       return;
     }
 
@@ -343,10 +357,10 @@
       return;
     }
 
-    const header = el?.closest('[data-subset-id]') as HTMLElement | null;
+    const header = el?.closest('.subset-header[data-subset-block-id]') as HTMLElement | null;
     if (header) {
       overEntryKey = null;
-      overSubsetId = header.dataset.subsetId ?? null;
+      overSubsetId = header.dataset.subsetBlockId ?? null;
       const rect = header.getBoundingClientRect();
       overSubsetSide = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
     }
@@ -652,6 +666,11 @@
 
   function onEntryDragOver(e: DragEvent, key: string) {
     e.preventDefault();
+    if (draggedSubsetId !== null) {
+      updateDropTargetAtPoint(e.clientX, e.clientY);
+      updateDragAutoScroll(e.clientX, e.clientY);
+      return;
+    }
     overEntryKey = key;
     const row = e.currentTarget as HTMLElement;
     const rect = row.getBoundingClientRect();
@@ -685,6 +704,28 @@
       return;
     }
     draggedSubsetId = subsetId;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', subsetId);
+      const subset = localSubsets.find(candidate => candidate.id === subsetId);
+      const preview = document.createElement('div');
+      preview.textContent = `⏭ ${subset?.name ?? ''} · ${$t.editor.subsetSongs(entriesInSubset(subsetId))}`;
+      Object.assign(preview.style, {
+        position: 'fixed',
+        left: '-10000px',
+        top: '-10000px',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        background: '#ede9fe',
+        color: '#5b21b6',
+        border: '2px solid #7c3aed',
+        font: '600 14px system-ui, sans-serif',
+        whiteSpace: 'nowrap',
+      });
+      document.body.appendChild(preview);
+      e.dataTransfer.setDragImage(preview, 24, 20);
+      requestAnimationFrame(() => preview.remove());
+    }
   }
 
   function onSubsetDragOver(e: DragEvent, subsetId: string) {
@@ -714,9 +755,14 @@
     await persistLayout(layout);
   }
 
-  async function dropOnSubsetHeader(subsetId: string) {
-    if (draggedEntryKey) await dropEntryOnSubset(subsetId);
-    else await dropSubset();
+  async function dropAtCurrentTarget() {
+    if (draggedSubsetId) {
+      await dropSubset();
+    } else if (draggedEntryKey && overSubsetId) {
+      await dropEntryOnSubset(overSubsetId);
+    } else {
+      await dropEntry();
+    }
   }
 
   function clearSubsetDrag() {
@@ -936,7 +982,17 @@
             <th class="th-actions"></th>
           </tr>
         </thead>
-        <tbody>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <tbody
+          ondragover={(e) => {
+            if (draggedEntryKey !== null || draggedSubsetId !== null) {
+              e.preventDefault();
+              updateDropTargetAtPoint(e.clientX, e.clientY);
+              updateDragAutoScroll(e.clientX, e.clientY);
+            }
+          }}
+          ondrop={(e) => { e.preventDefault(); void dropAtCurrentTarget(); }}
+        >
           {#each renderItems() as item (renderItemKey(item))}
             {#if item.kind === 'header'}
               <tr
@@ -945,11 +1001,10 @@
                 class:dragging={draggedSubsetId === item.subset.id}
                 class:drag-over={overSubsetId === item.subset.id && draggedSubsetId !== item.subset.id}
                 draggable={!isFiltered && activeSubsetId !== item.subset.id}
-                data-subset-id={item.subset.id}
+                data-subset-block-id={item.subset.id}
                 onclick={() => handleSubsetHeaderClick(item.subset)}
                 ondragstart={(e) => onSubsetDragStart(e, item.subset.id)}
                 ondragover={(e) => onSubsetDragOver(e, item.subset.id)}
-                ondrop={() => dropOnSubsetHeader(item.subset.id)}
                 ondragend={clearSubsetDrag}
               >
                 <td colspan={totalCols}>
@@ -1011,12 +1066,14 @@
                     class:drag-over={isOver}
                     class:subset-member={!!entry.subsetId}
                     class:subset-active-member={activeSubsetId !== null && entry.subsetId === activeSubsetId}
+                    class:subset-block-dragging={draggedSubsetId !== null && entry.subsetId === draggedSubsetId}
+                    class:subset-block-over={draggedSubsetId !== null && overSubsetId === entry.subsetId && draggedSubsetId !== entry.subsetId}
                     draggable={canDrag}
                     data-row-key={key}
+                    data-subset-block-id={entry.subsetId}
                     onclick={(e) => handleRowClick(e, entry)}
                     ondragstart={canDrag ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onEntryDragStart(key); } : undefined}
                     ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
-                    ondrop={canDrag ? dropEntry : undefined}
                     ondragend={canDrag ? clearEntryDrag : undefined}
                   >
                     <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>
@@ -1088,7 +1145,6 @@
                   data-row-key={key}
                   ondragstart={canDrag ? (() => onEntryDragStart(key)) : undefined}
                   ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
-                  ondrop={canDrag ? dropEntry : undefined}
                   ondragend={canDrag ? clearEntryDrag : undefined}
                 >
                   <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}><span class="drag-handle">⠿</span></td>
@@ -1132,7 +1188,6 @@
               class="drop-end-row"
               class:drop-end-active={overEntryKey === 'end'}
               ondragover={e => { e.preventDefault(); overEntryKey = 'end'; }}
-              ondrop={dropEntry}
             >
               <td colspan={totalCols}></td>
             </tr>
@@ -1277,6 +1332,8 @@
   .song-row:active { cursor: grabbing; }
   .song-row.dragging td { opacity: 0.35; }
   .song-row.drag-over td { outline: 2px dashed var(--accent); outline-offset: -1px; }
+  .song-row.subset-block-dragging td { opacity: 0.35; }
+  .song-row.subset-block-over td { background: rgba(124, 58, 237, 0.12); }
 
   .break-row { cursor: grab; user-select: none; }
   .break-row td { background: rgba(59, 130, 246, 0.09); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }

@@ -48,7 +48,7 @@
       for (const [name, role] of Object.entries(song.musicians)) {
         if (permanentNames.has(name)) result[name] = { instruments: [...(role.instruments ?? [])] };
       }
-    } else {
+    } else if (mode !== 'setlist-only') {
       for (const m of musicians) {
         result[m.name] = { instruments: m.defaultInstruments?.length ? [...m.defaultInstruments] : [] };
       }
