@@ -1496,7 +1496,6 @@
     -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
     mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
   }
-  :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { filter: brightness(2); }
   :global([data-theme="dark"]) .guest-tag { color: rgba(255,255,255,0.85) !important; }
 
   .entry-time-mob { display: none; }
