@@ -79,6 +79,8 @@ const strings = {
       save: 'Save',
       archive: 'Archive',
       unarchive: 'Restore',
+      addSetlistOnlyTitle: 'Add Song to Setlist',
+      editSetlistOnlyTitle: 'Edit Setlist Song',
     },
     instrument: {
       guitar: 'Guitar',
@@ -119,6 +121,11 @@ const strings = {
       subsetHint: 'Tap songs below to add them to the set',
       subsetRemove: 'Remove from set',
       subsetDissolve: 'Dissolve set',
+      addSetlistOnly: 'Add song not in catalog',
+      subsetEdit: 'Edit set',
+      subsetTapEdit: 'Tap to edit',
+      subsetUp: 'Up',
+      subsetDown: 'Down',
     },
     addSongs: {
       title: 'Add Songs',
@@ -301,6 +308,8 @@ const strings = {
       save: 'Сохранить',
       archive: 'В архив',
       unarchive: 'Вернуть из архива',
+      addSetlistOnlyTitle: 'Добавить песню в сетлист',
+      editSetlistOnlyTitle: 'Редактировать песню в сетлисте',
     },
     instrument: {
       guitar: 'Гитара',
@@ -341,6 +350,11 @@ const strings = {
       subsetHint: 'Нажимайте на песни ниже, чтобы добавить их в сет',
       subsetRemove: 'Убрать из сета',
       subsetDissolve: 'Распустить сет',
+      addSetlistOnly: 'Добавить песню не из списка',
+      subsetEdit: 'Редактировать сет',
+      subsetTapEdit: 'Нажмите, чтобы редактировать',
+      subsetUp: 'Выше',
+      subsetDown: 'Ниже',
     },
     addSongs: {
       title: 'Добавить песни',

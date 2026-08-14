@@ -24,6 +24,7 @@ export interface Song {
   comment?: string;  // general note, copied to setlist entry on add
   musicians: Record<string, MusicianRole>;
   sortOrder?: number;
+  lengthMinutes?: number;
   progress?: Record<string, LearningStage>;
   lyrics?: string;
   transpose?: number;
@@ -39,12 +40,14 @@ export interface SetlistEntry {
   playedAt?: string;  // ISO 8601, set when marked played
   comment?: string;
   progress?: Record<string, LearningStage>;
-  subsetId?: string;  // groups entry into a sub-setlist block (top of the list)
+  subsetId?: string;  // groups a song into a contiguous subset block
+  setlistOnly?: boolean;  // created directly in this setlist (no backlog record)
 }
 
 export interface SetlistSubset {
   id: string;
   name: string;
+  order?: number;  // header position in the same visual sequence as entry.order
   manualSort?: boolean;  // true once user drag-sorts inside → auto-sort disabled
 }
 

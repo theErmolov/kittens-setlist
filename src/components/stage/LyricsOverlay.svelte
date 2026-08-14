@@ -4,10 +4,11 @@
   import { updateSong } from '$lib/api';
   import { canWrite } from '$lib/auth';
 
-  let { song, onclose, onsongupdate }: {
+  let { song, onclose, onsongupdate, onsavetranspose }: {
     song: Song;
     onclose: () => void;
     onsongupdate?: (song: Song) => void;
+    onsavetranspose?: (song: Song) => Promise<Song>;
   } = $props();
 
   // ── Constants ──────────────────────────────────────────────────────────────
@@ -371,7 +372,10 @@
     if (!$canWrite) return;
     if (_saveTimer) clearTimeout(_saveTimer);
     _saveTimer = setTimeout(async () => {
-      const updated = await updateSong({ ...song, transpose: value }, true);
+      const changed = { ...song, transpose: value };
+      const updated = onsavetranspose
+        ? await onsavetranspose(changed)
+        : await updateSong(changed, true);
       onsongupdate?.(updated);
     }, 1500);
   }

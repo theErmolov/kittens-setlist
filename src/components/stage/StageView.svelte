@@ -6,7 +6,7 @@
   import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
-  import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough } from '$lib/api';
+  import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
@@ -178,7 +178,13 @@
   let unplayedToBottom = $state(false);
   let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '' || unplayedToBottom);
 
-  let lyricsForSong = $state<Song | null>(null);
+  let lyricsForEntry = $state<SetlistEntry | null>(null);
+
+  async function saveSetlistOnlyTranspose(entry: SetlistEntry, song: Song): Promise<Song> {
+    const updated = await updateEntrySong(setlist.id, entry.order, song);
+    applyPoll(updated);
+    return updated.entries.find(candidate => candidate.songId === entry.songId)?.song ?? song;
+  }
 
   // Per-entry start times keyed by entry order, only when startTime is set
   let entryTimes = $derived((): Map<number, string> => {
@@ -343,7 +349,7 @@
             {selectedMusician}
             {canMark}
             ontoggle={() => handleToggle(item.entry.songId!)}
-            onlyricsclick={() => { lyricsForSong = item.song; }} />
+            onlyricsclick={() => { lyricsForEntry = item.entry; }} />
         {:else}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -395,11 +401,16 @@
     {/if}
   </div>
 
-  {#if lyricsForSong}
+  {#if lyricsForEntry?.song}
     <LyricsOverlay
-      song={lyricsForSong}
-      onclose={() => { lyricsForSong = null; }}
-      onsongupdate={(updated) => { lyricsForSong = updated; }}
+      song={lyricsForEntry.song}
+      onclose={() => { lyricsForEntry = null; }}
+      onsongupdate={(updated) => {
+        if (lyricsForEntry) lyricsForEntry = { ...lyricsForEntry, song: updated };
+      }}
+      onsavetranspose={lyricsForEntry.setlistOnly
+        ? (song) => saveSetlistOnlyTranspose(lyricsForEntry!, song)
+        : undefined}
     />
   {/if}
 

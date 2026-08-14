@@ -30,7 +30,7 @@
   }: {
     song: Partial<Song> | null;
     musicians: BandMusician[];
-    mode?: 'backlog' | 'entry';
+    mode?: 'backlog' | 'entry' | 'setlist-only';
     onclose: () => void;
     onsave: (s: Song) => void;
     ondelete?: () => void;
@@ -67,6 +67,7 @@
     lengthMinutes: song?.lengthMinutes ?? 5,
     progress: { ...(song?.progress ?? {}) },
     lyrics: song?.lyrics ?? '',
+    transpose: song?.transpose,
     archived: song?.archived ?? false,
   });
 
@@ -192,6 +193,8 @@
   let modalTitle = $derived(
     mode === 'entry'
       ? ($t.song.editTitle + ' (в сетлисте)')
+      : mode === 'setlist-only'
+        ? (song?.id ? $t.song.editSetlistOnlyTitle : $t.song.addSetlistOnlyTitle)
       : (song?.id ? $t.song.editTitle : $t.song.addTitle)
   );
 </script>
@@ -349,7 +352,7 @@
         {#if onaddtosetlist}
           <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
         {/if}
-        {#if mode !== 'entry' && song?.id}
+        {#if mode === 'backlog' && song?.id}
           <button class="btn-icon" onclick={toggleArchive} title={draft.archived ? $t.song.unarchive : $t.song.archive}>{draft.archived ? '📤' : '📦'}</button>
         {/if}
         {#if onremove}

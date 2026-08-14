@@ -120,6 +120,13 @@ export async function addSongsToSetlist(setlistId: string, songs: Song[]): Promi
   return req(`/setlists/${setlistId}/songs`, { method: 'POST', body: JSON.stringify({ songs }) });
 }
 
+export async function addSetlistOnlySong(setlistId: string, song: Song): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/songs`, {
+    method: 'POST',
+    body: JSON.stringify({ songs: [song], setlistOnly: true }),
+  });
+}
+
 export async function updateEntrySong(setlistId: string, order: number, song: Song): Promise<Setlist> {
   return req(`/setlists/${setlistId}/entry-song`, { method: 'PATCH', body: JSON.stringify({ order, song }) });
 }

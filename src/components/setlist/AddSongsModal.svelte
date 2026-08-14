@@ -8,12 +8,14 @@
     songs,
     existingIds,
     onclose,
-    onadd
+    onadd,
+    onaddnew,
   }: {
     songs: Song[];
     existingIds: Set<string>;
     onclose: () => void;
     onadd: (songs: Song[]) => void;
+    onaddnew?: () => void;
   } = $props();
 
   let search = $state('');
@@ -79,6 +81,9 @@
       {/if}
     </div>
     <div class="modal-footer">
+      {#if onaddnew}
+        <button class="btn-new" onclick={onaddnew}>{$t.editor.addSetlistOnly}</button>
+      {/if}
       <span class="sel-count">{$t.addSongs.selected(selected.size)}</span>
       <button class="btn-secondary" onclick={onclose}>{$t.addSongs.cancel}</button>
       <button class="btn-primary" onclick={handleAdd} disabled={selected.size === 0}>
@@ -105,7 +110,17 @@
   .empty { text-align: center; color: var(--text-muted); padding: 24px; }
   .modal-footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
   .sel-count { flex: 1; font-size: 0.82rem; color: var(--text-muted); }
+  .btn-new { display: none; }
   .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-primary:disabled { opacity: 0.4; cursor: default; }
   .btn-secondary { padding: 8px 18px; background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text); }
+
+  @media (max-width: 700px) {
+    .modal-footer { flex-wrap: wrap; }
+    .btn-new {
+      display: block; width: 100%; padding: 9px 12px;
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); cursor: pointer; text-align: left;
+    }
+  }
 </style>

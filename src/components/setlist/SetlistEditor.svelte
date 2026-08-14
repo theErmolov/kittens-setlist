@@ -4,12 +4,13 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
+  import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, addSetlistOnlySong, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
   import { sortSubset } from '$lib/subsetSort';
+  import { buildSetlistLayout, normalizeSetlistLayout, moveLayoutEntry, moveLayoutEntryToSubset, moveSubsetBlock, moveSubsetBlockBy, type SetlistLayoutItem } from '$lib/setlistLayout';
   import CommentInput from './CommentInput.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import { base } from '$app/paths';
@@ -87,17 +88,23 @@
   $effect(() => { localSubsets = [...(setlist.subsets ?? [])]; });
 
   let showAddModal = $state(false);
+  let showSetlistOnlyModal = $state(false);
   let showBreakPicker = $state(false);
   let editingBreakOrder = $state<number | null>(null);
-  let dragIndex = $state<number | null>(null);
-  let overIndex = $state<number | null>(null);
+  let draggedEntryKey = $state<string | null>(null);
+  let overEntryKey = $state<string | 'end' | null>(null);
+  let overEntrySide = $state<'before' | 'after'>('before');
+  let draggedSubsetId = $state<string | null>(null);
+  let overSubsetId = $state<string | null>(null);
+  let overSubsetSide = $state<'before' | 'after'>('before');
   let editingEntry = $state<SetlistEntry | null>(null);
-  let lyricsViewSong = $state<Song | null>(null);
+  let lyricsViewEntry = $state<SetlistEntry | null>(null);
   let selectedMusician = $state<string | null>(null);
   let filterNotReady = $state(false);
   let filterText = $state('');
   let filterOpen = $state(false);
   let activeSubsetId = $state<string | null>(null);
+  let draftSubsetName = $state('');
 
   function toggleMusician(name: string) {
     selectedMusician = selectedMusician === name ? null : name;
@@ -119,7 +126,7 @@
 
     if (!entriesChanged && !subsetsChanged) return;
 
-    if (dragIndex !== null) {
+    if (draggedEntryKey !== null || draggedSubsetId !== null) {
       if (entriesChanged) {
         localEntries = localEntries.map(e => {
           const fresh = incoming.entries.find(i => i.order === e.order);
@@ -135,46 +142,30 @@
     if (activeSubsetId && !localSubsets.some(s => s.id === activeSubsetId)) activeSubsetId = null;
   }
 
-  // Rebuilds the entries array so subset blocks sit contiguously at the top,
-  // in `subsets` order, followed by the unassigned pool — then renumbers 0..N.
-  // `overrides` lets a caller supply the exact intra-block order for a subset
-  // being actively edited, instead of deriving it from existing `order` values.
-  function rebuildEntries(
-    entries: SetlistEntry[],
-    subsets: SetlistSubset[],
-    overrides?: Map<string, SetlistEntry[]>
-  ): SetlistEntry[] {
-    const sorted = [...entries].sort((a, b) => a.order - b.order);
-    const bySubset = new Map<string, SetlistEntry[]>();
-    const pool: SetlistEntry[] = [];
-    for (const e of sorted) {
-      if (e.subsetId) {
-        if (!bySubset.has(e.subsetId)) bySubset.set(e.subsetId, []);
-        bySubset.get(e.subsetId)!.push(e);
-      } else {
-        pool.push(e);
-      }
-    }
-    const out: SetlistEntry[] = [];
-    for (const subset of subsets) {
-      out.push(...(overrides?.get(subset.id) ?? bySubset.get(subset.id) ?? []));
-    }
-    out.push(...pool);
-    return out.map((e, i) => ({ ...e, order: i }));
-  }
-
   async function persistSubsets(entries: SetlistEntry[], subsets: SetlistSubset[]) {
     localEntries = entries;
     localSubsets = subsets;
     applyUpdate(await reorderEntries(setlist.id, entries, subsets));
   }
 
+  function currentLayout(): SetlistLayoutItem[] {
+    return buildSetlistLayout(localEntries, localSubsets);
+  }
+
+  async function persistLayout(layout: SetlistLayoutItem[]) {
+    const normalized = normalizeSetlistLayout(layout);
+    await persistSubsets(normalized.entries, normalized.subsets);
+  }
+
   // Up to 2 songs (oldest→most recent) this subset should chain after: the tail
   // of the previous subset, or — for the first subset — the most recently played songs.
   function computeAnchors(subsetId: string): Song[] {
-    const idx = localSubsets.findIndex(s => s.id === subsetId);
+    const orderedSubsets = currentLayout()
+      .filter((item): item is Extract<SetlistLayoutItem, { kind: 'subset' }> => item.kind === 'subset')
+      .map(item => item.subset);
+    const idx = orderedSubsets.findIndex(s => s.id === subsetId);
     if (idx > 0) {
-      const prevMembers = sortedEntries.filter(e => e.subsetId === localSubsets[idx - 1].id);
+      const prevMembers = sortedEntries.filter(e => e.subsetId === orderedSubsets[idx - 1].id);
       return prevMembers.slice(-2).map(e => e.song).filter((s): s is Song => !!s);
     }
     const played = sortedEntries
@@ -191,22 +182,64 @@
     return localEntries.filter(e => e.subsetId === subsetId && e.songId).length;
   }
 
-  async function handleNewSubset() {
-    const subset: SetlistSubset = { id: crypto.randomUUID(), name: $t.editor.subsetDefaultName(localSubsets.length + 1) };
-    const newSubsets = [...localSubsets, subset];
-    activeSubsetId = subset.id;
-    await persistSubsets(rebuildEntries(localEntries, newSubsets), newSubsets);
+  function subsetPosition(subsetId: string): number {
+    return currentLayout()
+      .filter(item => item.kind === 'subset')
+      .findIndex(item => item.kind === 'subset' && item.subset.id === subsetId);
   }
 
-  function toggleSubsetMode(subsetId: string) {
-    activeSubsetId = activeSubsetId === subsetId ? null : subsetId;
+  function subsetTotal(): number {
+    return currentLayout().filter(item => item.kind === 'subset').length;
+  }
+
+  async function handleNewSubset() {
+    const subset: SetlistSubset = { id: crypto.randomUUID(), name: $t.editor.subsetDefaultName(localSubsets.length + 1) };
+    const layout = currentLayout();
+    const lastSubsetIndex = layout.findLastIndex(item => item.kind === 'subset');
+    layout.splice(lastSubsetIndex + 1, 0, { kind: 'subset', subset, entries: [] });
+    activeSubsetId = subset.id;
+    draftSubsetName = subset.name;
+    await persistLayout(layout);
+  }
+
+  function openSubsetEdit(subset: SetlistSubset) {
+    activeSubsetId = subset.id;
+    draftSubsetName = subset.name;
+  }
+
+  function handleSubsetHeaderClick(subset: SetlistSubset) {
+    if (activeSubsetId !== subset.id && window.matchMedia('(max-width: 700px)').matches) openSubsetEdit(subset);
+  }
+
+  async function finishSubsetEdit() {
+    if (!activeSubsetId || !draftSubsetName.trim()) return;
+    const layout = currentLayout().map(item =>
+      item.kind === 'subset' && item.subset.id === activeSubsetId
+        ? { ...item, subset: { ...item.subset, name: draftSubsetName.trim() } }
+        : item
+    );
+    await persistLayout(layout);
+    activeSubsetId = null;
   }
 
   async function dissolveSubset(subsetId: string) {
-    const newSubsets = localSubsets.filter(s => s.id !== subsetId);
-    const newEntries = localEntries.map(e => e.subsetId === subsetId ? { ...e, subsetId: undefined } : e);
+    const layout = currentLayout();
+    const index = layout.findIndex(item => item.kind === 'subset' && item.subset.id === subsetId);
+    if (index < 0) return;
+    const [removed] = layout.splice(index, 1);
+    if (removed.kind === 'subset') {
+      layout.push(...removed.entries.map(entry => ({ kind: 'entry' as const, entry })));
+    }
     if (activeSubsetId === subsetId) activeSubsetId = null;
-    await persistSubsets(rebuildEntries(newEntries, newSubsets), newSubsets);
+    await persistLayout(layout);
+  }
+
+  async function moveSubset(subsetId: string, targetSubsetId: string) {
+    await persistLayout(moveSubsetBlock(currentLayout(), subsetId, targetSubsetId));
+  }
+
+  async function moveSubsetBy(subsetId: string, delta: -1 | 1) {
+    await persistLayout(moveSubsetBlockBy(currentLayout(), subsetId, delta));
   }
 
   async function toggleSubsetMembership(entry: SetlistEntry) {
@@ -216,14 +249,23 @@
     const subset = localSubsets.find(s => s.id === subsetId);
     if (!subset) return;
 
+    const layout = currentLayout();
+    const block = layout.find((item): item is Extract<SetlistLayoutItem, { kind: 'subset' }> =>
+      item.kind === 'subset' && item.subset.id === subsetId
+    );
+    if (!block) return;
+
     if (entry.subsetId === subsetId) {
-      const newEntries = localEntries.map(e => e.songId === entry.songId ? { ...e, subsetId: undefined } : e);
-      await persistSubsets(rebuildEntries(newEntries, localSubsets), localSubsets);
+      block.entries = block.entries.filter(member => member.songId !== entry.songId);
+      layout.push({ kind: 'entry', entry });
+      await persistLayout(layout);
       return;
     }
 
-    const taggedEntries = localEntries.map(e => e.songId === entry.songId ? { ...e, subsetId } : e);
-    const members = taggedEntries.filter(e => e.subsetId === subsetId).sort((a, b) => a.order - b.order);
+    const entryIndex = layout.findIndex(item => item.kind === 'entry' && item.entry.songId === entry.songId);
+    if (entryIndex < 0) return;
+    layout.splice(entryIndex, 1);
+    const members = [...block.entries, { ...entry, subsetId }];
     let overrideList = members;
     if (!subset.manualSort) {
       const anchors = computeAnchors(subsetId);
@@ -231,7 +273,8 @@
       const bySongId = new Map(members.map(e => [e.songId!, e]));
       overrideList = sortedSongs.map(s => bySongId.get(s.id)!);
     }
-    await persistSubsets(rebuildEntries(taggedEntries, localSubsets, new Map([[subsetId, overrideList]])), localSubsets);
+    block.entries = overrideList;
+    await persistLayout(layout);
   }
 
   function handleRowClick(e: MouseEvent, entry: SetlistEntry) {
@@ -245,33 +288,28 @@
     | { kind: 'header'; subset: SetlistSubset }
     | { kind: 'hint'; subset: SetlistSubset }
     | { kind: 'divider' }
-    | { kind: 'entry'; entry: SetlistEntry; index: number };
+    | { kind: 'entry'; entry: SetlistEntry };
 
   let renderItems = $derived((): RenderItem[] => {
     const display = displayEntries();
     if (isFiltered) {
-      return display.map((entry, index) => ({ kind: 'entry' as const, entry, index }));
+      return display.map(entry => ({ kind: 'entry' as const, entry }));
     }
-    const bySubset = new Map<string, { entry: SetlistEntry; index: number }[]>();
-    const pool: { entry: SetlistEntry; index: number }[] = [];
-    display.forEach((entry, index) => {
-      if (entry.subsetId) {
-        if (!bySubset.has(entry.subsetId)) bySubset.set(entry.subsetId, []);
-        bySubset.get(entry.subsetId)!.push({ entry, index });
-      } else {
-        pool.push({ entry, index });
-      }
-    });
     const items: RenderItem[] = [];
-    for (const subset of localSubsets) {
-      items.push({ kind: 'header', subset });
-      if (activeSubsetId === subset.id) items.push({ kind: 'hint', subset });
-      for (const { entry, index } of bySubset.get(subset.id) ?? []) {
-        items.push({ kind: 'entry', entry, index });
+    let restDividerAdded = false;
+    for (const layoutItem of currentLayout()) {
+      if (layoutItem.kind === 'subset') {
+        items.push({ kind: 'header', subset: layoutItem.subset });
+        if (activeSubsetId === layoutItem.subset.id) items.push({ kind: 'hint', subset: layoutItem.subset });
+        for (const entry of layoutItem.entries) items.push({ kind: 'entry', entry });
+      } else {
+        if (layoutItem.entry.songId && localSubsets.length > 0 && !restDividerAdded) {
+          items.push({ kind: 'divider' });
+          restDividerAdded = true;
+        }
+        items.push({ kind: 'entry', entry: layoutItem.entry });
       }
     }
-    if (localSubsets.length > 0 && pool.length > 0) items.push({ kind: 'divider' });
-    for (const { entry, index } of pool) items.push({ kind: 'entry', entry, index });
     return items;
   });
 
@@ -296,25 +334,38 @@
       const dy = Math.abs(touch.clientY - touchStartY);
       const dx = Math.abs(touch.clientX - touchStartX);
 
-      if (dragIndex === null) {
-        if (touchStartIndex !== null && dy > DRAG_THRESHOLD && dy > dx) {
-          dragIndex = touchStartIndex;
+      if (draggedEntryKey === null) {
+        if (touchStartEntryKey !== null && dy > DRAG_THRESHOLD && dy > dx) {
+          draggedEntryKey = touchStartEntryKey;
         } else {
           return;
         }
       }
       e.preventDefault();
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      const row = el?.closest('[data-row-i]') as HTMLElement | null;
+      const row = el?.closest('[data-row-key]') as HTMLElement | null;
       if (row) {
-        const idx = parseInt(row.dataset.rowI ?? '');
-        if (!isNaN(idx)) overIndex = idx;
+        overEntryKey = row.dataset.rowKey ?? null;
+        overSubsetId = null;
+        const rect = row.getBoundingClientRect();
+        overEntrySide = touch.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      } else {
+        const header = el?.closest('[data-subset-id]') as HTMLElement | null;
+        if (header) {
+          overEntryKey = null;
+          overSubsetId = header.dataset.subsetId ?? null;
+          const rect = header.getBoundingClientRect();
+          overSubsetSide = touch.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+        }
       }
     };
 
     const handleTouchEnd = () => {
-      if (dragIndex !== null) onDrop();
-      touchStartIndex = null;
+      if (draggedEntryKey !== null) {
+        if (overSubsetId) dropEntryOnSubset(overSubsetId);
+        else dropEntry();
+      }
+      touchStartEntryKey = null;
       touchStartY = null;
       touchStartX = null;
     };
@@ -376,14 +427,7 @@
   let isFiltered = $derived(selectedMusician !== null || filterNotReady || filterText.trim() !== '');
 
   let displayEntries = $derived(() => {
-    const base = filteredEntries();
-    if (!isFiltered && dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
-      const list = [...base];
-      const [item] = list.splice(dragIndex, 1);
-      list.splice(overIndex, 0, item);
-      return list;
-    }
-    return base;
+    return filteredEntries();
   });
 
   let songCount = $derived(sortedEntries.filter(e => e.songId).length);
@@ -452,6 +496,11 @@
     }
   }
 
+  async function handleAddSetlistOnly(song: Song) {
+    applyUpdate(await addSetlistOnlySong(setlist.id, song));
+    showSetlistOnlyModal = false;
+  }
+
   async function handleAddBreak(minutes: number) {
     applyUpdate(await addBreakToSetlist(setlist.id, minutes));
     showBreakPicker = false;
@@ -493,7 +542,7 @@
     // Sync progress and lengthMinutes back to the canonical backlog song.
     // Fetch fresh to avoid stale prop data and merge progress so we don't wipe
     // keys that weren't present in the entry snapshot.
-    if (entry.songId) {
+    if (entry.songId && !entry.setlistOnly) {
       try {
         const canonical = await getSong(entry.songId);
         if (canonical) {
@@ -511,56 +560,99 @@
     editingEntry = null;
   }
 
+  async function saveSetlistOnlyTranspose(entry: SetlistEntry, song: Song): Promise<Song> {
+    const updated = await updateEntrySong(setlist.id, entry.order, song);
+    applyUpdate(updated);
+    return updated.entries.find(candidate => candidate.songId === entry.songId)?.song ?? song;
+  }
+
   function entryKey(entry: typeof sortedEntries[0]) {
     return entry.songId ?? `break-${entry.order}`;
   }
 
-  function onDragStart(i: number) { dragIndex = i; }
+  function onEntryDragStart(key: string) { draggedEntryKey = key; }
 
-  function onDragOver(e: DragEvent, i: number) {
+  function onEntryDragOver(e: DragEvent, key: string) {
     e.preventDefault();
-    overIndex = i;
+    overEntryKey = key;
+    const row = e.currentTarget as HTMLElement;
+    const rect = row.getBoundingClientRect();
+    overEntrySide = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
   }
 
-  async function onDrop() {
-    if (dragIndex === null || overIndex === null || dragIndex === overIndex) {
-      dragIndex = null; overIndex = null; return;
+  async function dropEntry() {
+    const sourceKey = draggedEntryKey;
+    const targetKey = overEntryKey;
+    if (!sourceKey || !targetKey || sourceKey === targetKey) {
+      clearEntryDrag();
+      return;
     }
-    const list = [...sortedEntries];
-    const [item] = list.splice(dragIndex, 1);
-    const insertAt = overIndex;
-    const prevItem = list[insertAt - 1];
-    const nextItem = list[insertAt];
-    // Landing right after the last member of a subset (nextItem has no subsetId,
-    // e.g. the pool boundary, or there's nothing after at all) still counts as
-    // "inside" that subset — otherwise dropping a subset's last song back near
-    // its own tail kicks it out into the pool.
-    const newSubsetId =
-      prevItem?.subsetId && (!nextItem?.subsetId || prevItem.subsetId === nextItem.subsetId) ? prevItem.subsetId
-      : (!prevItem?.subsetId && nextItem?.subsetId) ? nextItem.subsetId
-      : undefined;
-    list.splice(insertAt, 0, { ...item, subsetId: newSubsetId });
-    const reordered = list.map((e, i) => ({ ...e, order: i }));
-    const finalSubsets = newSubsetId
-      ? localSubsets.map(s => s.id === newSubsetId ? { ...s, manualSort: true } : s)
-      : localSubsets;
-    dragIndex = null; overIndex = null;
-    await persistSubsets(reordered, finalSubsets);
+
+    const layout = moveLayoutEntry(currentLayout(), sourceKey, targetKey, overEntrySide);
+    clearEntryDrag();
+    await persistLayout(layout);
   }
 
-  function onDragEnd() { dragIndex = null; overIndex = null; }
+  function clearEntryDrag() {
+    draggedEntryKey = null;
+    overEntryKey = null;
+    if (!draggedSubsetId) overSubsetId = null;
+  }
 
-  let touchStartIndex = $state<number | null>(null);
+  function onSubsetDragStart(e: DragEvent, subsetId: string) {
+    if (isFiltered || window.matchMedia('(max-width: 700px)').matches) {
+      e.preventDefault();
+      return;
+    }
+    draggedSubsetId = subsetId;
+  }
+
+  function onSubsetDragOver(e: DragEvent, subsetId: string) {
+    if (!draggedSubsetId && !draggedEntryKey) return;
+    e.preventDefault();
+    overSubsetId = subsetId;
+    const row = e.currentTarget as HTMLElement;
+    const rect = row.getBoundingClientRect();
+    overSubsetSide = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }
+
+  async function dropSubset() {
+    const source = draggedSubsetId;
+    const target = overSubsetId;
+    draggedSubsetId = null;
+    overSubsetId = null;
+    if (source && target && source !== target) await moveSubset(source, target);
+  }
+
+  async function dropEntryOnSubset(subsetId: string) {
+    if (!draggedEntryKey) return;
+    const layout = moveLayoutEntryToSubset(currentLayout(), draggedEntryKey, subsetId, overSubsetSide);
+    clearEntryDrag();
+    overSubsetId = null;
+    await persistLayout(layout);
+  }
+
+  async function dropOnSubsetHeader(subsetId: string) {
+    if (draggedEntryKey) await dropEntryOnSubset(subsetId);
+    else await dropSubset();
+  }
+
+  function clearSubsetDrag() {
+    draggedSubsetId = null;
+    overSubsetId = null;
+  }
+
+  let touchStartEntryKey = $state<string | null>(null);
   let touchStartY = $state<number | null>(null);
   let touchStartX = $state<number | null>(null);
   const DRAG_THRESHOLD = 8;
 
   // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
-  function handleDragHandleTouchStart(e: TouchEvent, i: number) {
+  function handleDragHandleTouchStart(e: TouchEvent, key: string) {
     e.stopPropagation();
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
-    if (!isFiltered) touchStartIndex = i;
+    if (!isFiltered) touchStartEntryKey = key;
   }
 
   function guestTagsFor(song: Song): { name: string; instruments: Instrument[] }[] {
@@ -633,6 +725,7 @@
         {/if}
       </div>
       <button class="btn-secondary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongs}</button>
+      <button class="btn-secondary" onclick={() => { showSetlistOnlyModal = true; }}>{$t.editor.addSetlistOnly}</button>
       <button class="btn-secondary" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
       <a href="{base}/setlists/{setlist.id}/stage" class="btn-stage">{$t.editor.stageView}</a>
     </div>
@@ -750,12 +843,40 @@
         <tbody>
           {#each renderItems() as item (renderItemKey(item))}
             {#if item.kind === 'header'}
-              <tr class="subset-header" class:active={activeSubsetId === item.subset.id} onclick={() => toggleSubsetMode(item.subset.id)}>
+              <tr
+                class="subset-header"
+                class:active={activeSubsetId === item.subset.id}
+                class:dragging={draggedSubsetId === item.subset.id}
+                class:drag-over={overSubsetId === item.subset.id && draggedSubsetId !== item.subset.id}
+                draggable={!isFiltered && activeSubsetId !== item.subset.id}
+                data-subset-id={item.subset.id}
+                onclick={() => handleSubsetHeaderClick(item.subset)}
+                ondragstart={(e) => onSubsetDragStart(e, item.subset.id)}
+                ondragover={(e) => onSubsetDragOver(e, item.subset.id)}
+                ondrop={() => dropOnSubsetHeader(item.subset.id)}
+                ondragend={clearSubsetDrag}
+              >
                 <td colspan={totalCols}>
                   <div class="subset-header-inner">
-                    <span class="subset-header-name">⏭ {item.subset.name}</span>
+                    <span class="subset-drag desktop-only">⠿</span>
+                    {#if activeSubsetId === item.subset.id}
+                      <input
+                        class="subset-name-input"
+                        bind:value={draftSubsetName}
+                        required
+                        aria-label={$t.editor.subsetEdit}
+                        aria-invalid={!draftSubsetName.trim()}
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => { if (e.key === 'Enter') finishSubsetEdit(); }}
+                      />
+                    {:else}
+                      <span class="subset-header-name">⏭ {item.subset.name}</span>
+                    {/if}
                     <span class="subset-header-count">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</span>
-                    <button class="subset-dissolve" onclick={(e) => { e.stopPropagation(); dissolveSubset(item.subset.id); }} title={$t.editor.subsetDissolve}>✕</button>
+                    <span class="subset-mobile-hint">{$t.editor.subsetTapEdit}</span>
+                    {#if activeSubsetId !== item.subset.id}
+                      <button class="subset-edit desktop-only" onclick={(e) => { e.stopPropagation(); openSubsetEdit(item.subset); }} title={$t.editor.subsetEdit}>✏️</button>
+                    {/if}
                   </div>
                 </td>
               </tr>
@@ -764,7 +885,12 @@
                 <td colspan={totalCols}>
                   <div class="subset-hint-inner">
                     <span class="subset-hint-text">{$t.editor.subsetHint}</span>
-                    <button class="subset-done-btn" onclick={() => { activeSubsetId = null; }}>{$t.editor.subsetDone}</button>
+                    <div class="subset-mobile-order">
+                      <button onclick={() => moveSubsetBy(item.subset.id, -1)} disabled={subsetPosition(item.subset.id) <= 0}>{$t.editor.subsetUp}</button>
+                      <button onclick={() => moveSubsetBy(item.subset.id, 1)} disabled={subsetPosition(item.subset.id) >= subsetTotal() - 1}>{$t.editor.subsetDown}</button>
+                    </div>
+                    <button class="subset-dissolve" onclick={() => dissolveSubset(item.subset.id)}>{$t.editor.subsetDissolve}</button>
+                    <button class="subset-done-btn" onclick={finishSubsetEdit} disabled={!draftSubsetName.trim()}>{$t.editor.subsetDone}</button>
                   </div>
                 </td>
               </tr>
@@ -772,10 +898,11 @@
               <tr class="subset-rest-divider"><td colspan={totalCols}>{$t.editor.subsetRest}</td></tr>
             {:else}
               {@const entry = item.entry}
-              {@const i = item.index}
-              {@const isDragging = dragIndex !== null && entryKey(sortedEntries[dragIndex]) === entryKey(entry)}
-              {@const isOver = overIndex === i && dragIndex !== null && dragIndex !== i}
-              {@const songNum = displayEntries().slice(0, i + 1).filter(e => e.songId).length}
+              {@const key = entryKey(entry)}
+              {@const entryIndex = displayEntries().findIndex(candidate => entryKey(candidate) === key)}
+              {@const isDragging = draggedEntryKey === key}
+              {@const isOver = overEntryKey === key && draggedEntryKey !== key}
+              {@const songNum = displayEntries().slice(0, entryIndex + 1).filter(e => e.songId).length}
               {@const canDrag = !isFiltered}
               {#if entry.songId}
                 {@const song = entry.song}
@@ -789,14 +916,14 @@
                     class:subset-member={!!entry.subsetId}
                     class:subset-active-member={activeSubsetId !== null && entry.subsetId === activeSubsetId}
                     draggable={canDrag}
-                    data-row-i={i}
+                    data-row-key={key}
                     onclick={(e) => handleRowClick(e, entry)}
-                    ondragstart={canDrag ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry))); } : undefined}
-                    ondragover={canDrag ? (e => onDragOver(e, i)) : undefined}
-                    ondrop={canDrag ? onDrop : undefined}
-                    ondragend={canDrag ? onDragEnd : undefined}
+                    ondragstart={canDrag ? (ev) => { if ((ev.target as HTMLElement).closest('input,textarea')) { ev.preventDefault(); return; } onEntryDragStart(key); } : undefined}
+                    ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
+                    ondrop={canDrag ? dropEntry : undefined}
+                    ondragend={canDrag ? clearEntryDrag : undefined}
                   >
-                    <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}>
+                    <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>
                       {#if activeSubsetId !== null}
                         <span class="subset-tap-indicator">{entry.subsetId === activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
                       {:else}
@@ -815,7 +942,7 @@
                         <span class="artist">{song.artist}</span>
                         <span class="sep">–</span>
                         <span class="title">{song.title}</span>
-                        {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewSong = song; }} title="Текст песни">📝</button>{/if}
+                        {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewEntry = entry; }} title="Текст песни">📝</button>{/if}
                         {#each guestTags as g}
                           {@const gStage = entryStage(entry, g.name)}
                           <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
@@ -861,14 +988,14 @@
                   class="break-row"
                   class:dragging={isDragging}
                   class:drag-over={isOver}
-                  draggable="true"
-                  data-row-i={i}
-                  ondragstart={() => onDragStart(sortedEntries.findIndex(e => entryKey(e) === entryKey(entry)))}
-                  ondragover={e => onDragOver(e, i)}
-                  ondrop={onDrop}
-                  ondragend={onDragEnd}
+                  draggable={canDrag}
+                  data-row-key={key}
+                  ondragstart={canDrag ? (() => onEntryDragStart(key)) : undefined}
+                  ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
+                  ondrop={canDrag ? dropEntry : undefined}
+                  ondragend={canDrag ? clearEntryDrag : undefined}
                 >
-                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, i)}><span class="drag-handle">⠿</span></td>
+                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}><span class="drag-handle">⠿</span></td>
                   <td class="td-num"></td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
@@ -903,13 +1030,13 @@
               {/if}
             {/if}
           {/each}
-          {#if dragIndex !== null}
+          {#if draggedEntryKey !== null}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <tr
               class="drop-end-row"
-              class:drop-end-active={overIndex === sortedEntries.length}
-              ondragover={e => { e.preventDefault(); overIndex = sortedEntries.length; }}
-              ondrop={onDrop}
+              class:drop-end-active={overEntryKey === 'end'}
+              ondragover={e => { e.preventDefault(); overEntryKey = 'end'; }}
+              ondrop={dropEntry}
             >
               <td colspan={totalCols}></td>
             </tr>
@@ -926,14 +1053,30 @@
     {existingIds}
     onclose={() => { showAddModal = false; }}
     onadd={handleAdd}
+    onaddnew={() => { showAddModal = false; showSetlistOnlyModal = true; }}
   />
 {/if}
 
-{#if lyricsViewSong}
+{#if showSetlistOnlyModal}
+  <SongEditModal
+    song={null}
+    {musicians}
+    mode="setlist-only"
+    onclose={() => { showSetlistOnlyModal = false; }}
+    onsave={handleAddSetlistOnly}
+  />
+{/if}
+
+{#if lyricsViewEntry?.song}
   <LyricsOverlay
-    song={lyricsViewSong}
-    onclose={() => { lyricsViewSong = null; }}
-    onsongupdate={(updated) => { lyricsViewSong = updated; }}
+    song={lyricsViewEntry.song}
+    onclose={() => { lyricsViewEntry = null; }}
+    onsongupdate={(updated) => {
+      if (lyricsViewEntry) lyricsViewEntry = { ...lyricsViewEntry, song: updated };
+    }}
+    onsavetranspose={lyricsViewEntry.setlistOnly
+      ? (song) => saveSetlistOnlyTranspose(lyricsViewEntry!, song)
+      : undefined}
   />
 {/if}
 
@@ -941,7 +1084,7 @@
   <SongEditModal
     song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '' } : null}
     {musicians}
-    mode="entry"
+    mode={editingEntry.setlistOnly ? 'setlist-only' : 'entry'}
     onclose={() => { editingEntry = null; }}
     onsave={handleEntrySave}
     onremove={editingEntry.songId ? () => { handleRemove(editingEntry!.songId!); } : undefined}
@@ -1050,7 +1193,7 @@
   .drop-end-row td { height: 28px; border-radius: 8px; }
   .drop-end-active td { outline: 2px dashed var(--accent); }
 
-  .subset-header { cursor: pointer; user-select: none; }
+  .subset-header { cursor: grab; user-select: none; }
   .subset-header td {
     background: rgba(124, 58, 237, 0.12);
     border-top: 2px solid #7c3aed;
@@ -1063,11 +1206,25 @@
   }
   .subset-header:hover td { background: rgba(124, 58, 237, 0.18); }
   .subset-header.active td { background: rgba(124, 58, 237, 0.24); }
+  .subset-header.dragging td { opacity: 0.4; }
+  .subset-header.drag-over td { outline: 2px dashed #7c3aed; outline-offset: -2px; }
+  .subset-drag { color: #7c3aed; opacity: 0.55; font-size: 1rem; }
   .subset-header-name { font-weight: 700; color: #7c3aed; }
   .subset-header-count { color: var(--text-muted); font-size: 0.8rem; }
-  .subset-dissolve {
+  .subset-mobile-hint { display: none; color: var(--text-muted); font-size: 0.76rem; }
+  .subset-name-input {
+    min-width: 180px; padding: 4px 8px; border: 1px solid #7c3aed; border-radius: 5px;
+    background: var(--surface); color: var(--text); font-size: 0.86rem; font-weight: 700;
+  }
+  .subset-name-input[aria-invalid="true"] { border-color: #ef4444; }
+  .subset-edit {
     margin-left: auto; background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 0.82rem; padding: 2px 6px; border-radius: 4px;
+    font-size: 0.88rem; padding: 2px 6px; opacity: 0.6;
+  }
+  .subset-edit:hover { opacity: 1; }
+  .subset-dissolve {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 0.82rem; padding: 4px 8px; border-radius: 4px;
   }
   .subset-dissolve:hover { color: #ef4444; }
 
@@ -1076,10 +1233,18 @@
     display: flex; align-items: center; gap: 10px;
     padding: 6px 10px; font-size: 0.8rem; color: var(--text-muted);
   }
+  .subset-hint-text { flex: 1; }
   .subset-done-btn {
-    margin-left: auto; padding: 4px 14px; border: 1px solid #7c3aed; border-radius: 14px;
+    padding: 4px 14px; border: 1px solid #7c3aed; border-radius: 14px;
     background: #7c3aed; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600;
   }
+  .subset-done-btn:disabled { opacity: 0.4; cursor: default; }
+  .subset-mobile-order { display: none; gap: 6px; }
+  .subset-mobile-order button {
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 12px;
+    background: transparent; color: var(--text); font-size: 0.78rem;
+  }
+  .subset-mobile-order button:disabled { opacity: 0.35; }
 
   .subset-rest-divider td {
     padding: 4px 10px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
@@ -1207,6 +1372,16 @@
     .editor-header { padding: 12px 8px; }
     .song-name { flex-wrap: wrap; }
     .meta-input { font-size: 16px; }
+    .subset-header { cursor: pointer; }
+    .subset-header-inner { flex-wrap: wrap; padding: 8px 10px; }
+    .subset-header-count { margin-right: auto; }
+    .subset-mobile-hint { display: inline; width: 100%; padding-left: 0; }
+    .subset-header.active .subset-mobile-hint { display: none; }
+    .subset-name-input { flex: 1; min-width: 0; font-size: 16px; }
+    .subset-hint-inner { flex-wrap: wrap; }
+    .subset-hint-text { width: 100%; }
+    .subset-mobile-order { display: flex; }
+    .subset-dissolve { margin-left: auto; }
 
     /* Song row separators */
     .song-row td { border-top: 1px solid var(--border); }

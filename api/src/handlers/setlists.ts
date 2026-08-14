@@ -3,6 +3,7 @@ import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { Setlist, SetlistEntry, SetlistSubset, Song, LearningStage, User } from '../lib/types.js';
 import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
+import { appendSongsToSetlist, nextVisualOrder, normalizeSubsetNames } from '../lib/setlist-entries.js';
 
 const SONGS_TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 const TABLE = process.env.SETLISTS_TABLE ?? 'kittens-setlists';
@@ -41,15 +42,11 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
 
   if (afterId === '/songs') {
     if (method === 'POST') {
-      const { songs } = JSON.parse(event.body ?? '{}') as { songs: Song[] };
+      const { songs, setlistOnly = false } = JSON.parse(event.body ?? '{}') as { songs: Song[]; setlistOnly?: boolean };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
-      const existing = new Set(setlist.entries.map(e => e.songId).filter(Boolean));
-      const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
-      const newEntries: SetlistEntry[] = songs
-        .filter(s => !existing.has(s.id))
-        .map((s, i) => ({ songId: s.id, song: s, order: maxOrder + 1 + i, played: false, ...(s.progress ? { progress: s.progress } : {}) }));
-      const updated: Setlist = { ...setlist, entries: [...setlist.entries, ...newEntries] };
+      if (!Array.isArray(songs) || songs.length === 0) return err('Songs are required', 400);
+      const { updated, newEntries } = appendSongsToSetlist(setlist, songs, setlistOnly);
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       const names = newEntries.map(e => e.song ? songName(e.song) : '?').join(', ');
       await logAudit({ action: 'setlist.song_add', actor: user, entityType: 'setlist', entityId: id, entityName: setlistName(setlist), summary: `добавлено: ${names}` });
@@ -78,8 +75,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const { minutes } = JSON.parse(event.body ?? '{}') as { minutes: number };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
-      const maxOrder = setlist.entries.reduce((m, e) => Math.max(m, e.order), -1);
-      const entry: SetlistEntry = { breakMinutes: minutes, order: maxOrder + 1, played: false };
+      const entry: SetlistEntry = { breakMinutes: minutes, order: nextVisualOrder(setlist), played: false };
       const updated: Setlist = { ...setlist, entries: [...setlist.entries, entry] };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       await logAudit({ action: 'setlist.break_add', actor: user, entityType: 'setlist', entityId: id, entityName: setlistName(setlist), summary: `добавлен перерыв ${minutes} мин` });
@@ -167,7 +163,7 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
         ),
       };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
-      if (isPermanent && songId) {
+      if (isPermanent && songId && !entry?.setlistOnly) {
         const song = await dbGet<Song>(SONGS_TABLE, songId);
         if (song) {
           await dbPut(SONGS_TABLE, {
@@ -253,7 +249,10 @@ export async function setlistsHandler(event: APIGatewayProxyEventV2, strippedPat
       const { entries, subsets } = JSON.parse(event.body ?? '{}') as { entries: SetlistEntry[]; subsets?: SetlistSubset[] };
       const setlist = await dbGet<Setlist>(TABLE, id);
       if (!setlist) return err('Not found', 404);
-      const updated: Setlist = { ...setlist, entries, ...(subsets !== undefined ? { subsets } : {}) };
+      if (!Array.isArray(entries)) return err('Entries are required', 400);
+      const normalizedSubsets = subsets === undefined ? undefined : normalizeSubsetNames(subsets);
+      if (normalizedSubsets === null) return err('Subset name is required', 400);
+      const updated: Setlist = { ...setlist, entries, ...(normalizedSubsets !== undefined ? { subsets: normalizedSubsets } : {}) };
       await dbPut(TABLE, updated as unknown as Record<string, unknown>);
       await logAudit({ action: 'setlist.reorder', actor: user, entityType: 'setlist', entityId: id, entityName: setlistName(setlist), summary: `порядок изменён (${entries.length} позиций)` });
       return ok(updated);
