@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import PeopleManager from '$components/admin/PeopleManager.svelte';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { getUsers, getAuditLog } from '$lib/api';
   import type { User, AuditLogEntry } from '$lib/types';
@@ -61,14 +61,11 @@
   }
 
   function formatTimestamp(timestamp: string) {
-    return new Date(timestamp).toLocaleString('ru-RU', {
+    return new Date(timestamp).toLocaleString($lang === 'ru' ? 'ru-RU' : 'en-GB', {
       day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
     });
   }
 
-  const entityTypeLabel: Record<AuditLogEntry['entityType'], string> = {
-    song: 'Песня', setlist: 'Сетлист', musician: 'Музыкант', setlist_entry: 'Запись', user: 'Пользователь'
-  };
 </script>
 
 <div class="admin">
@@ -91,7 +88,7 @@
           {#each auditItems as entry (entry.sk)}
             <div class="audit-row">
               <span class="audit-when">{formatTimestamp(entry.timestamp)}</span><span class="audit-who">{entry.actorName}</span>
-              <span><span class="entity-type">{entityTypeLabel[entry.entityType]}</span>{entry.entityName}</span>
+              <span><span class="entity-type">{$t.admin.auditEntities[entry.entityType]}</span>{entry.entityName}</span>
               <span class="audit-details">{formatAuditSummary(entry.summary)}</span>
             </div>
           {/each}

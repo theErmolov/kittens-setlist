@@ -310,13 +310,13 @@
           ondragend={canDrag && user.musicianName ? () => { dragId = null; dragOverId = null; } : undefined}
         >
           <div class="identity">
-            {#if canDrag && user.musicianName}<span class="drag-handle" title="Drag to reorder">⠿</span>{/if}
+            {#if canDrag && user.musicianName}<span class="drag-handle" title={$t.admin.dragToReorder}>⠿</span>{/if}
             {#if user.photoUrl}<img class="avatar" src={user.photoUrl} alt="" />{/if}
             <div class="identity-text">
               <span class="name">{displayName(user)}</span>
               {#if user.username}<span class="hint">@{user.username}</span>{/if}
               {#if user.isAdmin}
-                <span class="badge admin-badge">admin</span>
+                <span class="badge admin-badge">{$t.admin.adminBadge}</span>
               {:else if user.telegramId}
                 <span class="badge status" class:pending={user.status === 'pending'} class:rejected={user.status === 'rejected'}>{statusLabel(user)}</span>
               {/if}
@@ -327,7 +327,7 @@
             {#if user.telegramId && !user.isAdmin}
               <select value={roleSelections[user.id] ?? user.role ?? 'reader'} class="role-select" disabled={saving === user.id}
                 onchange={event => handleRoleChange(user, event)}>
-                <option value="writer">Writer</option><option value="reader">Reader</option>
+                <option value="writer">{$t.admin.roleWriter}</option><option value="reader">{$t.admin.roleReader}</option>
               </select>
             {/if}
           </div>

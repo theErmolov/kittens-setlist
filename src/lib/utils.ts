@@ -41,12 +41,17 @@ export function sortInstruments(instruments: Instrument[]): Instrument[] {
   return [...instruments].sort((a, b) => INSTRUMENT_ORDER.indexOf(a) - INSTRUMENT_ORDER.indexOf(b));
 }
 
-export function formatDuration(minutes: number): string {
+export function formatDuration(minutes: number, lang: 'ru' | 'en' = 'en'): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
+  if (lang === 'en') {
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
+  if (h === 0) return `${m} мин`;
+  if (m === 0) return `${h} ч`;
+  return `${h} ч ${m} мин`;
 }
 
 const STAGE_ORDER: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
@@ -72,9 +77,9 @@ export function songReadiness(
 }
 
 /** Format a YYYY-MM-DD string as a human-readable date (e.g. "2 апреля 2026"). */
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string, lang: 'ru' | 'en' = 'ru'): string {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(y, m - 1, d));
+  return new Intl.DateTimeFormat(lang === 'ru' ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(y, m - 1, d));
 }
 
 /** Add `minutes` to a "HH:MM" time string, wrapping at midnight. */
@@ -103,22 +108,22 @@ export function isEventFarFuture(date?: string, startTime?: string): boolean {
 // ─── Budget ───────────────────────────────────────────────────────────────────
 
 /** Format integer EUR cents as a localized currency string, e.g. 2710 → "27,10 €". */
-export function formatEUR(cents: number): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+export function formatEUR(cents: number, lang: 'ru' | 'en' = 'ru'): string {
+  return new Intl.NumberFormat(lang === 'ru' ? 'ru-RU' : 'en-GB', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 }
 
 /** Plain report-entry format: whole euros omit decimals, cents keep two digits. */
-export function formatAmount(cents: number): string {
+export function formatAmount(cents: number, lang: 'ru' | 'en' = 'ru'): string {
   const fractionDigits = cents % 100 === 0 ? 0 : 2;
-  return new Intl.NumberFormat('ru-RU', {
+  return new Intl.NumberFormat(lang === 'ru' ? 'ru-RU' : 'en-GB', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(cents / 100);
 }
 
 /** Calculated report totals omit insignificant trailing zeroes. */
-function formatReportTotal(cents: number): string {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(cents / 100);
+function formatReportTotal(cents: number, lang: 'ru' | 'en'): string {
+  return new Intl.NumberFormat(lang === 'ru' ? 'ru-RU' : 'en-GB', { maximumFractionDigits: 2 }).format(cents / 100);
 }
 
 /** Parse a user-typed EUR amount ("27,10" / "27.10" / "27") into integer cents. */
@@ -155,7 +160,7 @@ export function budgetTotals(entries: BudgetEntry[]): BudgetTotals {
 }
 
 /** Build the copy-paste «По баблу» report from the current cumulative state. */
-export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], now = Date.now()): string {
+export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], now = Date.now(), lang: 'ru' | 'en' = 'ru'): string {
   const t = budgetTotals(entries);
   const setlistName = (id?: string) => setlists.find(s => s.id === id)?.name;
 
@@ -176,17 +181,19 @@ export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], n
   const recentDonationTotal = recentDonations.reduce((sum, entry) => sum + entry.amount, 0);
 
   const lines: string[] = [];
-  lines.push('Рубрика «По баблу»:');
+  lines.push(lang === 'ru' ? 'Рубрика «По баблу»:' : 'Money report:');
   lines.push('');
 
   for (const donation of recentDonations) {
-    const label = donation.person?.trim() || (donation.method === 'cash' ? 'Наличка' : 'Пейпал');
-    lines.push(`${label} — ${formatAmount(donation.amount)}`);
+    const label = donation.person?.trim() || (donation.method === 'cash'
+      ? (lang === 'ru' ? 'Наличка' : 'Cash')
+      : (lang === 'ru' ? 'Пейпал' : 'PayPal'));
+    lines.push(`${label} — ${formatAmount(donation.amount, lang)}`);
   }
 
   if (recentDonations.length > 0) lines.push('');
-  lines.push(`Котятский банк — ${formatReportTotal(t.onHand - recentDonationTotal)}`);
-  lines.push(`Итого на руках — ${formatReportTotal(t.onHand)}`);
+  lines.push(`${lang === 'ru' ? 'Котятский банк' : 'Kittens bank'} — ${formatReportTotal(t.onHand - recentDonationTotal, lang)}`);
+  lines.push(`${lang === 'ru' ? 'Итого на руках' : 'Total on hand'} — ${formatReportTotal(t.onHand, lang)}`);
 
   const debts = entries.filter((e): e is Extract<BudgetEntry, { kind: 'debt' }> => e.kind === 'debt' && !e.paid);
   if (debts.length > 0) {
@@ -201,13 +208,13 @@ export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], n
     for (const [creditor, creditorDebts] of debtsByCreditor) {
       const items = creditorDebts.map(debt => {
         const note = debt.description || debt.comment || setlistName(debt.setlistId);
-        return `${formatAmount(debt.amount)}${note ? ` ${note}` : ''}`;
+        return `${formatAmount(debt.amount, lang)}${note ? ` ${note}` : ''}`;
       });
-      lines.push(`Долг${creditor ? ` ${creditor}` : ''}: ${items.join(' + ')}`);
+      lines.push(`${lang === 'ru' ? 'Долг' : 'Debt'}${creditor ? ` ${creditor}` : ''}: ${items.join(' + ')}`);
     }
   }
 
   lines.push('');
-  lines.push(`Итого наш баланс пока: ${formatReportTotal(t.balance)}`);
+  lines.push(`${lang === 'ru' ? 'Итого наш баланс пока' : 'Current balance'}: ${formatReportTotal(t.balance, lang)}`);
   return lines.join('\n');
 }

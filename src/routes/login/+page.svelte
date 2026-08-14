@@ -100,7 +100,7 @@
     {:else if status === 'rejected'}
       <p class="status-msg rejected">{$t.login.rejected}</p>
     {:else if status === 'error'}
-      <p class="status-msg rejected">Something went wrong. Try again.</p>
+      <p class="status-msg rejected">{$t.login.error}</p>
     {/if}
   </div>
 </div>

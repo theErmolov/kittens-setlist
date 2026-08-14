@@ -100,10 +100,10 @@
       <span class="mobile-artist">{song.artist}</span>
       <span class="mobile-sep">–</span>
       <span class="mobile-title">{song.title}</span>
-      {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>{/if}
+      {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title={$t.common.lyrics}>📝</button>{/if}
     </div>
     <span class="title-text desktop-only">{song.title}</span>
-    {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline desktop-only" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>{/if}
+    {#if song.lyrics && onlyricsclick}<button class="lyrics-btn-inline desktop-only" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title={$t.common.lyrics}>📝</button>{/if}
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}

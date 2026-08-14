@@ -6,7 +6,7 @@
   import { goto } from '$app/navigation';
   import twemoji from '@twemoji/api';
   import LogoCat from '$components/shared/LogoCat.svelte';
-  import { lang } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading, initAuth, logout } from '$lib/auth';
   import { getUsers } from '$lib/api';
 
@@ -69,7 +69,7 @@
 </script>
 
 <svelte:head>
-  <title>Центр Управления Котят</title>
+  <title>{$t.common.appTitle}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </svelte:head>
 
@@ -116,9 +116,9 @@
     </a>
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
-  <button class="theme-toggle" onclick={toggleTheme} title="Toggle theme">{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
+  <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if $currentUser}
-    <button class="logout-btn" onclick={handleLogout} title="Log out">🚪</button>
+    <button class="logout-btn" onclick={handleLogout} title={$t.common.logout}>🚪</button>
   {/if}
 </nav>
 

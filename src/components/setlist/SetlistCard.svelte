@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Setlist } from '$lib/types';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { formatDuration, formatDate } from '$lib/utils';
   import { base } from '$app/paths';
 
@@ -16,10 +16,10 @@
   <a href="{base}/setlists/{setlist.id}" class="card-link">
     <div class="card-name">{setlist.name}</div>
     <div class="card-meta">
-      {#if setlist.date}<span class="date">{formatDate(setlist.date)}</span>{/if}
+      {#if setlist.date}<span class="date">{formatDate(setlist.date, $lang)}</span>{/if}
       {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}
-      <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songMins + breakMins)})</span>
-      <span class="vibe-chip" class:no-vibe={!setlist.vibe}>{setlist.vibe ? '+вайб' : '-вайб'}</span>
+      <span class="count">{$t.setlists.songs(songCount)} ({formatDuration(songMins + breakMins, $lang)})</span>
+      <span class="vibe-chip" class:no-vibe={!setlist.vibe}>{setlist.vibe ? $t.setlists.vibeOn : $t.setlists.vibeOff}</span>
     </div>
   </a>
   <div class="card-actions">

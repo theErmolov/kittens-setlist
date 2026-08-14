@@ -3,6 +3,7 @@
   import type { Song } from '$lib/types';
   import { updateSong } from '$lib/api';
   import { canWrite } from '$lib/auth';
+  import { t } from '$lib/i18n';
 
   let { song, onclose, onsongupdate, onsavetranspose }: {
     song: Song;
@@ -405,23 +406,23 @@
     {/if}
     <div class="header-controls">
       <div class="zoom-buttons">
-        <button class="zoom-btn" onclick={zoomOut} title="Smaller">A−</button>
-        <button class="zoom-btn" onclick={zoomIn} title="Larger">A+</button>
+        <button class="zoom-btn" onclick={zoomOut} title={$t.stage.zoomOut}>A−</button>
+        <button class="zoom-btn" onclick={zoomIn} title={$t.stage.zoomIn}>A+</button>
       </div>
       {#if originalKey}
         <div class="transpose-wrap">
           <div class="transpose-controls">
-            <button class="step-btn" onclick={transposeDown} title="Semitone down">▼</button>
+            <button class="step-btn" onclick={transposeDown} title={$t.stage.semitoneDown}>▼</button>
             <button
               class="transpose-btn"
               class:active={dropdownOpen}
               onclick={() => { dropdownOpen = !dropdownOpen; }}
-              title="Transpose"
+              title={$t.stage.transpose}
             >
               <span class="key-label" style:min-width="{maxKeyLength}ch">{targetKey}</span>
               <span class="offset-label" style:visibility={transpose === 0 ? 'hidden' : 'visible'}>{transpose > 0 ? `+${transpose}` : transpose}</span>
             </button>
-            <button class="step-btn" onclick={transposeUp} title="Semitone up">▲</button>
+            <button class="step-btn" onclick={transposeUp} title={$t.stage.semitoneUp}>▲</button>
           </div>
           {#if dropdownOpen}
             <div

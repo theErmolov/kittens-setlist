@@ -5,7 +5,7 @@
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
   import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, addSetlistOnlySong, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { currentUser } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
@@ -105,6 +105,13 @@
   let filterOpen = $state(false);
   let activeSubsetId = $state<string | null>(null);
   let draftSubsetName = $state('');
+  let tableWrapEl = $state<HTMLDivElement | null>(null);
+  let autoScrollFrame: number | null = null;
+  let autoScrollSpeed = 0;
+  let lastDragClientX = 0;
+  let lastDragClientY = 0;
+  const AUTO_SCROLL_EDGE = 80;
+  const AUTO_SCROLL_MAX_SPEED = 22;
 
   function toggleMusician(name: string) {
     selectedMusician = selectedMusician === name ? null : name;
@@ -319,6 +326,80 @@
     return `${item.kind}-${item.subset.id}`;
   }
 
+  function updateDropTargetAtPoint(clientX: number, clientY: number) {
+    const el = document.elementFromPoint(clientX, clientY);
+    if (draggedSubsetId !== null) {
+      const header = el?.closest('[data-subset-id]') as HTMLElement | null;
+      if (header) overSubsetId = header.dataset.subsetId ?? null;
+      return;
+    }
+
+    const row = el?.closest('[data-row-key]') as HTMLElement | null;
+    if (row) {
+      overEntryKey = row.dataset.rowKey ?? null;
+      overSubsetId = null;
+      const rect = row.getBoundingClientRect();
+      overEntrySide = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      return;
+    }
+
+    const header = el?.closest('[data-subset-id]') as HTMLElement | null;
+    if (header) {
+      overEntryKey = null;
+      overSubsetId = header.dataset.subsetId ?? null;
+      const rect = header.getBoundingClientRect();
+      overSubsetSide = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    }
+  }
+
+  function stopDragAutoScroll() {
+    autoScrollSpeed = 0;
+    if (autoScrollFrame !== null) {
+      cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = null;
+    }
+  }
+
+  function autoScrollTick() {
+    autoScrollFrame = null;
+    if (!tableWrapEl || autoScrollSpeed === 0 || (draggedEntryKey === null && draggedSubsetId === null)) return;
+    const before = tableWrapEl.scrollTop;
+    tableWrapEl.scrollTop += autoScrollSpeed;
+    updateDropTargetAtPoint(lastDragClientX, lastDragClientY);
+    if (tableWrapEl.scrollTop === before) {
+      autoScrollSpeed = 0;
+      return;
+    }
+    autoScrollFrame = requestAnimationFrame(autoScrollTick);
+  }
+
+  function updateDragAutoScroll(clientX: number, clientY: number) {
+    lastDragClientX = clientX;
+    lastDragClientY = clientY;
+    if (!tableWrapEl || (draggedEntryKey === null && draggedSubsetId === null)) {
+      stopDragAutoScroll();
+      return;
+    }
+
+    const rect = tableWrapEl.getBoundingClientRect();
+    const edge = Math.min(AUTO_SCROLL_EDGE, rect.height / 3);
+    let speed = 0;
+    if (clientY < rect.top + edge) {
+      const strength = Math.min(1, Math.max(0, (rect.top + edge - clientY) / edge));
+      speed = -Math.ceil(AUTO_SCROLL_MAX_SPEED * strength);
+    } else if (clientY > rect.bottom - edge) {
+      const strength = Math.min(1, Math.max(0, (clientY - (rect.bottom - edge)) / edge));
+      speed = Math.ceil(AUTO_SCROLL_MAX_SPEED * strength);
+    }
+
+    autoScrollSpeed = speed;
+    if (speed === 0) {
+      stopDragAutoScroll();
+    } else if (autoScrollFrame === null) {
+      autoScrollFrame = requestAnimationFrame(autoScrollTick);
+    }
+  }
+
   onMount(() => {
     const u = $currentUser;
     const pollMs = (u?.isAdmin || u?.role === 'writer') ? 3000 : 15000;
@@ -342,22 +423,8 @@
         }
       }
       e.preventDefault();
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      const row = el?.closest('[data-row-key]') as HTMLElement | null;
-      if (row) {
-        overEntryKey = row.dataset.rowKey ?? null;
-        overSubsetId = null;
-        const rect = row.getBoundingClientRect();
-        overEntrySide = touch.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-      } else {
-        const header = el?.closest('[data-subset-id]') as HTMLElement | null;
-        if (header) {
-          overEntryKey = null;
-          overSubsetId = header.dataset.subsetId ?? null;
-          const rect = header.getBoundingClientRect();
-          overSubsetSide = touch.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-        }
-      }
+      updateDropTargetAtPoint(touch.clientX, touch.clientY);
+      updateDragAutoScroll(touch.clientX, touch.clientY);
     };
 
     const handleTouchEnd = () => {
@@ -368,15 +435,26 @@
       touchStartEntryKey = null;
       touchStartY = null;
       touchStartX = null;
+      stopDragAutoScroll();
+    };
+
+    const handleTouchCancel = () => {
+      touchStartEntryKey = null;
+      touchStartY = null;
+      touchStartX = null;
+      clearEntryDrag();
     };
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchCancel);
 
     return () => {
       stopPoller();
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchCancel);
+      stopDragAutoScroll();
     };
   });
 
@@ -578,6 +656,7 @@
     const row = e.currentTarget as HTMLElement;
     const rect = row.getBoundingClientRect();
     overEntrySide = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    updateDragAutoScroll(e.clientX, e.clientY);
   }
 
   async function dropEntry() {
@@ -597,6 +676,7 @@
     draggedEntryKey = null;
     overEntryKey = null;
     if (!draggedSubsetId) overSubsetId = null;
+    stopDragAutoScroll();
   }
 
   function onSubsetDragStart(e: DragEvent, subsetId: string) {
@@ -614,6 +694,7 @@
     const row = e.currentTarget as HTMLElement;
     const rect = row.getBoundingClientRect();
     overSubsetSide = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    updateDragAutoScroll(e.clientX, e.clientY);
   }
 
   async function dropSubset() {
@@ -621,6 +702,7 @@
     const target = overSubsetId;
     draggedSubsetId = null;
     overSubsetId = null;
+    stopDragAutoScroll();
     if (source && target && source !== target) await moveSubset(source, target);
   }
 
@@ -640,6 +722,7 @@
   function clearSubsetDrag() {
     draggedSubsetId = null;
     overSubsetId = null;
+    stopDragAutoScroll();
   }
 
   let touchStartEntryKey = $state<string | null>(null);
@@ -687,7 +770,7 @@
     <div class="meta">
       {#if editingMeta}
         <div class="meta-form">
-          <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder="Название" />
+          <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder={$t.editor.namePlaceholder} />
           <input class="meta-input" type="date" bind:value={draftMeta.date} />
           <input class="meta-input" type="time" bind:value={draftMeta.startTime} />
           <div class="vibe-row">
@@ -697,29 +780,29 @@
             </label>
             <span class="help-tip" title={$t.setlists.vibeTooltip}>?</span>
           </div>
-          <button class="btn-primary" onclick={saveMeta}>Сохранить</button>
-          <button class="btn-secondary" onclick={() => { editingMeta = false; }}>Отмена</button>
+          <button class="btn-primary" onclick={saveMeta}>{$t.editor.save}</button>
+          <button class="btn-secondary" onclick={() => { editingMeta = false; }}>{$t.editor.cancel}</button>
         </div>
       {:else}
         <div class="meta-view">
-          <h1>{localMeta.name} <span class="vibe-badge" class:no-vibe={!localMeta.vibe} title={$t.setlists.vibeTooltip}>{localMeta.vibe ? '+вайб' : '-вайб'}</span></h1>
+          <h1>{localMeta.name} <span class="vibe-badge" class:no-vibe={!localMeta.vibe} title={$t.setlists.vibeTooltip}>{localMeta.vibe ? $t.setlists.vibeOn : $t.setlists.vibeOff}</span></h1>
           <div class="meta-details">
-            {#if localMeta.date}<span class="date">{formatDate(localMeta.date)}</span>{/if}
+            {#if localMeta.date}<span class="date">{formatDate(localMeta.date, $lang)}</span>{/if}
             {#if localMeta.startTime}<span class="start-time">▶ {localMeta.startTime}</span>{/if}
-            <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes)})</span>
+            <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes, $lang)})</span>
             {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}
           </div>
         </div>
-        <button class="edit-meta-btn" onclick={startEditMeta} title="Редактировать">✏️</button>
+        <button class="edit-meta-btn" onclick={startEditMeta} title={$t.editor.edit}>✏️</button>
       {/if}
     </div>
     <div class="header-actions">
       <div class="break-wrap">
-        <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ Перерыв</button>
+        <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ {$t.editor.break}</button>
         {#if showBreakPicker}
           <div class="break-picker">
             {#each [5, 10, 20, 30] as min}
-              <button class="break-opt" onclick={() => handleAddBreak(min)}>{min} мин</button>
+              <button class="break-opt" onclick={() => handleAddBreak(min)}>{$t.editor.minutes(min)}</button>
             {/each}
           </div>
         {/if}
@@ -732,7 +815,7 @@
   </div>
 
   <div class="filter-bar">
-    <input class="filter-search" type="search" placeholder="Поиск..." bind:value={filterText} />
+    <input class="filter-search" type="search" placeholder={$t.editor.search} bind:value={filterText} />
     {#each allMusicians as name}
       <button
         class="filter-chip"
@@ -757,13 +840,13 @@
       class="filter-chip"
       class:active={filterNotReady}
       onclick={() => { filterNotReady = !filterNotReady; }}
-    >не готово ({songCount - readyCount})</button>
+    >{$t.editor.notReady(songCount - readyCount)}</button>
   </div>
 
   <!-- Mobile filter panel (slides up above bottom bar) -->
   <div class="mobile-filter-panel" class:open={filterOpen}>
     <div class="filter-group">
-      <input class="filter-search filter-search-full" type="search" placeholder="Поиск по названию или исполнителю..." bind:value={filterText} />
+      <input class="filter-search filter-search-full" type="search" placeholder={$t.editor.searchFull} bind:value={filterText} />
     </div>
     <div class="filter-sep-h"></div>
     {#if allMusicians.length > 0}
@@ -797,13 +880,13 @@
         class="filter-chip"
         class:active={filterNotReady}
         onclick={() => { filterNotReady = !filterNotReady; }}
-      >не готово ({songCount - readyCount})</button>
+      >{$t.editor.notReady(songCount - readyCount)}</button>
     </div>
     <div class="filter-sep-h"></div>
     <div class="filter-group mob-break-group">
-      <span class="mob-break-label">⏸ Перерыв:</span>
+      <span class="mob-break-label">⏸ {$t.editor.break}:</span>
       {#each [5, 10, 20, 30] as min}
-        <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{min} мин</button>
+        <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{$t.editor.minutes(min)}</button>
       {/each}
     </div>
   </div>
@@ -814,10 +897,10 @@
       class="bottom-btn"
       class:active={filterOpen || isFiltered}
       onclick={() => { filterOpen = !filterOpen; }}
-    >🎛️ Фильтр</button>
-    <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">🎤 На сцену</a>
+    >🎛️ {$t.editor.filter}</button>
+    <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">{$t.editor.stageView}</a>
     <button class="bottom-subset" onclick={handleNewSubset} title={$t.editor.newSubset}>⏭</button>
-    <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>+ Добавить</button>
+    <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>{$t.editor.add}</button>
   </div>
 
   {#if sortedEntries.length === 0}
@@ -826,14 +909,27 @@
       <button class="btn-primary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongsBtn}</button>
     </div>
   {:else}
-    <div class="table-wrap">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="table-wrap"
+      bind:this={tableWrapEl}
+      ondragover={(e) => {
+        if (draggedEntryKey !== null || draggedSubsetId !== null) {
+          e.preventDefault();
+          updateDragAutoScroll(e.clientX, e.clientY);
+        }
+      }}
+      ondragleave={(e) => {
+        if (!tableWrapEl?.contains(e.relatedTarget as Node | null)) stopDragAutoScroll();
+      }}
+    >
       <table>
         <thead>
           <tr>
             <th class="th-drag"></th>
             <th class="th-num">#</th>
             {#if localMeta.startTime}<th class="th-time">⏱</th>{/if}
-            <th class="th-song">Песня</th>
+            <th class="th-song">{$t.editor.songColumn}</th>
             {#each allMusicians as name, i}
               <th class="th-musician progress-delim" class:musician-alt={i % 2 === 0}>{name}</th>
             {/each}
@@ -942,7 +1038,7 @@
                         <span class="artist">{song.artist}</span>
                         <span class="sep">–</span>
                         <span class="title">{song.title}</span>
-                        {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewEntry = entry; }} title="Текст песни">📝</button>{/if}
+                        {#if song.lyrics}<button class="lyrics-btn-inline" onclick={(e) => { e.stopPropagation(); lyricsViewEntry = entry; }} title={$t.common.lyrics}>📝</button>{/if}
                         {#each guestTags as g}
                           {@const gStage = entryStage(entry, g.name)}
                           <span class="guest-tag desktop-only" style="background: {PROG_BG[gStage] ?? 'var(--border)'}; color: {PROG_COLOR[gStage] ?? 'var(--text-muted)'};">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each} {g.name}</span>
@@ -978,7 +1074,7 @@
                       </td>
                     {/each}
                     <td class="td-actions">
-                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title="Редактировать в сетлисте">✏️</button>
+                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title={$t.editor.editEntry}>✏️</button>
                       <button class="remove-btn desktop-only" onclick={() => handleRemoveClick(entry)} title={activeSubsetId !== null && entry.subsetId === activeSubsetId ? $t.editor.subsetRemove : $t.editor.remove}>✕</button>
                     </td>
                   </tr>
@@ -1009,13 +1105,13 @@
                               class="break-opt"
                               class:break-opt-active={entry.breakMinutes === min}
                               onclick={(e) => { e.stopPropagation(); handleUpdateBreak(entry.order, min); }}
-                            >{min} мин</button>
+                            >{$t.editor.minutes(min)}</button>
                           {/each}
                           <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
                         </div>
                       {:else}
                         <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
-                          Перерыв — {entry.breakMinutes} мин
+                          {$t.editor.breakLabel(entry.breakMinutes!)}
                         </button>
                       {/if}
                       <CommentInput

@@ -182,7 +182,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2>{modalTitle}</h2>
-      <button class="close-btn" onclick={closeModal} aria-label="close">✕</button>
+      <button class="close-btn" onclick={closeModal} aria-label={$t.common.close}>✕</button>
     </div>
 
     <div class="modal-body">

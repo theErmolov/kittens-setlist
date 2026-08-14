@@ -6,7 +6,7 @@
   import FilterChips from '$components/shared/FilterChips.svelte';
   import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { canWrite } from '$lib/auth';
 
   let {
@@ -192,7 +192,7 @@
     <input class="search" placeholder={$t.backlog.search} bind:value={search} />
     <div class="chips-row">
       <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0))})</span>
+      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})</span>
     </div>
     {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
   </div>

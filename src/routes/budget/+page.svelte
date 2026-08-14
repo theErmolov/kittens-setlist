@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { getBudget, getSetlists, deleteBudgetEntry, updateBudgetEntry, getReceiptUrl } from '$lib/api';
   import { budgetTotals, buildBudgetReport, formatEUR } from '$lib/utils';
@@ -41,7 +41,7 @@
   function fmtDate(iso: string): string {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+    return new Intl.DateTimeFormat($lang === 'ru' ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
   }
 
   function openAdd(kind: BudgetKind) { editEntry = null; modalKind = kind; }
@@ -77,7 +77,7 @@
   }
 
   function generateReport() {
-    reportText = buildBudgetReport(entries, setlists);
+    reportText = buildBudgetReport(entries, setlists, Date.now(), $lang);
     copied = false;
   }
 
@@ -96,15 +96,15 @@
   {:else}
     <!-- Dashboard: Наличка + Переводы = На руках − Долги = Баланс -->
     <div class="dash">
-      <div class="card"><span class="card-lbl">{$t.budget.dash.cash}</span><span class="card-val">{formatEUR(totals.cash)}</span></div>
+      <div class="card"><span class="card-lbl">{$t.budget.dash.cash}</span><span class="card-val">{formatEUR(totals.cash, $lang)}</span></div>
       <span class="op">+</span>
-      <div class="card"><span class="card-lbl">{$t.budget.dash.transfer}</span><span class="card-val">{formatEUR(totals.transfer)}</span></div>
+      <div class="card"><span class="card-lbl">{$t.budget.dash.transfer}</span><span class="card-val">{formatEUR(totals.transfer, $lang)}</span></div>
       <span class="op">=</span>
-      <div class="card accent"><span class="card-lbl">{$t.budget.dash.onHand}</span><span class="card-val">{formatEUR(totals.onHand)}</span></div>
+      <div class="card accent"><span class="card-lbl">{$t.budget.dash.onHand}</span><span class="card-val">{formatEUR(totals.onHand, $lang)}</span></div>
       <span class="op">−</span>
-      <div class="card"><span class="card-lbl">{$t.budget.dash.debts}</span><span class="card-val neg">{formatEUR(totals.debts)}</span></div>
+      <div class="card"><span class="card-lbl">{$t.budget.dash.debts}</span><span class="card-val neg">{formatEUR(totals.debts, $lang)}</span></div>
       <span class="op">=</span>
-      <div class="card accent"><span class="card-lbl">{$t.budget.dash.balance}</span><span class="card-val" class:neg={totals.balance < 0}>{formatEUR(totals.balance)}</span></div>
+      <div class="card accent"><span class="card-lbl">{$t.budget.dash.balance}</span><span class="card-val" class:neg={totals.balance < 0}>{formatEUR(totals.balance, $lang)}</span></div>
     </div>
 
     <!-- Add buttons -->
@@ -124,7 +124,7 @@
             <div class="row-main">
               <span class="badge {e.kind}">{$t.budget.kind[e.kind]}</span>
               <span class="row-amount" class:pos={e.kind === 'income'} class:neg={e.kind === 'expense'} class:debt={e.kind === 'debt'}>
-                {e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}{formatEUR(e.amount)}
+                {e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}{formatEUR(e.amount, $lang)}
               </span>
               <span class="row-who">
                 {#if e.kind === 'income'}{e.person || '—'}

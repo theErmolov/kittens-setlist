@@ -2,6 +2,7 @@
   import type { Song, SetlistEntry, BandMusician } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { sortInstruments } from '$lib/utils';
+  import { t } from '$lib/i18n';
 
   const instrumentIcons: Record<string, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
@@ -66,7 +67,7 @@
         <CategoryBadge category={song.category} iconOnly />
       </div>
       {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+        <button class="lyrics-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title={$t.common.lyrics}>📝</button>
       {/if}
     </div>
     <div class="col-info">
@@ -104,7 +105,7 @@
     <div class="col-comment">
       {#if entry.comment}<span class="col-comment-text">{entry.comment}</span>{/if}
       {#if song.lyrics && onlyricsclick}
-        <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title="Текст песни">📝</button>
+        <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title={$t.common.lyrics}>📝</button>
       {/if}
     </div>
   </div>

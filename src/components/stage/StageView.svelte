@@ -7,7 +7,7 @@
   import FilterChips from '$components/shared/FilterChips.svelte';
   import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
   import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough, updateEntrySong } from '$lib/api';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
   import { base } from '$app/paths';
@@ -266,7 +266,7 @@
         <span class="timing-clock">🕐 {timingInfo()!.currentTime}</span>
       {/if}
       <span class="progress">
-        {playedCount}/{totalCount} ({formatDuration(totalMinutes)})
+        {playedCount}/{totalCount} ({formatDuration(totalMinutes, $lang)})
         {#if timingInfo()}
           {@const info = timingInfo()!}
           <span class="progress-sep">·</span>{$t.stage.finish}: {info.finishTime}
@@ -292,8 +292,8 @@
         class="header-filter-btn"
         class:active={filterOpen || isFiltered}
         onclick={() => { filterOpen = !filterOpen; }}
-        title="Фильтры"
-      >🎛️ <span class="filter-btn-label">Фильтр</span></button>
+        title={$t.stage.filters}
+      >🎛️ <span class="filter-btn-label">{$t.stage.filter}</span></button>
     </div>
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
@@ -324,7 +324,7 @@
           class="musician-chip"
           class:active={unplayedToBottom}
           onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-        >↓ Несыгранные вниз</button>
+        >{$t.stage.unplayedToBottom}</button>
       {/if}
     </div>
     {/if}
@@ -354,7 +354,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="stage-break" class:played={item.entry.played} class:can-mark={canMark} onclick={() => handleBreakToggle(item.entry.order)}>
-            <span class="break-main">⏸ {item.entry.breakMinutes} мин{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
+            <span class="break-main">⏸ {$t.stage.breakMinutes(item.entry.breakMinutes!)}{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
             {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
           </div>
         {/if}
@@ -396,7 +396,7 @@
           class="musician-chip"
           class:active={unplayedToBottom}
           onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-        >↓ Несыгранные вниз</button>
+        >{$t.stage.unplayedToBottom}</button>
       </div>
     {/if}
   </div>
@@ -420,13 +420,13 @@
       class="bottom-btn"
       class:active={filterOpen || isFiltered}
       onclick={() => { filterOpen = !filterOpen; }}
-    >🎛️ Фильтр</button>
+    >🎛️ {$t.stage.filter}</button>
     {#if setlist.vibe}
       <button
         class="bottom-btn"
         class:active={unplayedToBottom}
         onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-      >↓ Несыгранные вниз</button>
+      >{$t.stage.unplayedToBottom}</button>
     {/if}
   </div>
 </div>

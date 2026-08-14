@@ -192,7 +192,7 @@
 
   let modalTitle = $derived(
     mode === 'entry'
-      ? ($t.song.editTitle + ' (в сетлисте)')
+      ? ($t.song.editTitle + ' ' + $t.song.entrySuffix)
       : mode === 'setlist-only'
         ? (song?.id ? $t.song.editSetlistOnlyTitle : $t.song.addSetlistOnlyTitle)
       : (song?.id ? $t.song.editTitle : $t.song.addTitle)
@@ -222,8 +222,8 @@
       </div>
 
       <div class="tab-strip">
-        <button class="tab-btn" class:active={activeTab === 'details'} onclick={() => activeTab = 'details'}>Детали</button>
-        <button class="tab-btn" class:active={activeTab === 'lyrics'} onclick={() => activeTab = 'lyrics'}>Текст</button>
+        <button class="tab-btn" class:active={activeTab === 'details'} onclick={() => activeTab = 'details'}>{$t.song.detailsTab}</button>
+        <button class="tab-btn" class:active={activeTab === 'lyrics'} onclick={() => activeTab = 'lyrics'}>{$t.song.lyricsTab}</button>
       </div>
 
       {#if activeTab === 'details'}
@@ -245,7 +245,7 @@
             <span class="header-name">{$t.song.musicians}</span>
             <span class="row-gap"></span>
             <span class="header-instruments"></span>
-            <span class="header-progress">Прогресс</span>
+            <span class="header-progress">{$t.song.progress}</span>
           </div>
 
           <!-- Permanent band members -->
@@ -291,7 +291,7 @@
               <input
                 class="roster-name guest-name"
                 value={row.name}
-                placeholder={isAdd ? '+ гость' : 'Имя'}
+                placeholder={isAdd ? $t.song.guestPlaceholder : $t.song.guestNamePlaceholder}
                 oninput={(e) => onGuestInput(row, (e.target as HTMLInputElement).value)}
               />
               <span class="row-gap"></span>
@@ -340,7 +340,7 @@
         </div>
       </div>
       {:else}
-      <textarea class="lyrics-editor" bind:value={draft.lyrics} placeholder="Текст и аккорды песни...&#10;&#10;Am  G  C  F&#10;Слова первого куплета"></textarea>
+      <textarea class="lyrics-editor" bind:value={draft.lyrics} placeholder={$t.song.lyricsPlaceholder}></textarea>
       {/if}
     </div>
 
@@ -356,7 +356,7 @@
           <button class="btn-icon" onclick={toggleArchive} title={draft.archived ? $t.song.unarchive : $t.song.archive}>{draft.archived ? '📤' : '📦'}</button>
         {/if}
         {#if onremove}
-          <button class="btn-remove-setlist danger" onclick={() => { if (confirm('Убрать из сетлиста?')) { onremove!(); closeModal(); } }} title="Убрать из сетлиста">− из сетлиста</button>
+          <button class="btn-remove-setlist danger" onclick={() => { if (confirm($t.song.removeFromSetlistConfirm)) { onremove!(); closeModal(); } }} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</button>
         {/if}
       </div>
       <div class="footer-right">

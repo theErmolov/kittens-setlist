@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from '$lib/i18n';
+
   let {
     value: initial = '',
     onsave
@@ -15,7 +17,7 @@
 <input
   class="comment-input"
   bind:value
-  placeholder="комментарий..."
+  placeholder={$t.common.commentPlaceholder}
   draggable="false"
   onmousedown={(e) => e.stopPropagation()}
   onclick={(e) => e.stopPropagation()}
