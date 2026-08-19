@@ -3,7 +3,7 @@ import { dbPut, dbDeleteByKey, dbQueryPartition } from '../lib/dynamo.js';
 import { ok, err } from '../lib/response.js';
 import type { PresenceEntry, User } from '../lib/types.js';
 
-const TABLE = process.env.PRESENCE_TABLE ?? 'kittens-presence';
+const TABLE = process.env.PRESENCE_TABLE ?? 'kittens-presence-v2';
 const TTL_SECONDS = 90;
 
 function displayName(user: User): string {

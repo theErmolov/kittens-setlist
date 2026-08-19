@@ -225,11 +225,14 @@ Resources:
           KeyType: HASH
 
   # ─── Presence — who's viewing a resource right now (heartbeat + TTL) ──────────
+  # Note: key was renamed setlistId → room (2026-08-19), so the table was renamed
+  # from kittens-presence (retained, orphaned) to kittens-presence-v2 to allow CFN
+  # to replace it — CloudFormation cannot replace a custom-named table in place.
   PresenceTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     Properties:
-      TableName: kittens-presence
+      TableName: kittens-presence-v2
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: room
