@@ -273,12 +273,12 @@
      yellow = you're alone on the page */
   .presence-dot {
     position: absolute;
-    bottom: -3px;
+    bottom: -6px;
     left: 50%;
     transform: translateX(-50%);
-    width: 7px; height: 7px; border-radius: 50%;
+    width: 5px; height: 5px; border-radius: 50%;
     background: #22c55e;
-    box-shadow: 0 0 0 1.5px var(--surface);
+    box-shadow: 0 0 0 0 #22c55e80;
     animation: presence-pulse 1.8s ease-out infinite;
   }
   .presence-dot.alone {
@@ -286,14 +286,14 @@
     animation: presence-pulse-alone 1.8s ease-out infinite;
   }
   @keyframes presence-pulse {
-    0%   { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e80; }
-    70%  { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 5px #22c55e00; }
-    100% { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e00; }
+    0%   { box-shadow: 0 0 0 0 #22c55e80; }
+    70%  { box-shadow: 0 0 0 4px #22c55e00; }
+    100% { box-shadow: 0 0 0 0 #22c55e00; }
   }
   @keyframes presence-pulse-alone {
-    0%   { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #eab30880; }
-    70%  { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 5px #eab30800; }
-    100% { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #eab30800; }
+    0%   { box-shadow: 0 0 0 0 #eab30880; }
+    70%  { box-shadow: 0 0 0 4px #eab30800; }
+    100% { box-shadow: 0 0 0 0 #eab30800; }
   }
 
   .lang-toggle {
