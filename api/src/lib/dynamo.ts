@@ -61,6 +61,21 @@ export async function dbQueryIndex<T>(
   return (res.Items ?? []) as T[];
 }
 
+/** Query all items for a table's own partition key (no GSI). */
+export async function dbQueryPartition<T>(
+  table: string,
+  keyName: string,
+  keyValue: string,
+): Promise<T[]> {
+  const res = await db.send(new QueryCommand({
+    TableName: table,
+    KeyConditionExpression: '#key = :value',
+    ExpressionAttributeNames: { '#key': keyName },
+    ExpressionAttributeValues: { ':value': keyValue },
+  }));
+  return (res.Items ?? []) as T[];
+}
+
 export async function dbTransactPutAndDelete(
   table: string,
   item: Record<string, unknown>,

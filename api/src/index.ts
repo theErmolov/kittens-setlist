@@ -5,6 +5,7 @@ import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
 import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
+import { presenceHandler } from './handlers/presence.js';
 import { err } from './lib/response.js';
 import type { User } from './lib/types.js';
 
@@ -37,8 +38,14 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     event.requestContext.http.method === 'GET' &&
     /^\/setlists\/[^/]+$/.test(path);
 
+  // Presence heartbeats — public (works anonymous), user resolved opportunistically
+  const isPresence = /^\/setlists\/[^/]+\/presence$/.test(path);
+
   let user: User | null = null;
-  if (!isPublicSetlistGet) {
+  if (isPresence) {
+    // Public route: resolve the user if a valid token is present, else anonymous
+    user = await resolveAuth(event);
+  } else if (!isPublicSetlistGet) {
     // All other routes require an authenticated, approved user
     user = await resolveAuth(event);
     if (!user) return err('Unauthorized', 401);
@@ -55,7 +62,10 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
   }
   if (path.startsWith('/musicians')) return musiciansHandler(event, path, user!);
   if (path.startsWith('/songs')) return songsHandler(event, path, user!);
-  if (path.startsWith('/setlists')) return setlistsHandler(event, path, user!);
+  if (path.startsWith('/setlists')) {
+    if (isPresence) return presenceHandler(event, path, user);
+    return setlistsHandler(event, path, user!);
+  }
 
   return { statusCode: 404, body: 'Not found' };
 };

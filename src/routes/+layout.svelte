@@ -7,13 +7,18 @@
   import twemoji from '@twemoji/api';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang, t } from '$lib/i18n';
-  import { currentUser, authLoading, initAuth, logout } from '$lib/auth';
+  import { currentUser, authLoading, initAuth, logout, getCachedNavFlags, setCachedNavFlags } from '$lib/auth';
   import { getUsers } from '$lib/api';
+  import { presencePollingActive } from '$lib/presence';
 
   let { children } = $props();
 
   let dark = $state(browser ? localStorage.getItem('theme') === 'dark' : false);
   let hasPending = $state(false);
+  // Seed from cache so the nav renders the right icon count on first paint.
+  const cachedNavFlags = getCachedNavFlags();
+  let navIsAdmin = $state(cachedNavFlags.isAdmin);
+  let navLoggedIn = $state(cachedNavFlags.loggedIn);
 
   onMount(() => {
     const opts = { base: `${base}/emoji/`, folder: '.', ext: '.svg' };
@@ -46,6 +51,18 @@
     if (!isLoginPage && !isStage && $currentUser === null) {
       goto(`${base}/login`);
     }
+  });
+
+  // Sync the cached nav flags to the real auth state once it resolves, so the
+  // first paint (from cache) is corrected if anything changed since last visit.
+  $effect(() => {
+    if (!browser || $authLoading) return;
+    const u = $currentUser;
+    const isAdmin = u?.isAdmin === true;
+    const loggedIn = u !== null;
+    navIsAdmin = isAdmin;
+    navLoggedIn = loggedIn;
+    setCachedNavFlags({ isAdmin, loggedIn });
   });
 
   function toggleTheme() {
@@ -86,7 +103,7 @@
     <span class="link-icon">🎵</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
   </a>
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
-    <span class="link-icon">🎪</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
+    <span class="link-icon">🎪{#if $presencePollingActive}<span class="presence-dot" title={$lang === 'ru' ? 'Кто-то ещё смотрит этот сетлист' : 'Someone else is viewing this setlist'}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
   <a
     href="https://media.kittens.band"
@@ -97,7 +114,7 @@
   >
     <span class="link-icon">📷</span><span class="link-label">{$lang === 'ru' ? 'Медиа' : 'Media'}</span>
   </a>
-  {#if $currentUser?.isAdmin}
+  {#if navIsAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
       <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
     </a>
@@ -117,7 +134,7 @@
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
   <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
-  {#if $currentUser}
+  {#if navLoggedIn}
     <button class="logout-btn" onclick={handleLogout} title={$t.common.logout}>🚪</button>
   {/if}
 </nav>
@@ -231,7 +248,7 @@
   .nav-link:hover { color: var(--text); background: var(--chip-bg); }
   .nav-link.active { color: #fff; background: #6c63ff; }
 
-  .link-icon { font-size: 1rem; line-height: 1; }
+  .link-icon { font-size: 1rem; line-height: 1; position: relative; }
 
   .pending-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -244,6 +261,23 @@
     0%   { box-shadow: 0 0 0 0 #ef444480; }
     70%  { box-shadow: 0 0 0 6px #ef444400; }
     100% { box-shadow: 0 0 0 0 #ef444400; }
+  }
+
+  /* Live-sync indicator under the setlists icon (presence polling active) */
+  .presence-dot {
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 1.5px var(--surface);
+    animation: presence-pulse 1.8s ease-out infinite;
+  }
+  @keyframes presence-pulse {
+    0%   { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e80; }
+    70%  { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 5px #22c55e00; }
+    100% { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e00; }
   }
 
   .lang-toggle {

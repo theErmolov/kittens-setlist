@@ -23,6 +23,32 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Cached auth-derived nav flags. The nav bar reads these on first paint so the
+// icon count is stable before initAuth() resolves (avoids the reflow jump on
+// mobile where links are flex:1 and the admin/logout chrome appears late).
+const NAV_ADMIN_KEY = 'kittens_nav_admin';
+const NAV_LOGGED_IN_KEY = 'kittens_nav_logged_in';
+
+export function getCachedNavFlags(): { isAdmin: boolean; loggedIn: boolean } {
+  if (!browser) return { isAdmin: false, loggedIn: false };
+  return {
+    isAdmin: localStorage.getItem(NAV_ADMIN_KEY) === '1',
+    loggedIn: localStorage.getItem(NAV_LOGGED_IN_KEY) === '1',
+  };
+}
+
+export function setCachedNavFlags({ isAdmin, loggedIn }: { isAdmin: boolean; loggedIn: boolean }): void {
+  if (!browser) return;
+  localStorage.setItem(NAV_ADMIN_KEY, isAdmin ? '1' : '0');
+  localStorage.setItem(NAV_LOGGED_IN_KEY, loggedIn ? '1' : '0');
+}
+
+export function clearNavCache(): void {
+  if (!browser) return;
+  localStorage.removeItem(NAV_ADMIN_KEY);
+  localStorage.removeItem(NAV_LOGGED_IN_KEY);
+}
+
 /** Fetch /auth/me and populate currentUser. Call once on app init. */
 export async function initAuth(): Promise<void> {
   if (!browser) {
@@ -62,6 +88,7 @@ export async function logout(): Promise<void> {
     } catch { /* ignore */ }
   }
   clearToken();
+  clearNavCache();
   currentUser.set(null);
 }
 

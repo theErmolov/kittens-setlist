@@ -18,6 +18,7 @@ Globals:
         SESSIONS_TABLE: !Ref SessionsTable
         AUDIT_LOG_TABLE: !Ref AuditLogTable
         BUDGET_TABLE: !Ref BudgetTable
+        PRESENCE_TABLE: !Ref PresenceTable
         RECEIPTS_BUCKET: !Ref ReceiptsBucket
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
 
@@ -78,6 +79,8 @@ Resources:
             TableName: !Ref AuditLogTable
         - DynamoDBCrudPolicy:
             TableName: !Ref BudgetTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PresenceTable
         - S3CrudPolicy:
             BucketName: !Ref ReceiptsBucket
       Events:
@@ -220,6 +223,27 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+
+  # ─── Presence — who's viewing a setlist right now (heartbeat + TTL) ───────────
+  PresenceTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: kittens-presence
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: setlistId
+          AttributeType: S
+        - AttributeName: clientId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: setlistId
+          KeyType: HASH
+        - AttributeName: clientId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
 
   # ─── S3 — expense receipts (admin-only, accessed via presigned URLs) ──────────
   ReceiptsBucket:

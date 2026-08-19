@@ -9,6 +9,7 @@
   import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough, updateEntrySong } from '$lib/api';
   import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
+  import { PresenceController } from '$lib/presence';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
   import { base } from '$app/paths';
 
@@ -41,13 +42,15 @@
   let now = $state(new Date());
 
   onMount(() => {
+    const presence = new PresenceController(setlist.id);
+    presence.start();
     const stopPoller = startPolling(
       async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },
       isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
-      () => isEventLongOver(setlist.date, setlist.startTime),
+      () => isEventLongOver(setlist.date, setlist.startTime) || presence.isPaused(),
     );
     const clockTimer = setInterval(() => { now = new Date(); }, 1000);
-    return () => { stopPoller(); clearInterval(clockTimer); };
+    return () => { stopPoller(); presence.stop(); clearInterval(clockTimer); };
   });
 
   let categoryFilter = $state(new Set<Category>());

@@ -132,3 +132,15 @@ export interface DebtEntry extends BudgetBase {
 }
 
 export type BudgetEntry = IncomeEntry | ExpenseEntry | DebtEntry;
+
+// ─── Presence ─────────────────────────────────────────────────────────────────
+// Mirrors api/src/lib/types.ts — keep in sync.
+
+export interface PresenceEntry {
+  clientId: string;       // per-tab id (sessionStorage on the client)
+  userId?: string;        // resolved user id, if authenticated
+  name: string;           // display name; 'гость' for anonymous
+  canMark: boolean;       // true for admins/writers — only they can mutate
+  lastSeen: string;       // ISO 8601
+  expiresAt: number;      // Unix seconds
+}

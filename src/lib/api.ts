@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry } from '$lib/types';
+import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry, PresenceEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -210,4 +210,21 @@ export async function uploadReceipt(entryId: string, file: File): Promise<string
 export async function getReceiptUrl(entryId: string): Promise<string> {
   const { url } = await req<{ url: string }>(`/budget/${entryId}/receipt-url`);
   return url;
+}
+
+// ─── Presence ─────────────────────────────────────────────────────────────────
+
+/** Heartbeat: upsert our presence on a setlist; returns the other live viewers. */
+export async function heartbeatPresence(setlistId: string, clientId: string): Promise<{ others: PresenceEntry[] }> {
+  return req(`/setlists/${setlistId}/presence`, { method: 'POST', body: JSON.stringify({ clientId }) });
+}
+
+/** Best-effort leave: removes our presence. keepalive so it survives tab close. */
+export function leavePresence(setlistId: string, clientId: string): void {
+  const token = getToken();
+  fetch(`${BASE}/setlists/${setlistId}/presence?clientId=${encodeURIComponent(clientId)}`, {
+    method: 'DELETE',
+    keepalive: true,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }).catch(() => {});
 }
