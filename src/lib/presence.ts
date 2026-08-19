@@ -1,11 +1,15 @@
 /**
- * Presence: lightweight heartbeats so a setlist view polls only when another
- * user who can mutate the setlist is also viewing it.
+ * Presence: lightweight heartbeats so a collaborative view polls only when
+ * another user who can mutate the shared resource is also viewing it.
  *
- * Each open setlist view (editor or stage) creates a PresenceController that
- * heartbeats every 20s. The heartbeat response lists the *other* live viewers;
- * if none of them can mutate (canMark), the data poller is paused. Heartbeat
- * failures fall back to polling (graceful degradation against an old backend).
+ * Each open view (backlog, setlist editor, stage) creates a PresenceController
+ * that heartbeats every 20s. The heartbeat response lists the *other* live
+ * viewers; if none of them can mutate (canMark), the data poller is paused.
+ * Heartbeat failures fall back to polling (graceful degradation against an old
+ * backend).
+ *
+ * The nav bar reads `presenceIndicator` to show a dot on the active section's
+ * icon: green when someone else is here, yellow when you're alone.
  */
 import { browser } from '$app/environment';
 import { writable, type Writable } from 'svelte/store';
@@ -14,6 +18,14 @@ import type { PresenceEntry } from '$lib/types';
 
 const CLIENT_ID_KEY = 'kittens_presence_client_id';
 const HEARTBEAT_MS = 20_000;
+
+/** Which nav icon the indicator dot belongs to. */
+export type PresenceScope = 'backlog' | 'setlist';
+export type PresenceState = 'off' | 'alone' | 'withOthers';
+
+/** Room strings are the DynamoDB partition key: the shared resource being viewed. */
+export const BACKLOG_ROOM = 'backlog';
+export function setlistRoom(id: string): string { return `setlist:${id}`; }
 
 /** Per-tab client id. sessionStorage is scoped to a single tab (survives reload,
  * not shared with other tabs), so two tabs of the same user are distinct clients
@@ -28,9 +40,10 @@ export function getPresenceClientId(): string {
   return id;
 }
 
-/** True while a setlist view is actively syncing because another mutator is
- * present. The layout renders the green nav dot off this store. */
-export const presencePollingActive: Writable<boolean> = writable(false);
+/** Current presence state for the nav dot: 'off' (no active view / heartbeat
+ * failed), 'alone' (only you here), 'withOthers' (someone else is here). */
+export const presenceIndicator: Writable<{ state: PresenceState; scope: PresenceScope }> =
+  writable({ state: 'off', scope: 'setlist' });
 
 export class PresenceController {
   private others: PresenceEntry[] = [];
@@ -38,7 +51,7 @@ export class PresenceController {
   private stopped = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private setlistId: string) {}
+  constructor(private room: string, private scope: PresenceScope) {}
 
   private get hasOtherMutators(): boolean {
     return this.others.some(o => o.canMark);
@@ -64,20 +77,23 @@ export class PresenceController {
   };
 
   private onPageHide = (): void => {
-    leavePresence(this.setlistId, getPresenceClientId());
+    leavePresence(this.room, getPresenceClientId());
   };
 
   private async tick(): Promise<void> {
     if (this.stopped || document.hidden) return;
     try {
-      const { others } = await heartbeatPresence(this.setlistId, getPresenceClientId());
+      const { others } = await heartbeatPresence(this.room, getPresenceClientId());
       this.others = others;
       this.lastOk = true;
     } catch {
       // Old backend (no route) or network blip — don't suppress polling.
       this.lastOk = false;
     }
-    presencePollingActive.set(this.lastOk && this.hasOtherMutators);
+    presenceIndicator.set({
+      scope: this.scope,
+      state: this.lastOk ? (this.others.length > 0 ? 'withOthers' : 'alone') : 'off',
+    });
   }
 
   stop(): void {
@@ -86,8 +102,8 @@ export class PresenceController {
     this.timer = null;
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('pagehide', this.onPageHide);
-    leavePresence(this.setlistId, getPresenceClientId());
-    presencePollingActive.set(false);
+    leavePresence(this.room, getPresenceClientId());
+    presenceIndicator.set({ state: 'off', scope: this.scope });
     this.others = [];
   }
 }

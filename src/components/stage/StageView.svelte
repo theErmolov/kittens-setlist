@@ -9,7 +9,7 @@
   import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough, updateEntrySong } from '$lib/api';
   import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { PresenceController } from '$lib/presence';
+  import { PresenceController, setlistRoom } from '$lib/presence';
   import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
   import { base } from '$app/paths';
 
@@ -42,7 +42,7 @@
   let now = $state(new Date());
 
   onMount(() => {
-    const presence = new PresenceController(setlist.id);
+    const presence = new PresenceController(setlistRoom(setlist.id), 'setlist');
     presence.start();
     const stopPoller = startPolling(
       async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },

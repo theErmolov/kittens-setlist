@@ -11,12 +11,14 @@ function displayName(user: User): string {
 }
 
 /**
- * Presence heartbeats for setlist views. Public route (works anonymous, like
- * GET /setlists/:id): if a Bearer token is present the user is resolved and
- * their name/canMark derived server-side; otherwise the viewer is anonymous.
+ * Presence heartbeats for collaborative views (setlist editor, stage, backlog).
+ * Public route (works anonymous): if a Bearer token is present the user is
+ * resolved and their name/canMark derived server-side; otherwise anonymous.
  *
- *   POST   /setlists/:id/presence   { clientId }   → upsert self, return { others }
- *   DELETE /setlists/:id/presence?clientId=…       → remove self (leave)
+ *   POST   /presence/:room        { clientId }   → upsert self, return { others }
+ *   DELETE /presence/:room?clientId=…            → remove self (leave)
+ *
+ * `room` is the shared resource being viewed: `backlog` or `setlist:<id>`.
  */
 export async function presenceHandler(
   event: APIGatewayProxyEventV2,
@@ -24,9 +26,9 @@ export async function presenceHandler(
   user: User | null,
 ) {
   const method = event.requestContext.http.method;
-  const parts = strippedPath.split('/').filter(Boolean); // ['setlists', id, 'presence']
-  const setlistId = parts[1] ?? null;
-  if (!setlistId) return err('Missing setlist id', 400);
+  const parts = strippedPath.split('/').filter(Boolean); // ['presence', room]
+  const room = decodeURIComponent(parts[1] ?? '');
+  if (!room) return err('Missing room', 400);
 
   if (method === 'POST') {
     let clientId: string | undefined;
@@ -39,30 +41,29 @@ export async function presenceHandler(
 
     const now = Math.floor(Date.now() / 1000);
     const item: PresenceEntry = {
-      setlistId,
+      room,
       clientId,
       ...(user?.id ? { userId: user.id } : {}),
       name: user ? displayName(user) : 'гость',
       canMark: Boolean(user?.isAdmin || user?.role === 'writer'),
       lastSeen: new Date().toISOString(),
       expiresAt: now + TTL_SECONDS,
-    } as PresenceEntry & { setlistId: string };
+    };
 
     await dbPut(TABLE, item as unknown as Record<string, unknown>);
 
     // TTL deletion is eventual, so filter expired entries in JS. Return everyone
     // except the caller — the client decides whether to poll based on `canMark`.
-    const all = await dbQueryPartition<PresenceEntry & { setlistId: string }>(TABLE, 'setlistId', setlistId);
+    const all = await dbQueryPartition<PresenceEntry>(TABLE, 'room', room);
     const others = all
-      .filter(i => i.clientId !== clientId && typeof i.expiresAt === 'number' && i.expiresAt > now)
-      .map(({ setlistId: _setlistId, ...rest }) => rest);
+      .filter(i => i.clientId !== clientId && typeof i.expiresAt === 'number' && i.expiresAt > now);
     return ok({ others });
   }
 
   if (method === 'DELETE') {
     const clientId = event.queryStringParameters?.clientId;
     if (!clientId) return err('clientId is required', 400);
-    await dbDeleteByKey(TABLE, { setlistId, clientId });
+    await dbDeleteByKey(TABLE, { room, clientId });
     return ok({});
   }
 

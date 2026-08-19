@@ -214,15 +214,15 @@ export async function getReceiptUrl(entryId: string): Promise<string> {
 
 // ─── Presence ─────────────────────────────────────────────────────────────────
 
-/** Heartbeat: upsert our presence on a setlist; returns the other live viewers. */
-export async function heartbeatPresence(setlistId: string, clientId: string): Promise<{ others: PresenceEntry[] }> {
-  return req(`/setlists/${setlistId}/presence`, { method: 'POST', body: JSON.stringify({ clientId }) });
+/** Heartbeat: upsert our presence on a room; returns the other live viewers. */
+export async function heartbeatPresence(room: string, clientId: string): Promise<{ others: PresenceEntry[] }> {
+  return req(`/presence/${encodeURIComponent(room)}`, { method: 'POST', body: JSON.stringify({ clientId }) });
 }
 
 /** Best-effort leave: removes our presence. keepalive so it survives tab close. */
-export function leavePresence(setlistId: string, clientId: string): void {
+export function leavePresence(room: string, clientId: string): void {
   const token = getToken();
-  fetch(`${BASE}/setlists/${setlistId}/presence?clientId=${encodeURIComponent(clientId)}`, {
+  fetch(`${BASE}/presence/${encodeURIComponent(room)}?clientId=${encodeURIComponent(clientId)}`, {
     method: 'DELETE',
     keepalive: true,
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },

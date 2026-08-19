@@ -224,7 +224,7 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
-  # ─── Presence — who's viewing a setlist right now (heartbeat + TTL) ───────────
+  # ─── Presence — who's viewing a resource right now (heartbeat + TTL) ──────────
   PresenceTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
@@ -232,12 +232,12 @@ Resources:
       TableName: kittens-presence
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: setlistId
+        - AttributeName: room
           AttributeType: S
         - AttributeName: clientId
           AttributeType: S
       KeySchema:
-        - AttributeName: setlistId
+        - AttributeName: room
           KeyType: HASH
         - AttributeName: clientId
           KeyType: RANGE

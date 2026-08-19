@@ -39,7 +39,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     /^\/setlists\/[^/]+$/.test(path);
 
   // Presence heartbeats — public (works anonymous), user resolved opportunistically
-  const isPresence = /^\/setlists\/[^/]+\/presence$/.test(path);
+  const isPresence = /^\/presence\/[^/]+$/.test(path);
 
   let user: User | null = null;
   if (isPresence) {
@@ -60,12 +60,10 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     if (!user!.isAdmin) return err('Forbidden', 403);
     return budgetHandler(event, path, user!);
   }
+  if (isPresence) return presenceHandler(event, path, user);
   if (path.startsWith('/musicians')) return musiciansHandler(event, path, user!);
   if (path.startsWith('/songs')) return songsHandler(event, path, user!);
-  if (path.startsWith('/setlists')) {
-    if (isPresence) return presenceHandler(event, path, user);
-    return setlistsHandler(event, path, user!);
-  }
+  if (path.startsWith('/setlists')) return setlistsHandler(event, path, user!);
 
   return { statusCode: 404, body: 'Not found' };
 };

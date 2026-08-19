@@ -9,7 +9,7 @@
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading, initAuth, logout, getCachedNavFlags, setCachedNavFlags } from '$lib/auth';
   import { getUsers } from '$lib/api';
-  import { presencePollingActive } from '$lib/presence';
+  import { presenceIndicator } from '$lib/presence';
 
   let { children } = $props();
 
@@ -42,6 +42,12 @@
 
   // Strip base prefix so active checks work on both local and GitHub Pages
   let path = $derived(page.url.pathname.slice(base.length) || '/');
+
+  const presenceTitle = $derived(
+    $presenceIndicator.state === 'withOthers'
+      ? ($lang === 'ru' ? 'Кто-то ещё здесь' : 'Someone else is here')
+      : ($lang === 'ru' ? 'Только вы здесь' : 'Only you here'),
+  );
 
   // Auth guard: redirect to /login unless on login page or stage view
   $effect(() => {
@@ -100,10 +106,10 @@
     </span>
   </a>
   <a href="{base}/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
-    <span class="link-icon">🎵</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
+    <span class="link-icon">🎵{#if $presenceIndicator.scope === 'backlog' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
   </a>
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
-    <span class="link-icon">🎪{#if $presencePollingActive}<span class="presence-dot" title={$lang === 'ru' ? 'Кто-то ещё смотрит этот сетлист' : 'Someone else is viewing this setlist'}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
+    <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
   <a
     href="https://media.kittens.band"
@@ -263,7 +269,8 @@
     100% { box-shadow: 0 0 0 0 #ef444400; }
   }
 
-  /* Live-sync indicator under the setlists icon (presence polling active) */
+  /* Presence indicator under a section icon: green = someone else here,
+     yellow = you're alone on the page */
   .presence-dot {
     position: absolute;
     bottom: -3px;
@@ -274,10 +281,19 @@
     box-shadow: 0 0 0 1.5px var(--surface);
     animation: presence-pulse 1.8s ease-out infinite;
   }
+  .presence-dot.alone {
+    background: #eab308;
+    animation: presence-pulse-alone 1.8s ease-out infinite;
+  }
   @keyframes presence-pulse {
     0%   { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e80; }
     70%  { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 5px #22c55e00; }
     100% { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #22c55e00; }
+  }
+  @keyframes presence-pulse-alone {
+    0%   { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #eab30880; }
+    70%  { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 5px #eab30800; }
+    100% { box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 0 #eab30800; }
   }
 
   .lang-toggle {

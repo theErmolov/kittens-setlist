@@ -7,7 +7,7 @@
   import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, addSetlistOnlySong, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
-  import { PresenceController } from '$lib/presence';
+  import { PresenceController, setlistRoom } from '$lib/presence';
   import { currentUser } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
   import { sortSubset } from '$lib/subsetSort';
@@ -418,7 +418,7 @@
   onMount(() => {
     const u = $currentUser;
     const pollMs = (u?.isAdmin || u?.role === 'writer') ? 3000 : 15000;
-    const presence = new PresenceController(setlist.id);
+    const presence = new PresenceController(setlistRoom(setlist.id), 'setlist');
     presence.start();
     const stopPoller = startPolling(
       async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },

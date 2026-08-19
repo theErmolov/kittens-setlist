@@ -137,6 +137,7 @@ export type BudgetEntry = IncomeEntry | ExpenseEntry | DebtEntry;
 // Mirrors api/src/lib/types.ts — keep in sync.
 
 export interface PresenceEntry {
+  room: string;           // shared resource id: 'backlog' or `setlist:<id>`
   clientId: string;       // per-tab id (sessionStorage on the client)
   userId?: string;        // resolved user id, if authenticated
   name: string;           // display name; 'гость' for anonymous

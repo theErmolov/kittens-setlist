@@ -4,16 +4,13 @@ description: Non-obvious project context — band roster and known data issues
 type: project
 ---
 
-## ⚠️ Current session state (2026-08-18) — handoff
+## ⚠️ Current session state (2026-08-19) — handoff
 
-Two features fully implemented + verified, **NOT committed/pushed** (per hard rules — user must explicitly say "commit"/"push"). Full plan: `/Users/iermolov/.claude/plans/greedy-churning-gadget.md`.
-
-1. **Presence-based polling** (Option B) + 2. **Nav bar stability** — both documented in their own sections below. Code passes `api tsc --noEmit`, `npm run check` (0 errors), `npm run build`.
+Presence is now **generalized to all polling pages** (backlog + setlist editor + stage) with a **yellow "alone" / green "others here"** nav dot. **NOT committed/pushed** (per hard rules — user must explicitly say "commit"/"push").
 
 **Next steps for the continuing agent:**
-- Commit + push when the user asks (push → CI/CD deploys backend). Backend deploy is what *activates* presence — until then the frontend degrades safely (heartbeat 404 → `lastOk=false` → polls at original intervals, no green dot, no regression). So frontend can be live before backend.
-- **Live verification after deploy** (couldn't do from sandbox — no live AWS/browser access): open same setlist in two writer tabs → green dot appears under 🎪 on both, edits sync; close one → dot vanishes within ~20s, remaining tab stops polling. Also: admin reloads any page → nav bar must not jump (icons cached from first paint); after logout → /login shows no admin/logout chrome.
-- Touched files: `template.yaml`, `api/src/{index.ts,lib/dynamo.ts,lib/types.ts,handlers/presence.ts(new)}`, `src/lib/{api.ts,auth.ts,types.ts,presence.ts(new)}`, `src/components/{setlist/SetlistEditor.svelte,stage/StageView.svelte}`, `src/routes/+layout.svelte`.
+- Commit + push when the user asks (push → CI/CD deploys backend). Backend deploy is what *activates* presence — until then the frontend degrades safely (heartbeat 404 → `lastOk=false` → polls at original intervals, no dot, no regression). So frontend can be live before backend.
+- **Live verification after deploy**: open same setlist (or backlog) in two tabs → dot turns green (someone else here); alone → yellow. Close one tab → back to yellow within ~20s, remaining tab stops polling.
 
 ## Band roster (in DynamoDB)
 
@@ -67,18 +64,17 @@ Two features fully implemented + verified, **NOT committed/pushed** (per hard ru
 - `AddSongsModal.svelte` (setlist song picker) excludes archived songs from its list so they can't be added to a new setlist.
 - Verified end-to-end with Playwright against a mocked API (real AWS backend/Telegram auth not reachable from this sandbox): default view hides archived, archive toggle shows only archived, modal archive button flips the flag and the song disappears from the default list immediately.
 
-## Presence-based polling (2026-08-18)
+## Presence-based polling (2026-08-19)
 
-Setlist editor + stage poll `GET /setlists/:id` only when another user who can mutate is viewing the same setlist. Cuts idle polling (and mobile battery) to ~zero when alone.
+Backlog, setlist editor, and stage poll only when another user who can mutate the shared resource is also viewing it. Cuts idle polling (and mobile battery) to ~zero when alone.
 
-- **`kittens-presence` table** (template.yaml): HASH `setlistId`, RANGE `clientId`, TTL `expiresAt` (90s). Mirrors `SessionsTable`'s TTL pattern.
-- **Heartbeat = presence check (one round trip).** `POST /setlists/:id/presence { clientId }` upserts the caller's item, queries all live items for that setlist, returns `{ others }` (excluding caller + expired). `DELETE /setlists/:id/presence?clientId=…` removes self on leave (keepalive fetch). Route is **public** (works anonymous, like `GET /setlists/:id`) — opportunistic auth in `api/src/index.ts` (`isPresence`); handler `api/src/handlers/presence.ts`.
-- **`canMark` derived server-side** (`isAdmin || role==='writer'`; anon = false). Clients suppress their data poll only when a heartbeat has *successfully* confirmed no other `canMark` client is present. Readers/anonymous never justify polling. `dbQueryPartition` helper added to `api/src/lib/dynamo.ts`.
-- **Per-tab `clientId`** in `sessionStorage` (not `user.id`) — two tabs of the same user are distinct clients that can mutate, so each must see the other and keep polling. Keying by `user.id` would make each tab think it's alone and miss its own other tab's edits.
-- **Graceful degradation:** suppression requires `lastOk` (a successful heartbeat). Old backend (no route → 404) or network blip → `lastOk=false` → poll as before, no regression. Frontend can ship before backend.
-- **`PresenceController`** (`src/lib/presence.ts`): 20s heartbeat, pauses on tab-hidden, immediate re-tick on visible, `pagehide` → leave. Wired into `SetlistEditor.svelte` + `StageView.svelte` `onMount` — combined into the poller's `isPaused` as `… || presence.isPaused()`, `presence.stop()` in cleanup.
-- **Green dot:** `presencePollingActive` store (true = `lastOk && hasOtherMutators`) → small absolutely-positioned green dot under the 🎪 nav icon in `+layout.svelte` (CSS dot, no emoji). Lit only while a setlist view is live-syncing. Dot semantics chosen to avoid a mount-time flicker (not lit during heartbeat failure).
-- **Backlog polling is NOT presence-gated** — it polls the song catalog, rarely collaborative.
+- **`kittens-presence` table** (template.yaml): HASH `room`, RANGE `clientId`, TTL `expiresAt` (90s). `room` is the shared resource: `backlog` or `setlist:<id>`.
+- **Heartbeat = presence check (one round trip).** `POST /presence/:room { clientId }` upserts the caller's item, queries all live items for that room, returns `{ others }` (excluding caller + expired). `DELETE /presence/:room?clientId=…` removes self on leave (keepalive fetch). Route is **public** (works anonymous) — opportunistic auth in `api/src/index.ts` (`isPresence`); handler `api/src/handlers/presence.ts`. Room helpers in `src/lib/presence.ts`: `BACKLOG_ROOM`, `setlistRoom(id)`.
+- **`canMark` derived server-side** (`isAdmin || role==='writer'`; anon = false). Clients suppress their data poll only when a heartbeat has *successfully* confirmed no other `canMark` client is present. `dbQueryPartition` helper in `api/src/lib/dynamo.ts`.
+- **Per-tab `clientId`** in `sessionStorage` (not `user.id`) — two tabs of the same user are distinct clients that can mutate, so each must see the other and keep polling.
+- **Graceful degradation:** suppression requires `lastOk` (a successful heartbeat). Old backend (no route → 404) or network blip → `lastOk=false` → poll as before, no regression.
+- **`PresenceController`** (`src/lib/presence.ts`, ctor `(room, scope)`): 20s heartbeat, pauses on tab-hidden, immediate re-tick on visible, `pagehide` → leave. Wired into `SetlistEditor.svelte` + `StageView.svelte` + `backlog/+page.svelte` `onMount`, combined into the poller's `isPaused` as `… || presence.isPaused()`, `presence.stop()` in cleanup.
+- **Nav dot:** `presenceIndicator` store `{ state: 'off'|'alone'|'withOthers', scope: 'backlog'|'setlist' }`. `+layout.svelte` renders a green dot (withOthers) or yellow dot (alone) under the active section's nav icon (🎵 backlog / 🎪 setlists). CSS dot, no emoji.
 
 ## Nav bar stability (2026-08-18)
 
