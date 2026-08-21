@@ -111,6 +111,15 @@
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
+  {#if navIsAdmin}
+    <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
+      <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
+    </a>
+    <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
+      <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
+      {#if hasPending}<span class="pending-dot"></span>{/if}
+    </a>
+  {/if}
   <a
     href="https://media.kittens.band"
     class="nav-link"
@@ -121,13 +130,6 @@
     <span class="link-icon">📷</span><span class="link-label">{$lang === 'ru' ? 'Медиа' : 'Media'}</span>
   </a>
   {#if navIsAdmin}
-    <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
-      <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
-    </a>
-    <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
-      <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
-      {#if hasPending}<span class="pending-dot"></span>{/if}
-    </a>
     <a
       href="https://antispam.kittens.band/"
       class="nav-link"
