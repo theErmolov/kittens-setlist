@@ -23,16 +23,16 @@ export function pctBubbleStyle(pct: number): string {
   return                  'background: rgba(128,128,128,0.2); color: #6b7280';
 }
 
-export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
+export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
 
 export const INSTRUMENT_ICONS: Record<Instrument, string> = {
   guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹',
-  cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤',
+  cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤',
 };
 
 export function formatAuditSummary(summary: string): string {
   return summary.replace(
-    /\b(guitar|bass|drums|keys|cajon|violin|percussion|vocals)\b/g,
+    /\b(guitar|bass|drums|keys|cajon|violin|saxophone|trumpet|percussion|vocals)\b/g,
     (m) => INSTRUMENT_ICONS[m as Instrument] ?? m,
   );
 }

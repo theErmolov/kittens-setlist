@@ -238,7 +238,7 @@ export async function listMusicians(): Promise<BandMusician[]> {
 
 export function sanitizeInstruments(value: unknown): Instrument[] | undefined {
   if (value === undefined) return undefined;
-  const allowed: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'percussion', 'vocals'];
+  const allowed: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'saxophone', 'trumpet', 'percussion', 'vocals'];
   if (!Array.isArray(value) || value.some(item => !allowed.includes(item as Instrument))) {
     throw new Error('Invalid defaultInstruments');
   }

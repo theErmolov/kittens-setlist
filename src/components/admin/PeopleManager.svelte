@@ -7,7 +7,7 @@
 
   let { users = $bindable() }: { users: User[] } = $props();
 
-  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'percussion', 'vocals'];
+  const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'saxophone', 'trumpet', 'percussion', 'vocals'];
 
   let saving = $state<string | null>(null);
   let error = $state('');

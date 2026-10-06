@@ -1,5 +1,5 @@
 export type Category = 'top' | 'mid' | 'low';
-export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'percussion' | 'vocals';
+export type Instrument = 'guitar' | 'bass' | 'drums' | 'keys' | 'cajon' | 'violin' | 'saxophone' | 'trumpet' | 'percussion' | 'vocals';
 export type LearningStage = 'queue' | 'structure' | 'mastering' | 'ready';
 
 export interface MusicianRole {

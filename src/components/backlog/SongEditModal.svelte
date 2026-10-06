@@ -4,9 +4,9 @@
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
   import { t } from '$lib/i18n';
 
-  const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'drums', 'cajon', 'percussion'];
+  const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
   const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', percussion: '🪇', vocals: '🎤'
+    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤'
   };
 
   // Stages that appear as progress bar segments (in order)
@@ -374,7 +374,7 @@
   }
   .modal {
     background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 680px; height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+    width: 100%; max-width: 760px; height: 90vh; overflow: hidden; display: flex; flex-direction: column;
   }
   .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .modal-header h2 { margin: 0; font-size: 1.1rem; }
@@ -427,7 +427,7 @@
     text-transform: uppercase; letter-spacing: 0.04em;
   }
   .header-name { flex-shrink: 0; width: 72px; overflow: visible; white-space: nowrap; }
-  .header-instruments { flex-shrink: 0; width: 293px; }
+  .header-instruments { flex-shrink: 0; width: 367px; }
   .header-progress { flex-shrink: 0; margin-left: 20px; }
 
   .roster-row {
@@ -455,10 +455,10 @@
   }
   .ghost-row .guest-name { font-weight: 400; color: var(--text-muted); }
 
-  /* Fixed 8-column grid — one cell per instrument, perfectly aligned */
+  /* Fixed 10-column grid — one cell per instrument, perfectly aligned */
   .inst-grid {
     display: grid;
-    grid-template-columns: repeat(8, 34px);
+    grid-template-columns: repeat(10, 34px);
     gap: 3px;
     flex-shrink: 0;
   }
@@ -562,7 +562,7 @@
 
   .back-btn { display: none; }
 
-  @media (max-width: 700px) {
+  @media (max-width: 760px) {
     /* Full-screen modal */
     .modal-backdrop { padding: 0; align-items: stretch; }
     .modal { max-width: none; max-height: none; border-radius: 0; height: 100dvh; }
@@ -589,7 +589,7 @@
     .remove-guest-btn { order: 3; margin-left: 8px; width: auto; }
     .inst-grid {
       order: 4; width: 100%;
-      grid-template-columns: repeat(8, 1fr);
+      grid-template-columns: repeat(10, 1fr);
     }
     .inst-btn { width: 100%; height: 40px; }
     /* Ghost row: hide invisible inst-grid to avoid blank space */
