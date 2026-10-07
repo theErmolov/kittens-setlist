@@ -20,7 +20,13 @@ export async function personalCommentsHandler(event: APIGatewayProxyEventV2, pat
   } else {
     const setlist = await dbGet<Setlist>(process.env.SETLISTS_TABLE ?? 'kittens-setlists', id);
     if (!setlist) return err('Not found', 404);
-    if (typeof body.songId !== 'string' || !setlist.entries.some(entry => entry.songId === body.songId)) return err('Song not found', 404);
+    if (typeof body.songId !== 'string') return err('Song not found', 404);
+    const entry = setlist.entries.find(entry => entry.songId === body.songId);
+    if (!entry) return err('Song not found', 404);
+    // Match lyrics: edits flow back to the catalog, never into other existing snapshots.
+    if (!entry.setlistOnly && await dbGet<Song>(process.env.SONGS_TABLE ?? 'kittens-songs', body.songId)) {
+      await savePersonalComment('backlog', body.songId, user.id, body.comment);
+    }
     scope = `setlist:${id}`;
     songId = body.songId;
   }

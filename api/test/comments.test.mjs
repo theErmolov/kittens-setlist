@@ -57,20 +57,24 @@ test('private notes belong to the authenticated author; readers can edit only pe
   assert.equal(items('kittens-audit-log').length, 0);
 });
 
-test('adding copies every author’s note; backlog and different setlists stay independent', async () => {
+test('personal notes follow lyrics: copy on add, sync edits back, preserve other snapshots', async () => {
   await saveBacklog('A original', 'a');
   await saveBacklog('B original', 'b');
   await addSong();
+  put('kittens-setlists', { id: 'existing', name: 'Existing', entries: [] });
+  await request('POST', '/setlists/existing/songs', { songs: [song] });
   await saveBacklog('A backlog changed', 'a');
   assert.equal((await request('GET', '/setlists/show', undefined, 'a')).body.entries[0].personalComment, 'A original');
   assert.equal((await request('GET', '/setlists/show', undefined, 'b')).body.entries[0].personalComment, 'B original');
   await request('PATCH', '/setlists/show/personal-comment', { songId: 's1', comment: 'A show changed' });
   await addSong();
   assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, 'A show changed');
-  assert.equal((await request('GET', '/songs/s1')).body.personalComment, 'A backlog changed');
+  assert.equal((await request('GET', '/songs/s1')).body.personalComment, 'A show changed');
+  assert.equal((await request('GET', '/setlists/existing')).body.entries[0].personalComment, 'A original');
+  assert.equal((await request('GET', '/songs/s1', undefined, 'b')).body.personalComment, 'B original');
   put('kittens-setlists', { id: 'other', name: 'Other', entries: [] });
   const second = await request('POST', '/setlists/other/songs', { songs: [song] });
-  assert.equal(second.body.entries[0].personalComment, 'A backlog changed');
+  assert.equal(second.body.entries[0].personalComment, 'A show changed');
 });
 
 test('public stage, pending users and admins cannot see other authors’ notes', async () => {
@@ -110,10 +114,10 @@ test('clear, remove/re-add and setlist-only songs have independent note lifecycl
   await request('PATCH', '/setlists/show/personal-comment', { songId: 's1', comment: 'Show only' });
   await request('DELETE', '/setlists/show/songs/s1');
   await addSong();
-  assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, 'Original');
+  assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, 'Show only');
   await saveBacklog('', 'a');
   assert.equal((await request('GET', '/songs/s1')).body.personalComment, undefined);
-  assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, 'Original');
+  assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, 'Show only');
   const added = await request('POST', '/setlists/show/songs', { songs: [song], setlistOnly: true });
   await request('PATCH', '/setlists/show/personal-comment', { songId: added.body.entries.at(-1).songId, comment: 'Only in show' });
   assert.equal((await request('GET', '/setlists/show')).body.entries.at(-1).personalComment, 'Only in show');
@@ -133,4 +137,29 @@ test('note endpoints reject missing songs and invalid text', async () => {
   assert.equal((await request('PATCH', '/setlists/show/personal-comment', { songId: 'missing', comment: 'x' })).status, 404);
   assert.equal((await saveBacklog('x'.repeat(4001), 'a')).status, 400);
   assert.equal((await request('PATCH', '/songs/s1/personal-comment', { comment: {} })).status, 400);
+});
+
+
+test('clearing a setlist personal note also clears catalog, without changing other snapshots', async () => {
+  await saveBacklog('Keep in older snapshot', 'a');
+  await addSong();
+  put('kittens-setlists', { id: 'older', name: 'Older', entries: [] });
+  await request('POST', '/setlists/older/songs', { songs: [song] });
+  await request('PATCH', '/setlists/show/personal-comment', { songId: 's1', comment: '' });
+  assert.equal((await request('GET', '/songs/s1')).body.personalComment, undefined);
+  assert.equal((await request('GET', '/setlists/show')).body.entries[0].personalComment, undefined);
+  assert.equal((await request('GET', '/setlists/older')).body.entries[0].personalComment, 'Keep in older snapshot');
+});
+
+test('reader setlist edits propagate only their own note and never change shared song data', async () => {
+  await saveBacklog('Writer note', 'a');
+  await addSong();
+  const beforeSong = structuredClone(items('kittens-songs'));
+  const beforeSetlist = structuredClone(items('kittens-setlists'));
+  const response = await request('PATCH', '/setlists/show/personal-comment', { songId: 's1', comment: 'Reader note' }, 'b');
+  assert.equal(response.status, 200);
+  assert.equal((await request('GET', '/songs/s1', undefined, 'b')).body.personalComment, 'Reader note');
+  assert.equal((await request('GET', '/songs/s1')).body.personalComment, 'Writer note');
+  assert.deepEqual(items('kittens-songs'), beforeSong);
+  assert.deepEqual(items('kittens-setlists'), beforeSetlist);
 });

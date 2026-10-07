@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { isChordLine, firstChord, CHORD_FIND_SRC } from '$lib/lyricsChords';
+  import { packLyricsColumns, type LyricsPair } from '$lib/lyricsLayout';
   import { browser } from '$app/environment';
   import type { Song } from '$lib/types';
   import { updateSong } from '$lib/api';
@@ -27,14 +29,6 @@
   const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const FLAT_TO_SHARP: Record<string, string> = { Db:'C#', Eb:'D#', Gb:'F#', Ab:'G#', Bb:'A#' };
 
-  const CHORD_TOKEN_RE = /^[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?$/;
-  const ANNOTATION_TOKEN_RE = /^(?:[}\]|([)]*[xхх×]\d+|[+-]\d+)$/i;
-  const CHORD_FIND_SRC = /[A-G][b#]?(?:m(?:aj\d*)?|sus[24]?|aug|dim|\d+(?:add\d+)?)*(?:\/[A-G][b#]?)?/.source;
-
-  // ── Types ──────────────────────────────────────────────────────────────────
-
-  type LyricsPair = { chordLine: string | null; lyricLine: string };
-
   // ── State ──────────────────────────────────────────────────────────────────
 
   let transpose = $state(song.transpose ?? 0);
@@ -42,20 +36,12 @@
   let dropdownOpen = $state(false);
   let autoFontSize = $state(MIN_FONT);
   let columns = $state(1);
-  let renderedPairs = $state<LyricsPair[]>([]);
+  let renderedColumns = $state<LyricsPair[][]>([[]]);
   let lyricsBodyEl = $state<HTMLDivElement | null>(null);
   let currentPage = $state(0);
-  let pairsPerCol = $state(0);
   let hasPagination = $state(false);
 
   // ── Chord logic ────────────────────────────────────────────────────────────
-
-  function isChordLine(line: string): boolean {
-    const tokens = line.trim().split(/\s+/).filter(Boolean);
-    return tokens.length > 0
-      && tokens.some(t => CHORD_TOKEN_RE.test(t))
-      && tokens.every(t => CHORD_TOKEN_RE.test(t) || ANNOTATION_TOKEN_RE.test(t));
-  }
 
   function transposeRoot(root: string, n: number): string {
     const i = NOTES.indexOf(FLAT_TO_SHARP[root] ?? root);
@@ -84,10 +70,15 @@
     }
     if (tokens.length === 0) return line;
 
-    let result = '';
-    let outputPos = 0;
+    let result = line.slice(0, tokens[0].origStart);
+    let outputPos = result.length;
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i];
+      // Preserve labels and bar/repeat annotations as well as chord alignment.
+      if (i > 0) {
+        const between = line.slice(tokens[i - 1].origEnd, tok.origStart);
+        if (between.trim()) { result += between; outputPos += between.length; }
+      }
       // First token keeps its original position; subsequent must have at least 1 space gap
       const targetPos = i === 0 ? tok.origStart : Math.max(outputPos + 1, tok.origStart);
       if (targetPos > outputPos) {
@@ -115,7 +106,7 @@
   let originalKey = $derived.by((): string => {
     for (const line of rawLines) {
       if (isChordLine(line)) {
-        return line.trim().split(/\s+/).filter(Boolean)[0] ?? '';
+        return firstChord(line);
       }
     }
     return '';
@@ -130,15 +121,8 @@
 
   let effectiveFontSize = $derived(userFontSize ?? autoFontSize);
 
-  let totalPages = $derived.by(() =>
-    pairsPerCol <= 0 ? 1 : Math.max(1, Math.ceil(renderedPairs.length / (pairsPerCol * columns)))
-  );
-
-  let visiblePairs = $derived.by(() => {
-    if (!hasPagination) return renderedPairs;
-    const perPage = pairsPerCol * columns;
-    return renderedPairs.slice(currentPage * perPage, (currentPage + 1) * perPage);
-  });
+  let totalPages = $derived(Math.max(1, Math.ceil(renderedColumns.length / columns)));
+  let visibleColumns = $derived(renderedColumns.slice(currentPage * columns, (currentPage + 1) * columns));
 
   // ── Measurement ────────────────────────────────────────────────────────────
 
@@ -273,19 +257,19 @@
       }
 
       const colAvail = cols === 2 ? (avail - COL_GAP) / 2 : avail;
-      const pairs = buildPairs(lines).flatMap(p => wrapPair(p, Math.max(1, colAvail), fontSize));
-
-      const lineH = fontSize * LINE_HEIGHT;
-      let h = 0, ppc = 0;
-      for (const pair of pairs) {
-        const ph = (pair.chordLine ? 2 : 1) * lineH;
-        if (h + ph > availH && ppc > 0) break;
-        h += ph;
-        ppc++;
+      function layoutAt(size: number) {
+        const pairs = buildPairs(lines).flatMap(pair => wrapPair(pair, Math.max(1, colAvail), size));
+        return packLyricsColumns(pairs, size * LINE_HEIGHT, availH);
       }
-      const pairsPerColumn = Math.max(1, ppc);
-      const pages = Math.max(1, Math.ceil(pairs.length / (pairsPerColumn * cols)));
-      return { fontSize, cols, pairs, pairsPerColumn, pages };
+      let packed = layoutAt(fontSize);
+      // Total line height alone can fit while a chord/lyric pair cannot fit
+      // at a column boundary. Reduce auto zoom until the actual columns fit.
+      while (uf === null && fontSize > MIN_FONT && packed.length > cols) {
+        fontSize--;
+        packed = layoutAt(fontSize);
+      }
+      const pages = Math.max(1, Math.ceil(packed.length / cols));
+      return { fontSize, cols, packed, pages };
     }
 
     const r1 = computeAt(clientW - BODY_PAD_L - BODY_PAD_R);
@@ -300,8 +284,7 @@
 
     if (uf === null) autoFontSize = result.fontSize;
     columns = result.cols;
-    renderedPairs = result.pairs;
-    pairsPerCol = result.pairsPerColumn;
+    renderedColumns = result.packed;
     hasPagination = withButtons;
     if (!hasPagination || currentPage >= result.pages) currentPage = 0;
   }
@@ -450,19 +433,22 @@
     </div>
   </div>
 
-  <div class="lyrics-body" bind:this={lyricsBodyEl}>
+  <div class="lyrics-body" bind:this={lyricsBodyEl} style:padding-right="{hasPagination ? PAGE_BTN_WIDTH : BODY_PAD_R}px">
     <div
       class="lyrics-content"
-      class:two-col={columns > 1}
       style:font-size="{effectiveFontSize}px"
-      style:columns={columns > 1 ? columns : undefined}
+      style:grid-template-columns={columns > 1 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)'}
     >
-      {#each visiblePairs as pair}
-        <div class="pair">
-          {#if pair.chordLine !== null}
-            <span class="chord-line">{pair.chordLine || ' '}</span>
-          {/if}
-          <span class="lyric-line">{pair.lyricLine || ' '}</span>
+      {#each visibleColumns as column}
+        <div class="lyrics-column">
+          {#each column as pair}
+            <div class="pair">
+              {#if pair.chordLine !== null}
+                <span class="chord-line">{pair.chordLine || ' '}</span>
+              {/if}
+              <span class="lyric-line">{pair.lyricLine || ' '}</span>
+            </div>
+          {/each}
         </div>
       {/each}
     </div>
@@ -671,13 +657,12 @@
   .lyrics-content {
     font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
     line-height: 1.6;
+    display: grid;
     column-gap: 32px;
+    align-items: start;
   }
 
-  .lyrics-content.two-col {
-    column-fill: auto;
-    height: 100%;
-  }
+  .lyrics-column { min-width: 0; }
 
   .pair {
     break-inside: avoid;

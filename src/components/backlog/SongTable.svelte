@@ -138,8 +138,9 @@
   }
 
   async function handleSave(updated: Song) {
-    await updateSong(updated);
-    songs = songs.map(s => s.id === updated.id ? updated : s);
+    const saved = $canWrite ? await updateSong(updated) : updated;
+    await updatePersonalSongComment(updated.id, updated.personalComment ?? '');
+    songs = songs.map(s => s.id === updated.id ? { ...saved, personalComment: updated.personalComment ?? '' } : s);
     editingSong = null;
   }
 
@@ -267,10 +268,6 @@
             {showProgress}
             {additionMode}
             flashAdded={flashing.has(song.id)}
-            onpersonalcomment={async (value) => {
-              await updatePersonalSongComment(song.id, value);
-              songs = songs.map(item => item.id === song.id ? { ...item, personalComment: value } : item);
-            }}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => startAddFlow(song)}
@@ -347,15 +344,16 @@
 {#if editingSong}
   <SongEditModal
     song={editingSong}
+    personalOnly={!$canWrite}
     {musicians}
     onclose={() => { editingSong = null; }}
     onsave={handleSave}
-    ondelete={async () => {
+    ondelete={$canWrite ? async () => {
       const id = editingSong!.id;
       await deleteSong(id);
       songs = songs.filter(s => s.id !== id);
-    }}
-    onaddtosetlist={() => { if (editingSong) startAddFlow(editingSong); }}
+    } : undefined}
+    onaddtosetlist={$canWrite ? () => { if (editingSong) startAddFlow(editingSong); } : undefined}
   />
 {/if}
 

@@ -598,7 +598,13 @@
   }
 
   async function handleAddSetlistOnly(song: Song) {
-    applyUpdate(await addSetlistOnlySong(setlist.id, song));
+    const updated = await addSetlistOnlySong(setlist.id, song);
+    const entry = updated.entries.find(item => item.setlistOnly && !localEntries.some(existing => existing.songId === item.songId));
+    if (entry?.songId && song.personalComment) {
+      await updatePersonalEntryComment(setlist.id, entry.songId, song.personalComment);
+      entry.personalComment = song.personalComment;
+    }
+    applyUpdate(updated);
     showSetlistOnlyModal = false;
   }
 
@@ -633,6 +639,11 @@
   async function handleEntrySave(updatedSong: Song) {
     if (!editingEntry) return;
     const entry = editingEntry;
+    const personalComment = updatedSong.personalComment ?? '';
+    // Like lyrics, saving this snapshot writes the author's note back to the catalog.
+    await updatePersonalEntryComment(setlist.id, entry.songId!, personalComment);
+    localEntries = localEntries.map(item => item.songId === entry.songId ? { ...item, personalComment } : item);
+    if (!$canWrite) { editingEntry = null; return; }
     // Optimistic update — reflect changes immediately before API round-trips
     localEntries = localEntries.map(e =>
       e.order === entry.order ? { ...e, song: updatedSong, comment: updatedSong.comment ?? e.comment ?? '' } : e
@@ -1128,10 +1139,7 @@
                         value={entry.comment ?? ''}
                         onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
                       />
-                      <Note value={entry.personalComment} label={$t.common.personalComment} onsave={$currentUser?.status === 'approved' ? async (value) => {
-                        await updatePersonalEntryComment(setlist.id, entry.songId!, value);
-                        localEntries = localEntries.map(item => item.songId === entry.songId ? { ...item, personalComment: value } : item);
-                      } : undefined} />
+                      <Note value={entry.personalComment} label={$t.common.personalComment} />
                     </td>
                     {#each allMusicians as name, mi}
                       {@const role = song.musicians[name]}
@@ -1250,12 +1258,13 @@
 
 {#if editingEntry}
   <SongEditModal
-    song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '' } : null}
+    song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '', personalComment: editingEntry.personalComment ?? '' } : null}
+    personalOnly={!$canWrite}
     {musicians}
     mode={editingEntry.setlistOnly ? 'setlist-only' : 'entry'}
     onclose={() => { editingEntry = null; }}
     onsave={handleEntrySave}
-    onremove={editingEntry.songId ? () => { handleRemove(editingEntry!.songId!); } : undefined}
+    onremove={$canWrite && editingEntry.songId ? () => { handleRemove(editingEntry!.songId!); } : undefined}
   />
 {/if}
 

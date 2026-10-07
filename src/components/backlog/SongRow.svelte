@@ -3,7 +3,6 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { t } from '$lib/i18n';
   import { sortInstruments, progressPct, pctBubbleStyle } from '$lib/utils';
-  import Note from '$components/shared/Note.svelte';
   import { canWrite, currentUser } from '$lib/auth';
 
   const instrumentIcons: Record<Instrument, string> = {
@@ -30,7 +29,6 @@
     showProgress = false,
     additionMode = false,
     flashAdded = false,
-    onpersonalcomment,
     onedit,
     ondelete,
     onaddtosetlist,
@@ -41,7 +39,6 @@
     showProgress?: boolean;
     additionMode?: boolean;
     flashAdded?: boolean;
-    onpersonalcomment: (value: string) => Promise<void>;
     onedit: () => void;
     ondelete: () => void;
     onaddtosetlist: () => void;
@@ -83,7 +80,7 @@
   });
 </script>
 
-<tr class="song-row" class:flash-added={flashAdded} onclick={$canWrite ? (additionMode ? onaddtosetlist : onedit) : undefined}>
+<tr class="song-row" class:flash-added={flashAdded} onclick={$currentUser?.status === 'approved' ? ($canWrite && additionMode ? onaddtosetlist : onedit) : undefined}>
   <td class="td-cat desktop-only">
     {#if showProgress && overallPct !== null}
       <span class="overall-pct" style={pctBubbleStyle(overallPct)}>{overallPct}%</span>
@@ -110,7 +107,6 @@
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
-    <Note value={song.personalComment} label={$t.common.personalComment} onsave={$currentUser?.status === 'approved' ? onpersonalcomment : undefined} />
     {#if mobileBubbles.length > 0}
       <div class="mobile-musicians">
         {#each mobileBubbles as b}

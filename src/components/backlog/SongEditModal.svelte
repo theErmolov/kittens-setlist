@@ -22,6 +22,7 @@
     song,
     musicians,
     mode = 'backlog',
+    personalOnly = false,
     onclose,
     onsave,
     ondelete,
@@ -31,8 +32,9 @@
     song: Partial<Song> | null;
     musicians: BandMusician[];
     mode?: 'backlog' | 'entry' | 'setlist-only';
+    personalOnly?: boolean;
     onclose: () => void;
-    onsave: (s: Song) => void;
+    onsave: (s: Song) => Promise<void> | void;
     ondelete?: () => void;
     onaddtosetlist?: () => void;
     onremove?: () => void;
@@ -62,6 +64,7 @@
     title: song?.title ?? '',
     category: song?.category ?? 'mid',
     comment: song?.comment ?? '',
+    personalComment: song?.personalComment ?? '',
     musicians: buildInitialMusicians(),
     sortOrder: song?.sortOrder,
     lengthMinutes: song?.lengthMinutes ?? 5,
@@ -127,7 +130,12 @@
     new Set(guestRows.filter(r => r.name.trim() && r.instruments.length === 0).map(r => r.id))
   );
 
-  function handleSave(): boolean {
+  let saving = $state(false);
+  let saveFailed = $state(false);
+
+  async function handleSave(): Promise<boolean> {
+    if (saving) return false;
+    if (personalOnly) return persist({ ...draft });
     if (!draft.artist.trim() || !draft.title.trim()) return false;
     if (guestsMissingInstrument.size > 0) return false;
     const allMusicians: Record<string, MusicianRole> = { ...draft.musicians };
@@ -138,13 +146,20 @@
         allProgress[row.name.trim()] = row.progress;
       }
     }
-    onsave({ ...draft, musicians: allMusicians, progress: allProgress });
-    return true;
+    return persist({ ...draft, musicians: allMusicians, progress: allProgress });
   }
 
-  function toggleArchive() {
+  async function persist(updated: Song): Promise<boolean> {
+    saving = true;
+    saveFailed = false;
+    try { await onsave(updated); return true; }
+    catch { saveFailed = true; return false; }
+    finally { saving = false; }
+  }
+
+  async function toggleArchive() {
     draft.archived = !draft.archived;
-    if (handleSave()) closeModal();
+    if (await handleSave()) closeModal();
   }
 
   let dragStartedInModal = false;
@@ -210,6 +225,10 @@
     </div>
 
     <div class="modal-body">
+      {#if personalOnly}
+        <p>{draft.artist} — {draft.title}</p>
+      {:else}
+      <fieldset disabled={saving}>
       <div class="fields-row">
         <div class="field">
           <label>{$t.song.artist}</label>
@@ -342,6 +361,13 @@
       {:else}
       <textarea class="lyrics-editor" bind:value={draft.lyrics} placeholder={$t.song.lyricsPlaceholder}></textarea>
       {/if}
+      </fieldset>
+      {/if}
+      <div class="field personal-comment-field">
+        <label for="personal-song-comment">{$t.common.personalComment}</label>
+        <textarea id="personal-song-comment" bind:value={draft.personalComment} maxlength="4000" rows="3" disabled={saving}></textarea>
+      </div>
+      {#if saveFailed}<p class="save-error" role="alert">{$t.common.commentSaveFailed}</p>{/if}
     </div>
 
     <div class="modal-footer">
@@ -352,7 +378,7 @@
         {#if onaddtosetlist}
           <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
         {/if}
-        {#if mode === 'backlog' && song?.id}
+        {#if !personalOnly && mode === 'backlog' && song?.id}
           <button class="btn-icon" onclick={toggleArchive} title={draft.archived ? $t.song.unarchive : $t.song.archive}>{draft.archived ? '📤' : '📦'}</button>
         {/if}
         {#if onremove}
@@ -361,13 +387,19 @@
       </div>
       <div class="footer-right">
         <button class="btn-secondary" onclick={closeModal}>{$t.song.cancel}</button>
-        <button class="btn-primary" onclick={() => { if (handleSave()) closeModal(); }}>{$t.song.save}</button>
+        <button class="btn-primary" disabled={saving} onclick={async () => { if (await handleSave()) closeModal(); }}>{$t.song.save}</button>
       </div>
     </div>
   </div>
 </div>
 
 <style>
+  fieldset { display: flex; flex-direction: column; gap: 14px; border: 0; margin: 0; padding: 0; min-width: 0; }
+  .personal-comment-field { margin-top: 12px; }
+  .personal-comment-field textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+  .save-error { color: #ef4444; }
+  @media (max-width: 700px) { .personal-comment-field textarea { font-size: 16px; } }
+
   .modal-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;

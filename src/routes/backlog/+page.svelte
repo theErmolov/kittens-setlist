@@ -3,7 +3,7 @@
   import SongTable from '$components/backlog/SongTable.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
   import type { Song, Setlist, BandMusician } from '$lib/types';
-  import { getSongs, addSong, getSetlists, getMusicians } from '$lib/api';
+  import { getSongs, addSong, updatePersonalSongComment, getSetlists, getMusicians } from '$lib/api';
   import { startPolling } from '$lib/poller';
   import { PresenceController, BACKLOG_ROOM } from '$lib/presence';
   import { canWrite, currentUser } from '$lib/auth';
@@ -28,6 +28,10 @@
   async function handleAdd(song: Song) {
     const { id: _, ...rest } = song;
     const created = await addSong(rest);
+    if (song.personalComment) {
+      await updatePersonalSongComment(created.id, song.personalComment);
+      created.personalComment = song.personalComment;
+    }
     songs = [...songs, created];
     showAddModal = false;
   }
