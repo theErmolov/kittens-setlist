@@ -92,6 +92,9 @@ export async function logout(): Promise<void> {
   currentUser.set(null);
 }
 
+/** Rehearsals stay admin-only until explicitly extended to writers. */
+export const canAccessRehearsals = derived(currentUser, $u => $u?.isAdmin === true && $u.status === 'approved');
+
 export function isAdmin(): boolean {
   return get(currentUser)?.isAdmin === true;
 }

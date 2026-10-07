@@ -252,7 +252,7 @@ const strings = {
       roleWriter: 'Writer',
       roleReader: 'Reader',
       auditEntities: {
-        song: 'Song', setlist: 'Setlist', musician: 'Musician', setlist_entry: 'Entry', user: 'User',
+        song: 'Song', setlist: 'Setlist', musician: 'Musician', setlist_entry: 'Entry', user: 'User', rehearsal: 'Rehearsal',
       },
     },
     budget: {
@@ -542,7 +542,7 @@ const strings = {
       roleWriter: 'Редактор',
       roleReader: 'Читатель',
       auditEntities: {
-        song: 'Песня', setlist: 'Сетлист', musician: 'Музыкант', setlist_entry: 'Запись', user: 'Пользователь',
+        song: 'Песня', setlist: 'Сетлист', musician: 'Музыкант', setlist_entry: 'Запись', user: 'Пользователь', rehearsal: 'Репетиция',
       },
     },
     budget: {

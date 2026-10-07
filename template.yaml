@@ -18,6 +18,7 @@ Globals:
         SESSIONS_TABLE: !Ref SessionsTable
         AUDIT_LOG_TABLE: !Ref AuditLogTable
         BUDGET_TABLE: !Ref BudgetTable
+        REHEARSALS_TABLE: !Ref RehearsalsTable
         PERSONAL_COMMENTS_TABLE: !Ref PersonalCommentsTable
         PRESENCE_TABLE: !Ref PresenceTable
         RECEIPTS_BUCKET: !Ref ReceiptsBucket
@@ -84,6 +85,8 @@ Resources:
             TableName: !Ref PresenceTable
         - DynamoDBCrudPolicy:
             TableName: !Ref PersonalCommentsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RehearsalsTable
         - S3CrudPolicy:
             BucketName: !Ref ReceiptsBucket
       Events:
@@ -213,6 +216,20 @@ Resources:
           KeyType: HASH
         - AttributeName: sk
           KeyType: RANGE
+
+  RehearsalsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: kittens-rehearsals
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
 
   BudgetTable:
     Type: AWS::DynamoDB::Table

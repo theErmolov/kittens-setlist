@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { musiciansHandler } from './handlers/musicians.js';
 import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
+import { rehearsalsHandler } from './handlers/rehearsals.js';
 import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
 import { presenceHandler } from './handlers/presence.js';
@@ -58,6 +59,10 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
   }
 
   if (isPersonalComment) return personalCommentsHandler(event, path, user!);
+
+  if (path === '/rehearsals' || path.startsWith('/rehearsals/')) {
+    return rehearsalsHandler(event, path, user!);
+  }
 
   // Budget is admin-only — even for reads (financial data)
   if (path.startsWith('/budget')) {

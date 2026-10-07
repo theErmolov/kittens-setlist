@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SetlistRehearsals from '$components/rehearsals/SetlistRehearsals.svelte';
   import Note from '$components/shared/Note.svelte';
   import { onMount, untrack } from 'svelte';
   import type { Setlist, Song, Instrument, SetlistEntry, SetlistSubset, BandMusician, LearningStage } from '$lib/types';
@@ -832,6 +833,7 @@
 </script>
 
 <div class="editor">
+  <SetlistRehearsals setlistId={setlist.id} />
   <div class="editor-header">
     <div class="meta">
       {#if editingMeta}

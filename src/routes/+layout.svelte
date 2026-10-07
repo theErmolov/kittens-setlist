@@ -7,7 +7,7 @@
   import twemoji from '@twemoji/api';
   import LogoCat from '$components/shared/LogoCat.svelte';
   import { lang, t } from '$lib/i18n';
-  import { currentUser, authLoading, initAuth, logout, getCachedNavFlags, setCachedNavFlags } from '$lib/auth';
+  import { currentUser, authLoading, canAccessRehearsals, initAuth, logout, getCachedNavFlags, setCachedNavFlags } from '$lib/auth';
   import { getUsers } from '$lib/api';
   import { presenceIndicator } from '$lib/presence';
 
@@ -111,6 +111,11 @@
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
+  {#if $authLoading ? navIsAdmin : $canAccessRehearsals}
+    <a href="{base}/rehearsals" class="nav-link" class:active={path.startsWith('/rehearsals')}>
+      <span class="link-icon">📅</span><span class="link-label">{$lang === 'ru' ? 'Репетиции' : 'Rehearsals'}</span>
+    </a>
+  {/if}
   {#if navIsAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
       <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>

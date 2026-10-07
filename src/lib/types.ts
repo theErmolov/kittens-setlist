@@ -68,7 +68,7 @@ export interface AuditLogEntry {
   action: string;
   actorTelegramId: string;
   actorName: string;
-  entityType: 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user';
+  entityType: 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user' | 'rehearsal';
   entityId: string;
   entityName: string;
   summary: string;
@@ -148,3 +148,30 @@ export interface PresenceEntry {
   lastSeen: string;       // ISO 8601
   expiresAt: number;      // Unix seconds
 }
+
+// Rehearsals have an independent song selection; learning progress stays live.
+export interface RehearsalSong {
+  songId: string;
+  sourceSetlistId?: string;
+  song: Song; // arrangement snapshot; API overlays current learning progress
+  note?: string;
+  sourceMissing?: boolean; // response-only: original song/entry was removed
+}
+
+export interface Rehearsal {
+  id: string;
+  date: string; // YYYY-MM-DD, in timeZone
+  startTime: string;
+  endTime?: string; // same day
+  timeZone: string;
+  location?: string;
+  note?: string;
+  setlistId?: string;
+  attendees: string[]; // includes named guests without registered accounts
+  songs: RehearsalSong[];
+  cancelled: boolean;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+}
+export type RehearsalDraft = Pick<Rehearsal, 'date' | 'startTime' | 'endTime' | 'timeZone' | 'location' | 'note' | 'setlistId' | 'attendees' | 'songs' | 'cancelled'>;

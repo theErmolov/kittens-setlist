@@ -3,7 +3,7 @@
  * To swap the backend, only this file needs to change.
  */
 import { PUBLIC_API_URL } from '$env/static/public';
-import type { Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry, PresenceEntry } from '$lib/types';
+import type { Rehearsal, RehearsalDraft, Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry, PresenceEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
 
 const BASE = PUBLIC_API_URL;
@@ -240,3 +240,12 @@ export async function updatePersonalEntryComment(setlistId: string, songId: stri
 export async function updateSetlistComment(setlistId: string, comment: string): Promise<Setlist> {
   return req(`/setlists/${setlistId}/comment`, { method: 'PATCH', body: JSON.stringify({ comment }) });
 }
+
+// Rehearsals — admin-only, including reads.
+export const getRehearsals = (): Promise<Rehearsal[]> => req('/rehearsals');
+export const getRehearsal = (id: string): Promise<Rehearsal> => req(`/rehearsals/${encodeURIComponent(id)}`);
+export const createRehearsal = (draft: RehearsalDraft, copyFromId?: string): Promise<Rehearsal> => req('/rehearsals', { method: 'POST', body: JSON.stringify({ ...draft, copyFromId }) });
+export const updateRehearsal = (rehearsal: Rehearsal): Promise<Rehearsal> => req(`/rehearsals/${encodeURIComponent(rehearsal.id)}`, { method: 'PUT', body: JSON.stringify(rehearsal) });
+export const deleteRehearsal = (rehearsal: Rehearsal): Promise<void> => req(`/rehearsals/${encodeURIComponent(rehearsal.id)}`, { method: 'DELETE', body: JSON.stringify({ version: rehearsal.version }) });
+export const updateRehearsalProgress = (id: string, song: RehearsalSongRef, musicianName: string, stage: LearningStage): Promise<Rehearsal> => req(`/rehearsals/${encodeURIComponent(id)}/progress`, { method: 'PATCH', body: JSON.stringify({ ...song, musicianName, stage }) });
+type RehearsalSongRef = { songId: string; sourceSetlistId?: string };

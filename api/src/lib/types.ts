@@ -144,3 +144,30 @@ export interface PresenceEntry {
   lastSeen: string;       // ISO 8601, set on each heartbeat
   expiresAt: number;      // Unix seconds — DynamoDB TTL
 }
+
+// Rehearsals have an independent song selection; learning progress stays live.
+export interface RehearsalSong {
+  songId: string;
+  sourceSetlistId?: string;
+  song: Song; // arrangement snapshot; API overlays current learning progress
+  note?: string;
+  sourceMissing?: boolean; // response-only: original song/entry was removed
+}
+
+export interface Rehearsal {
+  id: string;
+  date: string; // YYYY-MM-DD, in timeZone
+  startTime: string;
+  endTime?: string; // same day
+  timeZone: string;
+  location?: string;
+  note?: string;
+  setlistId?: string;
+  attendees: string[]; // includes named guests without registered accounts
+  songs: RehearsalSong[];
+  cancelled: boolean;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+}
+export type RehearsalDraft = Pick<Rehearsal, 'date' | 'startTime' | 'endTime' | 'timeZone' | 'location' | 'note' | 'setlistId' | 'attendees' | 'songs' | 'cancelled'>;

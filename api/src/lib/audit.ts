@@ -14,7 +14,8 @@ export type AuditAction =
   | 'setlist.entry_song_edit' | 'setlist.entry_progress_update' | 'setlist.entry_comment_update'
   | 'setlist.reorder'
   | 'user.approve' | 'user.reject' | 'user.role_change' | 'user.merge' | 'user.musician_remove'
-  | 'budget.create' | 'budget.update' | 'budget.delete';
+  | 'budget.create' | 'budget.update' | 'budget.delete'
+  | 'rehearsal.create' | 'rehearsal.update' | 'rehearsal.delete' | 'rehearsal.progress_update';
 
 // Flip any action to false to silence it without changing handler code
 export const AUDIT_ACTIONS: Record<AuditAction, boolean> = {
@@ -43,12 +44,16 @@ export const AUDIT_ACTIONS: Record<AuditAction, boolean> = {
   'user.role_change': true,
   'user.merge': true,
   'user.musician_remove': true,
+  'rehearsal.create': true,
+  'rehearsal.update': true,
+  'rehearsal.delete': true,
+  'rehearsal.progress_update': true,
   'budget.create': true,
   'budget.update': true,
   'budget.delete': true,
 };
 
-export type EntityType = 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user' | 'budget';
+export type EntityType = 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user' | 'budget' | 'rehearsal';
 
 export interface AuditLogEntry {
   pk: string;
