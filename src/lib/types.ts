@@ -19,6 +19,7 @@ export interface Song {
   artist: string;
   title: string;
   category: Category;
+  personalComment?: string; // response-only: current author’s private note
   comment?: string;  // general note, copied to setlist entry on add
   musicians: Record<string, MusicianRole>;
   sortOrder?: number;
@@ -30,6 +31,7 @@ export interface Song {
 }
 
 export interface SetlistEntry {
+  personalComment?: string; // response-only, stored separately from shared entries
   songId?: string;        // absent for breaks
   song?: Song;            // embedded snapshot (present for all song entries)
   breakMinutes?: number;  // present for breaks
@@ -50,6 +52,7 @@ export interface SetlistSubset {
 }
 
 export interface Setlist {
+  comment?: string;
   id: string;
   name: string;
   date?: string;

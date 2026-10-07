@@ -228,3 +228,15 @@ export function leavePresence(room: string, clientId: string): void {
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   }).catch(() => {});
 }
+
+export async function updatePersonalSongComment(songId: string, comment: string): Promise<void> {
+  await req(`/songs/${songId}/personal-comment`, { method: 'PATCH', body: JSON.stringify({ comment }) });
+}
+
+export async function updatePersonalEntryComment(setlistId: string, songId: string, comment: string): Promise<void> {
+  await req(`/setlists/${setlistId}/personal-comment`, { method: 'PATCH', body: JSON.stringify({ songId, comment }) });
+}
+
+export async function updateSetlistComment(setlistId: string, comment: string): Promise<Setlist> {
+  return req(`/setlists/${setlistId}/comment`, { method: 'PATCH', body: JSON.stringify({ comment }) });
+}

@@ -1,14 +1,15 @@
 <script lang="ts">
+  import Note from '$components/shared/Note.svelte';
   import { onMount, untrack } from 'svelte';
   import type { Setlist, Song, Instrument, SetlistEntry, SetlistSubset, BandMusician, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import { getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, addSetlistOnlySong, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
+  import { updatePersonalEntryComment, updateSetlistComment, getSetlist, updateSetlist, updateSong, getSong, addSongsToSetlist, addSetlistOnlySong, removeSongFromSetlist, reorderEntries, addBreakToSetlist, removeBreakFromSetlist, updateBreak, updateEntryComment, updateEntrySong } from '$lib/api';
   import { lang, t } from '$lib/i18n';
   import { startPolling } from '$lib/poller';
   import { PresenceController, setlistRoom } from '$lib/presence';
-  import { currentUser } from '$lib/auth';
+  import { currentUser, canWrite } from '$lib/auth';
   import { formatDuration, formatDate, addMinutes, sortInstruments, songReadiness, progressPct, pctBubbleStyle, STAGE_PCT, isEventLongOver } from '$lib/utils';
   import { sortSubset } from '$lib/subsetSort';
   import { buildSetlistLayout, normalizeSetlistLayout, moveLayoutEntry, moveLayoutEntryToSubset, moveSubsetBlock, moveSubsetBlockBy, type SetlistLayoutItem } from '$lib/setlistLayout';
@@ -60,6 +61,8 @@
   });
 
   // Editable meta (name / date / startTime / vibe)
+  let localComment = $state('');
+  $effect(() => { localComment = setlist.comment ?? ''; });
   let editingMeta = $state(false);
   let draftMeta = $state({ name: '', date: '', startTime: '', vibe: false });
   let localMeta = $state({ name: '', date: '', startTime: '', vibe: false });
@@ -73,7 +76,7 @@
   });
 
   async function saveMeta() {
-    const updated = await updateSetlist({ ...setlist, ...draftMeta, entries: localEntries, subsets: localSubsets });
+    const updated = await updateSetlist({ ...setlist, ...draftMeta, comment: localComment, entries: localEntries, subsets: localSubsets });
     localMeta = { name: updated.name, date: updated.date ?? '', startTime: updated.startTime ?? '', vibe: updated.vibe ?? false };
     editingMeta = false;
   }
@@ -120,12 +123,14 @@
 
   // Full replace after own mutations — always authoritative
   function applyUpdate(updated: Setlist) {
+    localComment = updated.comment ?? '';
     localEntries = [...updated.entries];
     localSubsets = [...(updated.subsets ?? [])];
   }
 
   // Smart merge for poll updates — preserve drag state
   function applyPoll(incoming: Setlist) {
+    localComment = incoming.comment ?? '';
     const sorted = [...incoming.entries].sort((a, b) => a.order - b.order);
     const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
     const subsetsIncoming = incoming.subsets ?? [];
@@ -842,6 +847,10 @@
             <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes, $lang)})</span>
             {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}
           </div>
+          <Note value={localComment} label={$t.common.setlistComment} onsave={$canWrite ? async (value) => {
+            const updated = await updateSetlistComment(setlist.id, value);
+            applyUpdate(updated);
+          } : undefined} />
         </div>
         <button class="edit-meta-btn" onclick={startEditMeta} title={$t.editor.edit}>✏️</button>
       {/if}
@@ -1119,6 +1128,10 @@
                         value={entry.comment ?? ''}
                         onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
                       />
+                      <Note value={entry.personalComment} label={$t.common.personalComment} onsave={$currentUser?.status === 'approved' ? async (value) => {
+                        await updatePersonalEntryComment(setlist.id, entry.songId!, value);
+                        localEntries = localEntries.map(item => item.songId === entry.songId ? { ...item, personalComment: value } : item);
+                      } : undefined} />
                     </td>
                     {#each allMusicians as name, mi}
                       {@const role = song.musicians[name]}

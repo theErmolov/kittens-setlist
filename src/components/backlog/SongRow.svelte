@@ -3,7 +3,8 @@
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { t } from '$lib/i18n';
   import { sortInstruments, progressPct, pctBubbleStyle } from '$lib/utils';
-  import { canWrite } from '$lib/auth';
+  import Note from '$components/shared/Note.svelte';
+  import { canWrite, currentUser } from '$lib/auth';
 
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤'
@@ -29,6 +30,7 @@
     showProgress = false,
     additionMode = false,
     flashAdded = false,
+    onpersonalcomment,
     onedit,
     ondelete,
     onaddtosetlist,
@@ -39,6 +41,7 @@
     showProgress?: boolean;
     additionMode?: boolean;
     flashAdded?: boolean;
+    onpersonalcomment: (value: string) => Promise<void>;
     onedit: () => void;
     ondelete: () => void;
     onaddtosetlist: () => void;
@@ -107,6 +110,7 @@
     {#each guestTags as g}
       <span class="guest-tag desktop-only"><span class="guest-icons">{#each g.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span><span class="guest-name">{g.name}</span></span>
     {/each}
+    <Note value={song.personalComment} label={$t.common.personalComment} onsave={$currentUser?.status === 'approved' ? onpersonalcomment : undefined} />
     {#if mobileBubbles.length > 0}
       <div class="mobile-musicians">
         {#each mobileBubbles as b}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Note from '$components/shared/Note.svelte';
   import type { Song, SetlistEntry, BandMusician } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { sortInstruments } from '$lib/utils';
@@ -74,7 +75,12 @@
       <span class="title">{song.title}</span>
       <span class="artist">{song.artist}</span>
 
-      {#if entry.comment}<div class="comment-mobile">{entry.comment}</div>{/if}
+      {#if entry.comment || entry.personalComment}
+        <div class="comment-mobile">
+          {#if entry.comment}<div>{entry.comment}</div>{/if}
+          <Note value={entry.personalComment} label={$t.common.personalComment} />
+        </div>
+      {/if}
     </div>
     <div class="col-time">
       {#if startTime}<span class="start-time">{startTime}</span>{/if}
@@ -103,7 +109,10 @@
       {#if startTime}<span class="start-time start-time-desktop">{startTime}</span>{/if}
     </div>
     <div class="col-comment">
-      {#if entry.comment}<span class="col-comment-text">{entry.comment}</span>{/if}
+      <div class="comment-notes">
+        {#if entry.comment}<div class="col-comment-text">{entry.comment}</div>{/if}
+        <Note value={entry.personalComment} label={$t.common.personalComment} />
+      </div>
       {#if song.lyrics && onlyricsclick}
         <button class="lyrics-side-btn" onclick={(e) => { e.stopPropagation(); onlyricsclick?.(); }} title={$t.common.lyrics}>📝</button>
       {/if}
@@ -190,7 +199,7 @@
   .title { font-size: 1rem; font-weight: 700; color: var(--text); }
   .artist { font-size: 0.85rem; font-weight: 400; color: var(--text-muted); }
   .artist::before { content: "·"; margin-right: 2px; }
-  .comment-mobile { margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
+  .comment-mobile { flex-basis: 100%; margin-top: 2px; font-size: 0.78rem; color: var(--text); font-weight: 500; }
 
   /* Col 3 row 1: time */
   .col-time {
@@ -274,10 +283,10 @@
       grid-column: 3; grid-row: 1;
       display: flex; align-items: stretch; gap: 0; padding: 0; min-width: 0;
     }
+    .comment-notes { flex: 1; align-self: center; min-width: 0; padding: 8px 14px; }
     .col-comment-text {
       flex: 1; align-self: center;
       font-size: 0.92rem; font-weight: 500; color: var(--text);
-      padding: 8px 14px;
       word-break: break-word; overflow-wrap: break-word; white-space: normal; min-width: 0;
     }
     .lyrics-side-btn {

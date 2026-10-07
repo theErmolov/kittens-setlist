@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Note from '$components/shared/Note.svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import type { Setlist, Song, Category, SetlistEntry, SetlistSubset, BandMusician } from '$lib/types';
@@ -25,12 +26,15 @@
     pollInterval?: number;
   } = $props();
 
+  let localComment = $state('');
+  $effect(() => { localComment = setlist.comment ?? ''; });
   let localEntries = $state<SetlistEntry[]>([]);
   let localSubsets = $state<SetlistSubset[]>([]);
   $effect(() => { localEntries = [...setlist.entries]; });
   $effect(() => { localSubsets = [...(setlist.subsets ?? [])]; });
 
   function applyPoll(incoming: Setlist) {
+    localComment = incoming.comment ?? '';
     const sorted = [...incoming.entries].sort((a, b) => a.order - b.order);
     const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
     const subsetsIncoming = incoming.subsets ?? [];
@@ -117,7 +121,7 @@
         .map(e => ({ kind: 'song' as const, entry: e, song: e.song! }))
         .filter(({ song, entry }) => {
           if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return false;
-          if (onlyWithComment && !entry.comment) return false;
+          if (onlyWithComment && !entry.comment && !entry.personalComment) return false;
           return true;
         })
         .sort((a, b) => sortKey === 'artist'
@@ -129,7 +133,7 @@
       if (e.breakMinutes) return [{ kind: 'break', entry: e }];
       if (!e.song) return [];
       if (categoryFilter.size > 0 && !categoryFilter.has(e.song.category)) return [];
-      if (onlyWithComment && !e.comment) return [];
+      if (onlyWithComment && !e.comment && !e.personalComment) return [];
       return [{ kind: 'song', entry: e, song: e.song }];
     });
 
@@ -298,6 +302,7 @@
         title={$t.stage.filters}
       >🎛️ <span class="filter-btn-label">{$t.stage.filter}</span></button>
     </div>
+    <Note value={localComment} label={$t.common.setlistComment} collapsible />
     {#if !canMark}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}

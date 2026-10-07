@@ -22,11 +22,12 @@
   afterNavigate(() => { window.scrollTo(0, 0); });
 
   $effect(() => {
+    const authorId = $currentUser?.id;
     const targetId = id;
     if (!targetId) return;
     loading = true;
     getSetlist(targetId).then(s => {
-      if (id !== targetId) return;
+      if (id !== targetId || $currentUser?.id !== authorId) return;
       setlist = s;
       loading = false;
     }).catch(() => {

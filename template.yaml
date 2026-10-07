@@ -18,6 +18,7 @@ Globals:
         SESSIONS_TABLE: !Ref SessionsTable
         AUDIT_LOG_TABLE: !Ref AuditLogTable
         BUDGET_TABLE: !Ref BudgetTable
+        PERSONAL_COMMENTS_TABLE: !Ref PersonalCommentsTable
         PRESENCE_TABLE: !Ref PresenceTable
         RECEIPTS_BUCKET: !Ref ReceiptsBucket
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
@@ -81,6 +82,8 @@ Resources:
             TableName: !Ref BudgetTable
         - DynamoDBCrudPolicy:
             TableName: !Ref PresenceTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PersonalCommentsTable
         - S3CrudPolicy:
             BucketName: !Ref ReceiptsBucket
       Events:
@@ -247,6 +250,23 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
+
+  PersonalCommentsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      TableName: kittens-personal-comments
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: scope
+          AttributeType: S
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: scope
+          KeyType: HASH
+        - AttributeName: key
+          KeyType: RANGE
 
   # ─── S3 — expense receipts (admin-only, accessed via presigned URLs) ──────────
   ReceiptsBucket:

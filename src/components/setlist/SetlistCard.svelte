@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Note from '$components/shared/Note.svelte';
   import type { Setlist } from '$lib/types';
   import { lang, t } from '$lib/i18n';
   import { formatDuration, formatDate } from '$lib/utils';
@@ -15,6 +16,7 @@
 <div class="card">
   <a href="{base}/setlists/{setlist.id}" class="card-link">
     <div class="card-name">{setlist.name}</div>
+    <Note value={setlist.comment} label={$t.common.setlistComment} preview />
     <div class="card-meta">
       {#if setlist.date}<span class="date">{formatDate(setlist.date, $lang)}</span>{/if}
       {#if setlist.startTime}<span class="date">⏱ {setlist.startTime}</span>{/if}

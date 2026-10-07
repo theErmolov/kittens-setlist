@@ -1,6 +1,7 @@
+import { personalResponse, stripPersonalComments, clearPersonalComments } from '../lib/personal-comments.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { dbGet, dbPut, dbDelete, dbScan } from '../lib/dynamo.js';
-import { ok, err } from '../lib/response.js';
+import { err } from '../lib/response.js';
 import type { Song, User } from '../lib/types.js';
 import { logAudit, diffSummary, stageLabel, musiciansDiff } from '../lib/audit.js';
 
@@ -9,6 +10,7 @@ const TABLE = process.env.SONGS_TABLE ?? 'kittens-songs';
 function songName(s: Song) { return `${s.artist} — ${s.title}`; }
 
 export async function songsHandler(event: APIGatewayProxyEventV2, path: string, user: User) {
+  if (event.body) event = { ...event, body: JSON.stringify(stripPersonalComments(JSON.parse(event.body))) };
   const method = event.requestContext.http.method;
   const parts = path.split('/').filter(Boolean); // ['songs'] or ['songs', 'id']
   const id = parts[1] ?? null;
@@ -16,14 +18,14 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
   if (!id || id === '') {
     if (method === 'GET') {
       const items = await dbScan<Song>(TABLE);
-      return ok(items);
+      return personalResponse(items, user);
     }
     if (method === 'POST') {
       const body = JSON.parse(event.body ?? '{}') as Omit<Song, 'id'>;
       const song: Song = { ...body, id: crypto.randomUUID() };
       await dbPut(TABLE, song as unknown as Record<string, unknown>);
       await logAudit({ action: 'song.create', actor: user, entityType: 'song', entityId: song.id, entityName: songName(song), summary: `создана песня "${songName(song)}"` });
-      return ok(song, 201);
+      return personalResponse(song, user, 201);
     }
     return err('Method not allowed', 405);
   }
@@ -31,7 +33,7 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
   if (method === 'GET') {
     const item = await dbGet<Song>(TABLE, id);
     if (!item) return err('Not found', 404);
-    return ok(item);
+    return personalResponse(item, user);
   }
   if (method === 'PUT') {
     const body = JSON.parse(event.body ?? '{}') as Song;
@@ -58,13 +60,14 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
       const summary = parts.length ? parts.join(', ') : 'обновлена';
       await logAudit({ action: 'song.update', actor: user, entityType: 'song', entityId: id, entityName: songName(body), summary });
     }
-    return ok(body);
+    return personalResponse(body, user);
   }
   if (method === 'DELETE') {
     const before = await dbGet<Song>(TABLE, id);
     await dbDelete(TABLE, id);
+    await clearPersonalComments('backlog', id);
     await logAudit({ action: 'song.delete', actor: user, entityType: 'song', entityId: id, entityName: before ? songName(before) : id, summary: 'удалена' });
-    return ok({ deleted: id });
+    return personalResponse({ deleted: id }, user);
   }
 
   if (parts[2] === 'progress' && method === 'PATCH') {
@@ -76,7 +79,7 @@ export async function songsHandler(event: APIGatewayProxyEventV2, path: string, 
     const updated = { ...song, progress };
     await dbPut(TABLE, updated as unknown as Record<string, unknown>);
     await logAudit({ action: 'song.progress_update', actor: user, entityType: 'song', entityId: id, entityName: songName(song), summary: `${musicianName}: ${stageLabel(prevStage)} → ${stageLabel(stage)}` });
-    return ok(updated);
+    return personalResponse(updated, user);
   }
 
   return err('Method not allowed', 405);

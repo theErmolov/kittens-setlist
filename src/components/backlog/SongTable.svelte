@@ -4,7 +4,7 @@
   import SongEditModal from './SongEditModal.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
-  import { updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
+  import { updatePersonalSongComment, updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
   import { lang, t } from '$lib/i18n';
   import { canWrite } from '$lib/auth';
@@ -267,6 +267,10 @@
             {showProgress}
             {additionMode}
             flashAdded={flashing.has(song.id)}
+            onpersonalcomment={async (value) => {
+              await updatePersonalSongComment(song.id, value);
+              songs = songs.map(item => item.id === song.id ? { ...item, personalComment: value } : item);
+            }}
             onedit={() => { editingSong = song; }}
             ondelete={() => handleDelete(song.id)}
             onaddtosetlist={() => startAddFlow(song)}

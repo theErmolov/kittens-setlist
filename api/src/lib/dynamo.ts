@@ -66,14 +66,23 @@ export async function dbQueryPartition<T>(
   table: string,
   keyName: string,
   keyValue: string,
+  consistentRead = false,
 ): Promise<T[]> {
-  const res = await db.send(new QueryCommand({
-    TableName: table,
-    KeyConditionExpression: '#key = :value',
-    ExpressionAttributeNames: { '#key': keyName },
-    ExpressionAttributeValues: { ':value': keyValue },
-  }));
-  return (res.Items ?? []) as T[];
+  const items: T[] = [];
+  let lastKey: Record<string, unknown> | undefined;
+  do {
+    const res = await db.send(new QueryCommand({
+      TableName: table,
+      KeyConditionExpression: '#key = :value',
+      ExpressionAttributeNames: { '#key': keyName },
+      ExpressionAttributeValues: { ':value': keyValue },
+      ExclusiveStartKey: lastKey,
+      ConsistentRead: consistentRead,
+    }));
+    items.push(...((res.Items ?? []) as T[]));
+    lastKey = res.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+  return items;
 }
 
 export async function dbTransactPutAndDelete(

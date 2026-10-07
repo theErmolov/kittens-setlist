@@ -4,15 +4,17 @@
  *
  * Each open view (backlog, setlist editor, stage) creates a PresenceController
  * that heartbeats every 20s. The heartbeat response lists the *other* live
- * viewers; if none of them can mutate (canMark), the data poller is paused.
+ * viewers; if none can change shared data or the current author’s private notes,
+ * the data poller is paused.
  * Heartbeat failures fall back to polling (graceful degradation against an old
  * backend).
  *
  * The nav bar reads `presenceIndicator` to show a dot on the active section's
  * icon: green when someone else is here, yellow when you're alone.
  */
+import { currentUser } from '$lib/auth';
 import { browser } from '$app/environment';
-import { writable, type Writable } from 'svelte/store';
+import { get, writable, type Writable } from 'svelte/store';
 import { heartbeatPresence, leavePresence } from '$lib/api';
 import type { PresenceEntry } from '$lib/types';
 
@@ -54,7 +56,8 @@ export class PresenceController {
   constructor(private room: string, private scope: PresenceScope) {}
 
   private get hasOtherMutators(): boolean {
-    return this.others.some(o => o.canMark);
+    const user = get(currentUser);
+    return this.others.some(o => o.canMark || (user?.status === 'approved' && o.userId === user.id));
   }
 
   /** The data poller should be suppressed only once we've *successfully*
