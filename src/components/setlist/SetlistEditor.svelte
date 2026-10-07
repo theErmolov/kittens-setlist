@@ -1135,10 +1135,7 @@
                           {/each}
                         </div>
                       {/if}
-                      <CommentInput
-                        value={entry.comment ?? ''}
-                        onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
-                      />
+                      <Note value={entry.comment} label={$t.song.comment} />
                       <Note value={entry.personalComment} label={$t.common.personalComment} />
                     </td>
                     {#each allMusicians as name, mi}
