@@ -8,6 +8,7 @@ on:
       - 'edge/**'
       - 'template.yaml'
       - 'samconfig.toml'
+      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
 env:
@@ -55,3 +56,8 @@ jobs:
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --parameter-overrides \
               TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+      - name: Configure Telegram callback webhook
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: node api/scripts/configure-telegram-webhook.mjs

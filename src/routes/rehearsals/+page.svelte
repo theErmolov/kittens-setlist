@@ -3,10 +3,10 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
-  import { authLoading, canAccessRehearsals } from '$lib/auth';
+  import { authLoading, canAccessRehearsals, currentUser } from '$lib/auth';
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { getRehearsals, getSetlists, getMusicians, createRehearsal } from '$lib/api';
+  import { getRehearsals, getSetlists, getMusicians, createRehearsal, getNotificationPreferences, updateNotificationPreferences } from '$lib/api';
   import type { Rehearsal, RehearsalDraft, Setlist, BandMusician } from '$lib/types';
   import { calendarDays, localDate, isUpcoming } from '$lib/rehearsals';
   import { formatDate } from '$lib/utils';
@@ -22,6 +22,7 @@
   let selectedDate = $state(localDate());
   let month = $state(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   let showNew = $state(false);
+  let personalReminders = $state(true), preferencesLoaded = $state(false), preferencesBusy = $state(false), preferencesError = $state('');
   let initial = $state<Partial<RehearsalDraft>>({});
   const upcoming = $derived(rehearsals.filter(r => isUpcoming(r)).sort((a,b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)));
   const days = $derived(calendarDays(month));
@@ -39,12 +40,22 @@
     loading = true; error = '';
     try {
       [rehearsals, setlists, musicians] = await Promise.all([getRehearsals(), getSetlists(), getMusicians()]);
+      if ($currentUser?.isAdmin) {
+        try { personalReminders = (await getNotificationPreferences()).enabled; preferencesLoaded = true; }
+        catch { preferencesError = $rt.notificationsError; }
+      }
       if (page.url.searchParams.get('new') === '1') {
         initial = { date: selectedDate, setlistId: page.url.searchParams.get('setlist') ?? undefined };
         showNew = true;
       }
     } catch { error = $rt.error; }
     finally { loading = false; }
+  }
+  async function toggleReminders(enabled: boolean, input: HTMLInputElement) {
+    preferencesBusy = true; preferencesError = '';
+    try { personalReminders = (await updateNotificationPreferences(enabled)).enabled; }
+    catch { preferencesError = $rt.notificationsError; }
+    finally { preferencesBusy = false; input.checked = personalReminders; }
   }
   function moveMonth(delta: number) {
     month = new Date(month.getFullYear(), month.getMonth() + delta, 1);
@@ -63,6 +74,10 @@
   {#if loading}<p class="loading"><LoadingCat /></p>
   {:else if error}<p class="error" role="alert">{error}</p><button onclick={load}>{$rt.retry}</button>
   {:else}
+    {#if $currentUser?.isAdmin}
+      <div class="reminder-setting"><label><input type="checkbox" checked={personalReminders} disabled={!preferencesLoaded || preferencesBusy} onchange={event => toggleReminders(event.currentTarget.checked, event.currentTarget)} /> {$rt.personalReminders}</label></div>
+      {#if preferencesError}<p class="error" role="alert">{preferencesError}</p>{/if}
+    {/if}
     <h2>{$rt.upcoming}</h2>
     {#if upcoming.length}
       <div class="upcoming" aria-label={$rt.upcoming}>
@@ -96,6 +111,8 @@
 {#if showNew && !loading}<RehearsalForm {initial} {setlists} {musicians} onsubmit={save} onclose={closeForm} />{/if}
 {/if}
 <style>
+  .reminder-setting { margin-bottom: 20px; }
+  .reminder-setting label { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
   .loading { padding: 40px 20px; }
   .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
   header, .day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

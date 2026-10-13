@@ -20,6 +20,7 @@ const strings = {
     timeZone: 'Time zone', regular: 'Band members', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     cancelledHint: 'This rehearsal is cancelled. Restore it to continue preparing.',
     chooseDate: 'Choose date', invalidDate: 'Enter a valid date as DD.MM.YYYY.',
+    refresh: 'Refresh for this rehearsal', personalReminders: 'Personal rehearsal reminders', notificationsError: 'Could not update reminder settings.',
     progressError: 'Could not update progress. Please retry.', pending: 'Saving…',
   },
   ru: {
@@ -41,6 +42,7 @@ const strings = {
     timeZone: 'Часовой пояс', regular: 'Музыканты группы', weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
     cancelledHint: 'Репетиция отменена. Восстановите её, чтобы продолжить подготовку.',
     chooseDate: 'Выбрать дату', invalidDate: 'Введите дату в формате ДД.ММ.ГГГГ.',
+    refresh: 'Освежить к этой репетиции', personalReminders: 'Личные напоминания о репетициях', notificationsError: 'Не удалось изменить настройки напоминаний.',
     progressError: 'Не удалось обновить прогресс. Попробуйте ещё раз.', pending: 'Сохранение…',
   },
 };

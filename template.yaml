@@ -24,6 +24,9 @@ Globals:
         RECEIPTS_BUCKET: !Ref ReceiptsBucket
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
         AUTH_APPROVAL_TELEGRAM_ID: !Ref AuthApprovalTelegramId
+        REHEARSAL_GROUP_CHAT_ID: !Ref RehearsalGroupChatId
+        NOTIFICATIONS_TABLE: !Ref NotificationsTable
+        REMINDER_CHECK_MINUTES: !Ref ReminderCheckMinutes
 
 Parameters:
   StageName:
@@ -38,6 +41,21 @@ Parameters:
     Default: '165854464'
     AllowedPattern: '^([0-9]+)?$'
     Description: Approved admin receiving new access requests (Ilya); empty disables notifications
+
+  RehearsalGroupChatId:
+    Type: String
+    Default: '-1003912884262'
+    AllowedPattern: '^(-[0-9]+)?$'
+    Description: Trial announcements chat; empty disables rehearsal notifications
+
+  ReminderCheckMinutes:
+    Type: String
+    Default: '1'
+    AllowedValues: ['1', '60']
+    Description: One-minute checks during the trial; 60 for hourly checks
+
+Conditions:
+  MinuteReminderChecks: !Equals [!Ref ReminderCheckMinutes, '1']
 
 Resources:
 
@@ -93,6 +111,8 @@ Resources:
             TableName: !Ref PersonalCommentsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref RehearsalsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
         - S3CrudPolicy:
             BucketName: !Ref ReceiptsBucket
       Events:
@@ -109,6 +129,72 @@ Resources:
         Target: es2022
         EntryPoints:
           - src/index.ts
+
+  # One serialized worker handles scheduled checks and immediate button callbacks.
+  RehearsalNotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: api/
+      Handler: dist/index.rehearsalNotificationsHandler
+      Timeout: 60
+      ReservedConcurrentExecutions: 1
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RehearsalsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref SongsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref SetlistsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PeopleTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref MusiciansTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+      Events:
+        ReminderCheck:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: !If [MinuteReminderChecks, 'cron(* * * * ? *)', 'cron(0 * * * ? *)']
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumRetryAttempts: 0
+            Input: '{"source":"rehearsal-notifications"}'
+        TelegramWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /telegram/webhook
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        EntryPoints:
+          - src/index.ts
+
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: kittens-notifications
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
 
   # ─── DynamoDB Tables ──────────────────────────────────────────────────────────
 

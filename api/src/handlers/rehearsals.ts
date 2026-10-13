@@ -4,6 +4,7 @@ import { GetCommand, PutCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/l
 import { db, dbScan } from '../lib/dynamo.js';
 import { logAudit, stageLabel } from '../lib/audit.js';
 import { ok, err } from '../lib/response.js';
+import { zonedTime } from '../lib/rehearsal-reminder-plan.js';
 import { stripPersonalComments } from '../lib/personal-comments.js';
 import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, User, LearningStage } from '../lib/types.js';
 
@@ -30,7 +31,7 @@ function sources() {
     setlist(id: string) { if (!setlists.has(id)) setlists.set(id, getCurrent<Setlist>(SETLISTS, id)); return setlists.get(id)!; },
   };
 }
-async function hydrate(rehearsal: Rehearsal, cache = sources()): Promise<Rehearsal> {
+export async function hydrate(rehearsal: Rehearsal, cache = sources()): Promise<Rehearsal> {
   return stripPersonalComments({ ...rehearsal, songs: await Promise.all(rehearsal.songs.map(async item => {
     const entry = item.sourceSetlistId ? (await cache.setlist(item.sourceSetlistId))?.entries.find(e => e.songId === item.songId) : undefined;
     const canonical = entry?.setlistOnly ? undefined : await cache.song(item.songId);
@@ -47,6 +48,7 @@ async function parseDraft(body: Record<string, unknown>, before?: Rehearsal): Pr
   if (!validTime(startTime) || (endTime && (!validTime(endTime) || endTime <= startTime))) throw new InputError('End time must be after start time on the same day');
   const timeZone = text(body.timeZone, 'timeZone', 100);
   try { if (!timeZone) throw new Error(); new Intl.DateTimeFormat('en', { timeZone }); } catch { throw new InputError('Invalid time zone'); }
+  try { zonedTime(date, startTime, timeZone); } catch { throw new InputError('Invalid local rehearsal start time'); }
   if (!Array.isArray(body.attendees) || body.attendees.length > 100) throw new InputError('Invalid attendees');
   const attendees = [...new Set(body.attendees.map(name => text(name, 'attendee', 100)))];
   if (attendees.some(name => !name)) throw new InputError('Attendee name required');
@@ -69,7 +71,10 @@ async function parseDraft(body: Record<string, unknown>, before?: Rehearsal): Pr
       ? (await cache.setlist(ref.sourceSetlistId))?.entries.find(e => e.songId === ref.songId)?.song
       : await cache.song(ref.songId);
     if (!source && !previous) throw new InputError('Song not found', 404);
-    songs.push({ ...ref, song: stripPersonalComments(previous?.song ?? source!), note: text(input.note, 'song note') || undefined });
+    if (input.refreshFor !== undefined && (!Array.isArray(input.refreshFor) || input.refreshFor.length > 100)) throw new InputError('Invalid refresh musicians');
+    const refreshFor = [...new Set(((input.refreshFor ?? previous?.refreshFor ?? []) as unknown[]).map(name => text(name, 'refresh musician', 100)))];
+    if (refreshFor.some(name => !name || !(source ?? previous?.song)!.musicians[name]?.instruments.length)) throw new InputError('Refresh musician does not take part in this song');
+    songs.push({ ...ref, song: stripPersonalComments(previous?.song ?? source!), note: text(input.note, 'song note') || undefined, ...(refreshFor.length ? { refreshFor } : {}) });
   }
   if (body.cancelled !== undefined && typeof body.cancelled !== 'boolean') throw new InputError('Invalid cancelled status');
   return { date, startTime, endTime: endTime || undefined, timeZone, location: text(body.location, 'location', 500) || undefined, note: text(body.note, 'note') || undefined, setlistId, attendees, songs, cancelled: body.cancelled === true };

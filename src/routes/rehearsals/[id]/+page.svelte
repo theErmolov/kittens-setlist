@@ -82,6 +82,12 @@
     } catch { error = $rt.progressError; }
     finally { busy = false; }
   }
+  async function refresh(item: RehearsalSong, name: string, input: HTMLInputElement) {
+    if (!rehearsal) return;
+    const names = item.refreshFor ?? [];
+    await action({ songs: rehearsal.songs.map(song => rehearsalSongKey(song) === rehearsalSongKey(item) ? { ...song, refreshFor: names.includes(name) ? names.filter(n => n !== name) : [...names, name] } : song) });
+    input.checked = rehearsal.songs.find(song => rehearsalSongKey(song) === rehearsalSongKey(item))?.refreshFor?.includes(name) ?? false;
+  }
   async function toggleCancelled() { if (rehearsal && (rehearsal.cancelled || confirm($rt.cancelConfirm))) await action({ cancelled: !rehearsal.cancelled }); }
   async function remove() {
     if (!rehearsal || !confirm($rt.deleteConfirm)) return;
@@ -136,6 +142,7 @@
                   {#each ['queue', 'structure', 'mastering', 'ready'] as stage}<option value={stage}>{$t.progress[stage as LearningStage]}</option>{/each}
                 </select>
               </label>
+              <label class="refresh-setting"><input type="checkbox" checked={item.refreshFor?.includes(name) ?? false} onchange={event => refresh(item, name, event.currentTarget)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name)} /> {$rt.refresh} · {name}</label>
             {/each}
             {#if item.song.comment}<p class="note muted">{item.song.comment}</p>{/if}
             <label class="note-label">{$rt.songNote}<textarea bind:value={notes[songKey]} maxlength="4000" rows="2" disabled={busy || rehearsal.cancelled}></textarea></label>
@@ -157,6 +164,7 @@
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
+  .refresh-setting { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .85rem; color: var(--text-muted); }
   .loading { padding: 40px 20px; }
   .page { max-width: 820px; margin: 0 auto; padding: 22px 16px 48px; }
   .back { display: inline-block; margin-bottom: 22px; color: var(--text-muted); text-decoration: none; font-size: .85rem; }

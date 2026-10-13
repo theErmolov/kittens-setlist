@@ -151,6 +151,7 @@ export interface RehearsalSong {
   sourceSetlistId?: string;
   song: Song; // arrangement snapshot; API overlays current learning progress
   note?: string;
+  refreshFor?: string[]; // musicians explicitly refreshing this song for this rehearsal
   sourceMissing?: boolean; // response-only: original song/entry was removed
 }
 

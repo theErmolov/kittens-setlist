@@ -3,6 +3,8 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { musiciansHandler } from './handlers/musicians.js';
 import { songsHandler } from './handlers/songs.js';
 import { setlistsHandler } from './handlers/setlists.js';
+import { notificationPreferencesHandler } from './handlers/notification-preferences.js';
+export { rehearsalNotificationsHandler } from './handlers/rehearsal-notifications.js';
 import { rehearsalsHandler } from './handlers/rehearsals.js';
 import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
@@ -57,6 +59,8 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     const method = event.requestContext.http.method;
     if (user.role !== 'writer' && !user.isAdmin && method !== 'GET' && !isPersonalComment) return err('Forbidden', 403);
   }
+
+  if (path === '/notification-preferences') return notificationPreferencesHandler(event, user!);
 
   if (isPersonalComment) return personalCommentsHandler(event, path, user!);
 

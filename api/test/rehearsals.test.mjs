@@ -204,3 +204,29 @@ test('approved writers can create, read, edit, update progress and delete rehear
   assert.equal((await request('PATCH', `${path}/progress`, { songId: 's1', sourceSetlistId: 'show', musicianName: 'Bass', stage: 'ready' }, 'writer')).status, 200);
   assert.equal((await request('DELETE', path, { version: updated.body.version }, 'writer')).status, 200);
 });
+
+test('refresh markers are independent of progress, validate assignments and survive attendance changes', async () => {
+  let created = await create();
+  created.songs[0].refreshFor = ['Bass', 'Bass'];
+  let response = await request('PUT', `/rehearsals/${created.id}`, created);
+  assert.equal(response.status, 200);
+  created = response.body;
+  assert.deepEqual(created.songs[0].refreshFor, ['Bass']);
+  assert.equal(created.songs[0].song.progress.Bass, 'mastering');
+  response = await request('PUT', `/rehearsals/${created.id}`, { ...created, attendees: ['Guest'] });
+  assert.equal(response.status, 200);
+  created = response.body;
+  assert.deepEqual(created.songs[0].refreshFor, ['Bass']);
+  const bad = structuredClone(created); bad.songs[0].refreshFor = ['Nobody'];
+  assert.equal((await request('PUT', `/rehearsals/${created.id}`, bad)).status, 400);
+  const oldClient = structuredClone(created); delete oldClient.songs[0].refreshFor;
+  created = (await request('PUT', `/rehearsals/${created.id}`, oldClient)).body;
+  assert.deepEqual(created.songs[0].refreshFor, ['Bass']);
+  created.songs[0].refreshFor = [];
+  created = (await request('PUT', `/rehearsals/${created.id}`, created)).body;
+  assert.equal(created.songs[0].refreshFor, undefined);
+});
+
+test('nonexistent local start times at the DST spring transition are rejected', async () => {
+  assert.equal((await request('POST', '/rehearsals', { ...draft, date: '2026-03-29', startTime: '02:30', endTime: undefined })).status, 400);
+});
