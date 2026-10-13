@@ -246,7 +246,7 @@ const strings = {
       empty: 'No users yet.',
       save: 'Save',
       cancel: 'Cancel',
-      auditLog: 'Change Log',
+      auditLog: 'Audit Log',
       auditWhen: 'When',
       auditWho: 'Who',
       auditEntity: 'Entity',

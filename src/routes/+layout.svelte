@@ -121,9 +121,6 @@
     </a>
   {/if}
   {#if navIsAdmin}
-    <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
-      <span class="link-icon">💰</span><span class="link-label">{$t.nav.budget}</span>
-    </a>
     <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
       <span class="link-icon">🔑</span><span class="link-label">{$t.nav.admin}</span>
       {#if hasPending}<span class="pending-dot"></span>{/if}
@@ -138,17 +135,6 @@
   >
     <span class="link-icon">📷</span><span class="link-label">{$t.nav.media}</span>
   </a>
-  {#if navIsAdmin}
-    <a
-      href="https://antispam.kittens.band/"
-      class="nav-link"
-      target="_blank"
-      rel="noopener noreferrer"
-      title={$t.nav.antispam}
-    >
-      <span class="link-icon">🛡️</span><span class="link-label">{$t.nav.antispam}</span>
-    </a>
-  {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang.toUpperCase()}</button>
   <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if navLoggedIn}
