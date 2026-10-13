@@ -26,7 +26,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getMusicians(): Promise<BandMusician[]> {
   const items = await req<BandMusician[]>('/musicians');
-  return items.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  return items.sort((a, b) =>
+    (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER)
+      || a.name.localeCompare(b.name)
+  );
 }
 
 export async function addMusician(m: Omit<BandMusician, 'id'>): Promise<BandMusician> {
