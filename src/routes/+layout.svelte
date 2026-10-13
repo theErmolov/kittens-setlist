@@ -41,7 +41,7 @@
     return () => observer.disconnect();
   });
 
-  // Strip base prefix so active checks work on both local and GitHub Pages
+  // Normalize the pathname for active navigation checks.
   let path = $derived(page.url.pathname.slice(base.length) || '/');
 
   const presenceTitle = $derived(

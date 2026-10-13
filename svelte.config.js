@@ -6,9 +6,6 @@ const config = {
 		adapter: adapter({
 			fallback: '200.html'  // SPA mode — CloudFront serves this for unknown paths (200 status)
 		}),
-		paths: {
-			base: process.env.BASE_PATH ?? ''
-		},
 		alias: {
 			$components: 'src/components'
 		}

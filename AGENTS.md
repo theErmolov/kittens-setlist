@@ -42,7 +42,7 @@ Token lasts 180 days.
 
 ## Base path gotcha
 
-`paths.base` comes from `BASE_PATH` env var (empty for local/CloudFront, `/kittens-setlist` for GitHub Pages).
+The app is served at the domain root on CloudFront (`paths.base` is empty).
 - `href` attributes **must** use `import { base } from '$app/paths'` + `href="{base}/route"`
 - `goto()` is base-aware; `redirect()` is not — use `` `${base}/route` ``
 
