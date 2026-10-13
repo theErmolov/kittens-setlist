@@ -22,4 +22,7 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix api
       - run: npm run check
+        env:
+          PUBLIC_API_URL: ${{ vars.API_URL }}
+          PUBLIC_TELEGRAM_BOT_USERNAME: kittens_control_center_bot
       - run: npm run test:all
