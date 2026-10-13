@@ -68,7 +68,7 @@ export interface AuditLogEntry {
   action: string;
   actorTelegramId: string;
   actorName: string;
-  entityType: 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user' | 'rehearsal';
+  entityType: 'song' | 'setlist' | 'musician' | 'setlist_entry' | 'user' | 'budget' | 'rehearsal';
   entityId: string;
   entityName: string;
   summary: string;

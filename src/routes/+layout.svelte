@@ -46,8 +46,8 @@
 
   const presenceTitle = $derived(
     $presenceIndicator.state === 'withOthers'
-      ? ($lang === 'ru' ? 'Кто-то ещё здесь' : 'Someone else is here')
-      : ($lang === 'ru' ? 'Только вы здесь' : 'Only you here'),
+      ? $t.common.presenceOthers
+      : $t.common.presenceAlone,
   );
 
   // Auth guard: redirect to /login unless on login page or stage view
@@ -90,40 +90,42 @@
   $effect(() => {
     if (!browser) return;
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.documentElement.lang = $lang;
   });
 </script>
 
 <svelte:head>
   <title>{$t.common.appTitle}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="apple-mobile-web-app-title" content={$t.common.bandName} />
 </svelte:head>
 
 <nav class="nav">
   <a href="{base}/backlog" class="nav-brand">
     <LogoCat size={52} />
     <span class="brand-text">
-      <span class="brand-ru">Центр</span>
-      <span class="brand-ru">управления</span>
-      <span class="brand-en">Котят</span>
+      <span class="brand-ru">{$t.common.brandLines[0]}</span>
+      <span class="brand-ru">{$t.common.brandLines[1]}</span>
+      <span class="brand-en">{$t.common.brandLines[2]}</span>
     </span>
   </a>
   <a href="{base}/backlog" class="nav-link" class:active={path.startsWith('/backlog')}>
-    <span class="link-icon">🎵{#if $presenceIndicator.scope === 'backlog' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Каталог' : 'Backlog'}</span>
+    <span class="link-icon">🎵{#if $presenceIndicator.scope === 'backlog' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$t.nav.backlog}</span>
   </a>
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
-    <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
+    <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$t.nav.setlists}</span>
   </a>
   {#if $authLoading ? navCanAccessRehearsals : $canAccessRehearsals}
     <a href="{base}/rehearsals" class="nav-link" class:active={path.startsWith('/rehearsals')}>
-      <span class="link-icon">📅</span><span class="link-label">{$lang === 'ru' ? 'Репетиции' : 'Rehearsals'}</span>
+      <span class="link-icon">📅</span><span class="link-label">{$t.nav.rehearsals}</span>
     </a>
   {/if}
   {#if navIsAdmin}
     <a href="{base}/budget" class="nav-link" class:active={path.startsWith('/budget')}>
-      <span class="link-icon">💰</span><span class="link-label">{$lang === 'ru' ? 'Бюджет' : 'Budget'}</span>
+      <span class="link-icon">💰</span><span class="link-label">{$t.nav.budget}</span>
     </a>
     <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
-      <span class="link-icon">🔑</span><span class="link-label">{$lang === 'ru' ? 'Админ' : 'Admin'}</span>
+      <span class="link-icon">🔑</span><span class="link-label">{$t.nav.admin}</span>
       {#if hasPending}<span class="pending-dot"></span>{/if}
     </a>
   {/if}
@@ -132,9 +134,9 @@
     class="nav-link"
     target="_blank"
     rel="noopener noreferrer"
-    title={$lang === 'ru' ? 'Медиахранилище' : 'Media storage'}
+    title={$t.nav.mediaStorage}
   >
-    <span class="link-icon">📷</span><span class="link-label">{$lang === 'ru' ? 'Медиа' : 'Media'}</span>
+    <span class="link-icon">📷</span><span class="link-label">{$t.nav.media}</span>
   </a>
   {#if navIsAdmin}
     <a
@@ -142,9 +144,9 @@
       class="nav-link"
       target="_blank"
       rel="noopener noreferrer"
-      title={$lang === 'ru' ? 'Антиспам' : 'Anti-spam'}
+      title={$t.nav.antispam}
     >
-      <span class="link-icon">🛡️</span><span class="link-label">{$lang === 'ru' ? 'Антиспам' : 'Anti-spam'}</span>
+      <span class="link-icon">🛡️</span><span class="link-label">{$t.nav.antispam}</span>
     </a>
   {/if}
   <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>

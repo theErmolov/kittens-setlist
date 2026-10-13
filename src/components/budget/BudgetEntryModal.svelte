@@ -51,7 +51,7 @@
   let receiptFile = $state<File | null>(null);
 
   let saving = $state(false);
-  let error = $state('');
+  let error = $state<'invalidAmount' | 'requestFailed' | null>(null);
 
   const modalTitle = $derived(
     kind === 'income' ? (isEdit ? $t.budget.titles.editIncome : $t.budget.titles.addIncome)
@@ -84,9 +84,9 @@
   }
 
   async function handleSave() {
-    error = '';
+    error = null;
     const amount = parseEUR(amountInput);
-    if (amount <= 0) { error = '⚠'; return; }
+    if (amount <= 0) { error = 'invalidAmount'; return; }
     const dateIso = dateLocal ? new Date(dateLocal).toISOString() : new Date().toISOString();
 
     saving = true;
@@ -134,8 +134,8 @@
 
       onsaved(saved);
       closeModal();
-    } catch (e) {
-      error = (e as Error).message;
+    } catch {
+      error = 'requestFailed';
       saving = false;
     }
   }
@@ -260,7 +260,7 @@
         </div>
       {/if}
 
-      {#if error}<p class="err">{error}</p>{/if}
+      {#if error}<p class="err">{$t.common[error]}</p>{/if}
     </div>
 
     <div class="modal-footer">

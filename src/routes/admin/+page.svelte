@@ -6,7 +6,7 @@
   import { currentUser, authLoading } from '$lib/auth';
   import { getUsers, getAuditLog } from '$lib/api';
   import type { User, AuditLogEntry } from '$lib/types';
-  import { formatAuditSummary } from '$lib/utils';
+  import { formatLocalizedAuditSummary, formatLocalizedAuditEntity } from '$lib/auditI18n';
 
   let users = $state<User[]>([]);
   let loading = $state(true);
@@ -89,8 +89,8 @@
           {#each auditItems as entry (entry.sk)}
             <div class="audit-row">
               <span class="audit-when">{formatTimestamp(entry.timestamp)}</span><span class="audit-who">{entry.actorName}</span>
-              <span><span class="entity-type">{$t.admin.auditEntities[entry.entityType]}</span>{entry.entityName}</span>
-              <span class="audit-details">{formatAuditSummary(entry.summary)}</span>
+              <span><span class="entity-type">{$t.admin.auditEntities[entry.entityType]}</span>{formatLocalizedAuditEntity(entry, $lang)}</span>
+              <span class="audit-details">{formatLocalizedAuditSummary(entry, $lang)}</span>
             </div>
           {/each}
         </div>

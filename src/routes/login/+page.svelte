@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import { page } from '$app/state';
   import { PUBLIC_API_URL, PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
-  import { t } from '$lib/i18n';
+  import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading, setToken, getToken } from '$lib/auth';
   import type { User } from '$lib/types';
   import LogoCat from '$components/shared/LogoCat.svelte';
@@ -67,8 +66,13 @@
     }
   }
 
-  onMount(() => {
-    if (!browser) return;
+  const showWidget = $derived(status === 'idle' || status === 'loading');
+
+  $effect(() => {
+    const widgetLang = $lang;
+    if (!browser || !showWidget) return;
+    const container = document.getElementById('tg-widget');
+    if (!container) return;
     // Expose callback for Telegram widget
     (window as unknown as Record<string, unknown>).onTelegramAuth = onTelegramAuth;
 
@@ -76,10 +80,15 @@
     script.src = 'https://telegram.org/js/telegram-widget.js?22';
     script.setAttribute('data-telegram-login', PUBLIC_TELEGRAM_BOT_USERNAME);
     script.setAttribute('data-size', 'large');
+    script.setAttribute('data-lang', widgetLang);
     script.setAttribute('data-onauth', 'onTelegramAuth(user)');
     script.setAttribute('data-request-access', 'write');
     script.async = true;
-    document.getElementById('tg-widget')?.appendChild(script);
+    container.replaceChildren(script);
+    return () => {
+      container.replaceChildren();
+      delete (window as unknown as Record<string, unknown>).onTelegramAuth;
+    };
   });
 </script>
 
@@ -88,7 +97,7 @@
     <LogoCat size={72} />
     <h1>{$t.login.title}</h1>
 
-    {#if status === 'idle' || status === 'loading'}
+    {#if showWidget}
       <p class="subtitle">{$t.login.subtitle}</p>
       <div id="tg-widget" class="widget-wrap"></div>
       {#if status === 'loading'}

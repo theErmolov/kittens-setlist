@@ -10,7 +10,7 @@
   const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'saxophone', 'trumpet', 'percussion', 'vocals'];
 
   let saving = $state<string | null>(null);
-  let error = $state('');
+  let error = $state(false);
   let roleSelections = $state<Record<string, UserRole>>({});
   let approvalMusicianSelections = $state<Record<string, string>>({});
   let approvalMusicianNames = $state<Record<string, string>>({});
@@ -85,10 +85,6 @@
     users = loaded;
   }
 
-  function message(errorValue: unknown): string {
-    return errorValue instanceof Error ? errorValue.message : String(errorValue);
-  }
-
   function toggleApprovalInstrument(userId: string, instrument: Instrument) {
     const current = approvalMusicianInstruments[userId] ?? [];
     approvalMusicianInstruments[userId] = current.includes(instrument)
@@ -104,7 +100,7 @@
 
   async function setStatus(user: User, status: 'approved' | 'rejected') {
     saving = user.id;
-    error = '';
+    error = false;
     try {
       const patch: Parameters<typeof patchUser>[1] = {
         status,
@@ -122,8 +118,8 @@
       }
       await patchUser(user.id, patch);
       await refresh();
-    } catch (errorValue) {
-      error = message(errorValue);
+    } catch {
+      error = true;
     } finally {
       saving = null;
     }
@@ -131,13 +127,13 @@
 
   async function saveRole(user: User, role: UserRole) {
     saving = user.id;
-    error = '';
+    error = false;
     try {
       await patchUser(user.id, { role });
       await refresh();
-    } catch (errorValue) {
+    } catch {
       roleSelections[user.id] = user.role ?? 'reader';
-      error = message(errorValue);
+      error = true;
     } finally {
       saving = null;
     }
@@ -182,7 +178,7 @@
     if (!editorKind) return;
     const operationId = editorUserId ?? '__new__';
     saving = operationId;
-    error = '';
+    error = false;
     try {
       if (editorKind === 'standalone') {
         if (!draftName.trim()) return;
@@ -213,8 +209,8 @@
       }
       cancelEditor();
       await refresh();
-    } catch (errorValue) {
-      error = message(errorValue);
+    } catch {
+      error = true;
     } finally {
       saving = null;
     }
@@ -224,12 +220,12 @@
     const confirmation = user.telegramId ? $t.musicians.removeConfirm : $t.musicians.deleteConfirm;
     if (!confirm(confirmation)) return;
     saving = user.id;
-    error = '';
+    error = false;
     try {
       await deleteMusician(user.id);
       await refresh();
-    } catch (errorValue) {
-      error = message(errorValue);
+    } catch {
+      error = true;
     } finally {
       saving = null;
     }
@@ -257,12 +253,12 @@
     users = users.map(user => orderById.has(user.id) ? { ...user, sortOrder: orderById.get(user.id) } : user);
     dragId = null;
     dragOverId = null;
-    error = '';
+    error = false;
     try {
       await Promise.all(reordered.map((user, index) => updateMusician({ ...asMusician(user), sortOrder: index })));
       await refresh();
-    } catch (errorValue) {
-      error = message(errorValue);
+    } catch {
+      error = true;
       await refresh();
     }
   }
@@ -280,7 +276,7 @@
     <button class="btn primary" onclick={startStandaloneMusician}>{$t.musicians.addBtn}</button>
   </div>
 
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if error}<p class="error">{$t.common.requestFailed}</p>{/if}
 
   {#if editorKind === 'standalone'}
     <div class="standalone-editor">

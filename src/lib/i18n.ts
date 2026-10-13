@@ -16,6 +16,12 @@ const strings = {
   en: {
     common: {
       appTitle: 'Musical Kittens Control Center',
+      bandName: 'Musical Kittens',
+      brandLines: ['Musical', 'Kittens', 'Control Center'],
+      requestFailed: 'Could not complete the request. Please try again.',
+      invalidAmount: 'Enter an amount greater than zero.',
+      presenceOthers: 'Someone else is here',
+      presenceAlone: 'Only you here',
       themeToggle: 'Toggle theme',
       logout: 'Log out',
       close: 'Close',
@@ -34,6 +40,7 @@ const strings = {
       setlists: 'Setlists',
       musicians: 'Musicians',
       budget: 'Budget',
+      rehearsals: 'Rehearsals', admin: 'Admin', media: 'Media', mediaStorage: 'Media storage', antispam: 'Anti-spam',
     },
     musicians: {
       title: 'Musicians',
@@ -209,7 +216,7 @@ const strings = {
     },
     deleteConfirm: 'Delete this song?',
     login: {
-      title: 'Музыкальные Котятки',
+      title: 'Musical Kittens',
       subtitle: 'Log in with Telegram to continue',
       pending: 'Your account is pending approval.',
       pendingHint: 'Ask the admin to approve your access.',
@@ -252,7 +259,7 @@ const strings = {
       roleWriter: 'Writer',
       roleReader: 'Reader',
       auditEntities: {
-        song: 'Song', setlist: 'Setlist', musician: 'Musician', setlist_entry: 'Entry', user: 'User', rehearsal: 'Rehearsal',
+        song: 'Song', setlist: 'Setlist', musician: 'Musician', setlist_entry: 'Entry', user: 'User', rehearsal: 'Rehearsal', budget: 'Budget',
       },
     },
     budget: {
@@ -302,6 +309,12 @@ const strings = {
   ru: {
     common: {
       appTitle: 'Центр Управления Котят',
+      bandName: 'Музыкальные Котятки',
+      brandLines: ['Центр', 'управления', 'Котят'],
+      requestFailed: 'Не удалось выполнить запрос. Попробуйте ещё раз.',
+      invalidAmount: 'Введите сумму больше нуля.',
+      presenceOthers: 'Кто-то ещё здесь',
+      presenceAlone: 'Только вы здесь',
       themeToggle: 'Переключить тему',
       logout: 'Выйти',
       close: 'Закрыть',
@@ -320,6 +333,7 @@ const strings = {
       setlists: 'Сетлисты',
       musicians: 'Музыканты',
       budget: 'Бюджет',
+      rehearsals: 'Репетиции', admin: 'Админ', media: 'Медиа', mediaStorage: 'Медиахранилище', antispam: 'Антиспам',
     },
     musicians: {
       title: 'Музыканты',
@@ -542,7 +556,7 @@ const strings = {
       roleWriter: 'Редактор',
       roleReader: 'Читатель',
       auditEntities: {
-        song: 'Песня', setlist: 'Сетлист', musician: 'Музыкант', setlist_entry: 'Запись', user: 'Пользователь', rehearsal: 'Репетиция',
+        song: 'Песня', setlist: 'Сетлист', musician: 'Музыкант', setlist_entry: 'Запись', user: 'Пользователь', rehearsal: 'Репетиция', budget: 'Бюджет',
       },
     },
     budget: {
@@ -591,7 +605,7 @@ const strings = {
 };
 
 export const lang = writable<Lang>(
-  browser ? ((localStorage.getItem('lang') as Lang) ?? 'ru') : 'ru'
+  browser && localStorage.getItem('lang') === 'en' ? 'en' : 'ru'
 );
 
 lang.subscribe(l => {

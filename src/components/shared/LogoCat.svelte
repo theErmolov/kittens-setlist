@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n';
   let { size = 36 }: { size?: number } = $props();
 </script>
 
@@ -7,7 +8,7 @@
   height={size}
   viewBox="0 0 40 40"
   xmlns="http://www.w3.org/2000/svg"
-  aria-label="Музыкальные Котятки"
+  aria-label={$t.common.bandName}
 >
   <!-- Left ear -->
   <polygon points="6,19 3,5 15,15" fill="#6c63ff"/>
