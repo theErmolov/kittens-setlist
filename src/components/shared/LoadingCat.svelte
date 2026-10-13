@@ -8,7 +8,15 @@
 </span>
 
 <style>
-  .loading-cat { display: flex; width: 100%; justify-content: center; }
+  .loading-cat {
+    position: fixed;
+    left: 50%;
+    /* Centre in the viewport below the app's 56px navigation bar. */
+    top: calc(50dvh + 28px);
+    transform: translate(-50%, -50%);
+    display: flex;
+    pointer-events: none;
+  }
   .spinner { display: block; animation: spin 1.5s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) {
