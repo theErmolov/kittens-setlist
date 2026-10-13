@@ -1,4 +1,5 @@
 <script lang="ts">
+  import OnlineUsersPanel from './OnlineUsersPanel.svelte';
   import { browser } from '$app/environment';
   import { addMusician, deleteMusician, getUsers, patchUser, updateMusician } from '$lib/api';
   import { t } from '$lib/i18n';
@@ -269,6 +270,8 @@
     return $t.admin.approved;
   }
 </script>
+
+<OnlineUsersPanel />
 
 <section class="people-section">
   <div class="people-title">

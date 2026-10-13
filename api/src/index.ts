@@ -9,6 +9,7 @@ import { rehearsalsHandler } from './handlers/rehearsals.js';
 import { budgetHandler } from './handlers/budget.js';
 import { authHandler, resolveAuth } from './handlers/auth.js';
 import { presenceHandler } from './handlers/presence.js';
+import { onlinePresenceHandler } from './handlers/online-presence.js';
 import { personalCommentsHandler } from './handlers/personal-comments.js';
 import { err } from './lib/response.js';
 import type { User } from './lib/types.js';
@@ -60,6 +61,8 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     const method = event.requestContext.http.method;
     if (user.role !== 'writer' && !user.isAdmin && method !== 'GET' && !isPersonalComment && !isNotificationPreferences) return err('Forbidden', 403);
   }
+
+  if (path === '/online-presence') return onlinePresenceHandler(event, user);
 
   if (path === '/notification-preferences') return notificationPreferencesHandler(event, user!);
 

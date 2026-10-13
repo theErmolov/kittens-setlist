@@ -256,3 +256,8 @@ type RehearsalSongRef = { songId: string; sourceSetlistId?: string };
 // Approved users can manage their own personal rehearsal reminders.
 export const getNotificationPreferences = (): Promise<{ enabled: boolean }> => req('/notification-preferences');
 export const updateNotificationPreferences = (enabled: boolean): Promise<{ enabled: boolean }> => req('/notification-preferences', { method: 'PATCH', body: JSON.stringify({ enabled }) });
+
+/** Existing collaborative presence, listed only for admins. */
+export function getOnlinePresence(): Promise<PresenceEntry[]> {
+  return req('/online-presence', { signal: AbortSignal.timeout(10_000) });
+}
