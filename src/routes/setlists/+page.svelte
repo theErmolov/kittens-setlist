@@ -5,11 +5,15 @@
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
   import type { Setlist } from '$lib/types';
-  import { upcomingSetlists } from '$lib/rehearsals';
   import { canWrite } from '$lib/auth';
 
   let setlists = $state<Setlist[]>([]);
-  let sortedSetlists = $derived(upcomingSetlists(setlists));
+  let sortedSetlists = $derived([...setlists].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  }));
   let showNew = $state(false);
   let newName = $state('');
   let newDate = $state('');
