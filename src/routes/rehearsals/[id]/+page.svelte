@@ -98,7 +98,7 @@
   {#if loading}<p>{$rt.loading}</p>
   {:else if rehearsal}
     <header>
-      <div><h1>{formatDate(rehearsal.date, $lang)}</h1><div class="time">{rehearsal.startTime}{rehearsal.endTime ? `–${rehearsal.endTime}` : ''} <small>{rehearsal.timeZone}</small></div></div>
+      <div><h1>{formatDate(rehearsal.date, $lang)}</h1><div class="time">{rehearsal.startTime}</div></div>
       <button onclick={() => { repeating = false; showForm = true; }} disabled={busy}>{$rt.edit}</button>
     </header>
     {#if rehearsal.cancelled}<p class="cancelled">{$rt.cancelledHint}</p>{/if}
@@ -159,7 +159,7 @@
   .page { max-width: 820px; margin: 0 auto; padding: 22px 16px 48px; }
   .back { display: inline-block; margin-bottom: 22px; color: var(--text-muted); text-decoration: none; font-size: .85rem; }
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; } h1 { font-size: 1.5rem; margin: 0 0 8px; } h2 { font-size: 1rem; margin: 0; }
-  .time { font-size: 1.3rem; color: var(--accent); } .time small { color: var(--text-muted); font-size: .7rem; }
+  .time { font-size: 1.3rem; color: var(--accent); }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
   .primary, .chosen { background: var(--accent); color: #fff; border-color: var(--accent); }
   .location { font-size: 1rem; } .setlist { display: inline-block; color: var(--accent); font-size: .85rem; margin: 4px 0 10px; text-decoration: none; }

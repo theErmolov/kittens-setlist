@@ -241,7 +241,7 @@ export async function updateSetlistComment(setlistId: string, comment: string): 
   return req(`/setlists/${setlistId}/comment`, { method: 'PATCH', body: JSON.stringify({ comment }) });
 }
 
-// Rehearsals — admin-only, including reads.
+// Rehearsals — approved admins and writers only, including reads.
 export const getRehearsals = (): Promise<Rehearsal[]> => req('/rehearsals');
 export const getRehearsal = (id: string): Promise<Rehearsal> => req(`/rehearsals/${encodeURIComponent(id)}`);
 export const createRehearsal = (draft: RehearsalDraft, copyFromId?: string): Promise<Rehearsal> => req('/rehearsals', { method: 'POST', body: JSON.stringify({ ...draft, copyFromId }) });

@@ -9,10 +9,11 @@
     onsubmit: (draft: RehearsalDraft) => Promise<void>; onclose: () => void;
   } = $props();
   const seed = untrack(() => initial);
-  let date = $state(seed.date ?? localDate());
+  const formatInputDate = (iso: string) => iso.split('-').reverse().join('.');
+  let dateText = $state(formatInputDate(seed.date ?? localDate()));
+  const date = $derived(dateText.split('.').reverse().join('-'));
   let startTime = $state(seed.startTime ?? '19:00');
-  let endTime = $state(seed.endTime ?? '');
-  let timeZone = $state(seed.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const timeZone = seed.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   let location = $state(seed.location ?? '');
   let note = $state(seed.note ?? '');
   let setlistId = $state(seed.setlistId ?? '');
@@ -35,11 +36,11 @@
   async function save(event: SubmitEvent) {
     event.preventDefault(); if (busy) return;
     error = '';
-    if (endTime && endTime <= startTime) { error = $rt.endAfterStart; return; }
-    try { new Intl.DateTimeFormat('en', { timeZone }); } catch { error = $rt.invalidTimeZone; return; }
+    const parsed = new Date(`${date}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { error = $rt.invalidDate; return; }
     busy = true;
     try {
-      await onsubmit({ date, startTime, endTime: endTime || undefined, timeZone, location: location.trim() || undefined, note: note.trim() || undefined, setlistId: setlistId || undefined, attendees, songs: seed.songs ?? [], cancelled: seed.cancelled ?? false });
+      await onsubmit({ date, startTime, endTime: undefined, timeZone, location: location.trim() || undefined, note: note.trim() || undefined, setlistId: setlistId || undefined, attendees, songs: seed.songs ?? [], cancelled: seed.cancelled ?? false });
     } catch (e) { error = String(e).includes('409') ? $rt.conflict : $rt.saveError; }
     finally { busy = false; }
   }
@@ -51,11 +52,18 @@
     <form onsubmit={save}>
       <fieldset disabled={busy}>
         <div class="times">
-          <label>{$rt.date}<input type="date" bind:value={date} required /></label>
+          <div class="date-control">
+            <label for="rehearsal-date">{$rt.date}</label>
+            <div class="date-input">
+              <input id="rehearsal-date" type="text" inputmode="decimal" bind:value={dateText} placeholder="08.10.2026" pattern={'[0-9]{2}[.][0-9]{2}[.][0-9]{4}'} maxlength="10" required />
+              <span class="calendar-picker">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 11h18M8 3v4M16 3v4" /></svg>
+                <input class="native-date" type="date" value={date} aria-label={$rt.chooseDate} oninput={event => { if (event.currentTarget.value) dateText = formatInputDate(event.currentTarget.value); }} />
+              </span>
+            </div>
+          </div>
           <label>{$rt.start}<input type="time" bind:value={startTime} required /></label>
-          <label>{$rt.end}<input type="time" bind:value={endTime} min={startTime} /></label>
         </div>
-        <label>{$rt.timeZone}<input bind:value={timeZone} required /></label>
         <label>{$rt.location}<input bind:value={location} maxlength="500" /></label>
         <label>{$rt.setlist}
           <select bind:value={setlistId} onchange={() => { attendees = defaults(setlistId); }}>
@@ -85,7 +93,14 @@
   fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
   label { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; color: var(--text-muted); }
   input, select, textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--bg); color: var(--text); font: inherit; }
-  .times { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
+  .times { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+  .date-control { display: flex; flex-direction: column; gap: 6px; }
+  .date-input { position: relative; }
+  .date-input > input { padding-right: 44px; }
+  .calendar-picker { position: absolute; right: 0; top: 0; bottom: 0; width: 40px; display: grid; place-items: center; color: var(--text-muted); }
+  .calendar-picker:focus-within { outline: 2px solid var(--accent); border-radius: 7px; }
+  .native-date { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; padding: 0; cursor: pointer; }
+  .native-date::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--bg); color: var(--text); cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
   .attendees-header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

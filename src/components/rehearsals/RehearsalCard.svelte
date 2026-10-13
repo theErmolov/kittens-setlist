@@ -7,7 +7,7 @@
   let { rehearsal, setlistName }: { rehearsal: Rehearsal; setlistName?: string } = $props();
 </script>
 <a class="card" class:cancelled={rehearsal.cancelled} href="{base}/rehearsals/{rehearsal.id}">
-  <div class="date">{formatDate(rehearsal.date, $lang)} <span>{rehearsal.startTime}{rehearsal.endTime ? `–${rehearsal.endTime}` : ''}</span></div>
+  <div class="date">{formatDate(rehearsal.date, $lang)} <span>{rehearsal.startTime}</span></div>
   {#if rehearsal.cancelled}<strong class="status">{$rt.cancelled}</strong>{/if}
   {#if rehearsal.location}<div class="location">{rehearsal.location}</div>{/if}
   {#if setlistName}<div class="setlist">{setlistName}</div>{/if}

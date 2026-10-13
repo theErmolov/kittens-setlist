@@ -21,10 +21,10 @@ export function localDate(date = new Date()): string {
 
 export function isUpcoming(rehearsal: Rehearsal, now = new Date()): boolean {
   if (rehearsal.cancelled) return false;
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: rehearsal.timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: rehearsal.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const value = (type: string) => parts.find(p => p.type === type)!.value;
   const date = `${value('year')}-${value('month')}-${value('day')}`;
-  return rehearsal.date > date || (rehearsal.date === date && (rehearsal.endTime ?? '23:59') >= `${value('hour')}:${value('minute')}`);
+  return rehearsal.date >= date;
 }
 
 export function calendarDays(month: Date): Date[] {

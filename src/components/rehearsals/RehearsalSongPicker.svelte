@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { lang } from '$lib/i18n';
   import { modalDialog } from '$lib/modalDialog';
   import type { Rehearsal, RehearsalSong, Song, Setlist } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
@@ -15,7 +16,8 @@
   const candidates = $derived(source === 'setlist' && setlist
     ? [...setlist.entries].sort((a,b) => a.order - b.order).filter(e => e.song && e.songId).map(e => ({ songId: e.songId!, sourceSetlistId: setlist.id, song: { ...e.song!, progress: { ...(e.progress ?? {}), ...(e.song!.progress ?? {}), ...(!e.setlistOnly ? catalog.find(s => s.id === e.songId)?.progress ?? {} : {}) } } }))
     : catalog.filter(s => !s.archived).map(song => ({ songId: song.id, song })));
-  const visible = $derived(candidates.filter(item => `${item.song.artist} ${item.song.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())));
+  const visible = $derived(candidates.filter(item => `${item.song.artist} ${item.song.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+    .sort((a, b) => a.song.artist.localeCompare(b.song.artist, $lang, { sensitivity: 'base' }) || a.song.title.localeCompare(b.song.title, $lang, { sensitivity: 'base' })));
   function isSelected(item: RehearsalSong) { return selected.some(s => s.songId === item.songId); }
   function toggle(item: RehearsalSong) { selected = isSelected(item) ? selected.filter(s => s.songId !== item.songId) : [...selected, item]; }
   function selectMany(items: RehearsalSong[]) { for (const item of items) if (!isSelected(item)) selected = [...selected, item]; }
@@ -34,7 +36,7 @@
         <button class:active={source === 'catalog'} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog'}>{$rt.catalog}</button>
       </div>
       <input bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
-      <div class="shortcuts"><button onclick={() => selectMany(visible)}>{$rt.all}</button><button onclick={() => selectMany(visible.filter(s => { const pct = rehearsalReadiness(s.song, rehearsal.attendees); return pct !== null && pct < 100; }))}>{$rt.notReady}</button></div>
+      <div class="shortcuts"><button onclick={() => selectMany(visible)}>{$rt.allSongs}</button><button onclick={() => selectMany(visible.filter(s => { const pct = rehearsalReadiness(s.song, rehearsal.attendees); return pct !== null && pct < 100; }))}>{$rt.notReady}</button></div>
       <div class="songs">
         {#each visible as item (rehearsalSongKey(item))}
           {@const pct = rehearsalReadiness(item.song, rehearsal.attendees)}

@@ -21,10 +21,11 @@ test('calendar starts on Monday, includes month boundaries, and is stable across
   assert.equal(localDate(days.at(-1)), '2026-11-08');
   assert.equal(new Set(days.map(localDate)).size, 42);
 });
-test('upcoming uses the session time zone and end time, excludes cancelled sessions', () => {
+test('upcoming uses the session time zone and stays visible through its day, excluding cancelled sessions', () => {
   const r = { date: '2026-10-15', startTime: '19:00', endTime: '21:00', timeZone: 'Europe/Berlin', cancelled: false };
   assert.equal(isUpcoming(r, new Date('2026-10-15T18:30:00Z')), true);
-  assert.equal(isUpcoming(r, new Date('2026-10-15T19:01:00Z')), false);
+  assert.equal(isUpcoming(r, new Date('2026-10-15T19:01:00Z')), true);
+  assert.equal(isUpcoming(r, new Date('2026-10-15T22:00:00Z')), false);
   assert.equal(isUpcoming({ ...r, cancelled: true }, new Date('2026-10-14T10:00:00Z')), false);
   assert.equal(isUpcoming({ ...r, endTime: undefined }, new Date('2026-10-15T20:00:00Z')), true);
 });

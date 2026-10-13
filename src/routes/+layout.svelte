@@ -18,6 +18,7 @@
   // Seed from cache so the nav renders the right icon count on first paint.
   const cachedNavFlags = getCachedNavFlags();
   let navIsAdmin = $state(cachedNavFlags.isAdmin);
+  let navCanAccessRehearsals = $state(cachedNavFlags.canAccessRehearsals);
   let navLoggedIn = $state(cachedNavFlags.loggedIn);
 
   onMount(() => {
@@ -68,7 +69,8 @@
     const loggedIn = u !== null;
     navIsAdmin = isAdmin;
     navLoggedIn = loggedIn;
-    setCachedNavFlags({ isAdmin, loggedIn });
+    navCanAccessRehearsals = $canAccessRehearsals;
+    setCachedNavFlags({ isAdmin, loggedIn, canAccessRehearsals: $canAccessRehearsals });
   });
 
   function toggleTheme() {
@@ -111,7 +113,7 @@
   <a href="{base}/setlists" class="nav-link" class:active={path.startsWith('/setlists')}>
     <span class="link-icon">🎪{#if $presenceIndicator.scope === 'setlist' && $presenceIndicator.state !== 'off'}<span class="presence-dot" class:alone={$presenceIndicator.state === 'alone'} title={presenceTitle}></span>{/if}</span><span class="link-label">{$lang === 'ru' ? 'Сетлисты' : 'Setlists'}</span>
   </a>
-  {#if $authLoading ? navIsAdmin : $canAccessRehearsals}
+  {#if $authLoading ? navCanAccessRehearsals : $canAccessRehearsals}
     <a href="{base}/rehearsals" class="nav-link" class:active={path.startsWith('/rehearsals')}>
       <span class="link-icon">📅</span><span class="link-label">{$lang === 'ru' ? 'Репетиции' : 'Rehearsals'}</span>
     </a>

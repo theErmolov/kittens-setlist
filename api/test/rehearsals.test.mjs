@@ -74,9 +74,9 @@ async function request(method, path, body, user = 'admin') {
 }
 const create = async data => (await request('POST', '/rehearsals', data ?? draft)).body;
 
-test('every rehearsal operation is admin-only, including list/detail reads', async () => {
+test('readers, pending users and anonymous users cannot access rehearsal operations', async () => {
   const created = await create();
-  for (const user of ['writer', 'reader', 'pending', null]) {
+  for (const user of ['reader', 'pending', null]) {
     for (const [method, path, body] of [['GET', '/rehearsals'], ['GET', `/rehearsals/${created.id}`], ['POST', '/rehearsals', draft], ['PUT', `/rehearsals/${created.id}`, created], ['DELETE', `/rehearsals/${created.id}`, { version: 1 }], ['PATCH', `/rehearsals/${created.id}/progress`, { songId: 's1', stage: 'ready', musicianName: 'Bass' }]]) {
       assert.equal((await request(method, path, body, user)).status, user === null ? 401 : 403);
     }
@@ -189,4 +189,18 @@ test('repeat retains saved arrangements even after the linked setlist was delete
   assert.equal(repeated.body.songs[1].song.title, only.title);
   assert.equal(repeated.body.songs[1].sourceMissing, true);
   assert.equal(repeated.body.version, 1);
+});
+
+
+test('approved writers can create, read, edit, update progress and delete rehearsals', async () => {
+  const created = await request('POST', '/rehearsals', draft, 'writer');
+  assert.equal(created.status, 201);
+  const path = `/rehearsals/${created.body.id}`;
+  assert.equal((await request('GET', path, undefined, 'writer')).status, 200);
+  assert.equal((await request('GET', '/rehearsals', undefined, 'writer')).body.length, 1);
+  const updated = await request('PUT', path, { ...created.body, location: 'Writer studio' }, 'writer');
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.location, 'Writer studio');
+  assert.equal((await request('PATCH', `${path}/progress`, { songId: 's1', sourceSetlistId: 'show', musicianName: 'Bass', stage: 'ready' }, 'writer')).status, 200);
+  assert.equal((await request('DELETE', path, { version: updated.body.version }, 'writer')).status, 200);
 });

@@ -75,8 +75,8 @@ async function parseDraft(body: Record<string, unknown>, before?: Rehearsal): Pr
   return { date, startTime, endTime: endTime || undefined, timeZone, location: text(body.location, 'location', 500) || undefined, note: text(body.note, 'note') || undefined, setlistId, attendees, songs, cancelled: body.cancelled === true };
 }
 
-// Explicit admin-only policy, independent of deployment/release status.
-export function canAccessRehearsals(user: User | null): boolean { return user?.isAdmin === true && user.status === 'approved'; }
+// Readers have no rehearsal access, including reads.
+export function canAccessRehearsals(user: User | null): boolean { return user?.status === 'approved' && (user.isAdmin === true || user.role === 'writer'); }
 export async function rehearsalsHandler(event: APIGatewayProxyEventV2, path: string, user: User) {
   if (!canAccessRehearsals(user)) return err('Forbidden', 403);
   const method = event.requestContext.http.method;

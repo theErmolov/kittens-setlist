@@ -28,25 +28,29 @@ export function clearToken(): void {
 // mobile where links are flex:1 and the admin/logout chrome appears late).
 const NAV_ADMIN_KEY = 'kittens_nav_admin';
 const NAV_LOGGED_IN_KEY = 'kittens_nav_logged_in';
+const NAV_REHEARSALS_KEY = 'kittens_nav_rehearsals';
 
-export function getCachedNavFlags(): { isAdmin: boolean; loggedIn: boolean } {
-  if (!browser) return { isAdmin: false, loggedIn: false };
+export function getCachedNavFlags(): { isAdmin: boolean; loggedIn: boolean; canAccessRehearsals: boolean } {
+  if (!browser) return { isAdmin: false, loggedIn: false, canAccessRehearsals: false };
   return {
     isAdmin: localStorage.getItem(NAV_ADMIN_KEY) === '1',
     loggedIn: localStorage.getItem(NAV_LOGGED_IN_KEY) === '1',
+    canAccessRehearsals: localStorage.getItem(NAV_REHEARSALS_KEY) === '1' || localStorage.getItem(NAV_ADMIN_KEY) === '1',
   };
 }
 
-export function setCachedNavFlags({ isAdmin, loggedIn }: { isAdmin: boolean; loggedIn: boolean }): void {
+export function setCachedNavFlags({ isAdmin, loggedIn, canAccessRehearsals }: { isAdmin: boolean; loggedIn: boolean; canAccessRehearsals: boolean }): void {
   if (!browser) return;
   localStorage.setItem(NAV_ADMIN_KEY, isAdmin ? '1' : '0');
   localStorage.setItem(NAV_LOGGED_IN_KEY, loggedIn ? '1' : '0');
+  localStorage.setItem(NAV_REHEARSALS_KEY, canAccessRehearsals ? '1' : '0');
 }
 
 export function clearNavCache(): void {
   if (!browser) return;
   localStorage.removeItem(NAV_ADMIN_KEY);
   localStorage.removeItem(NAV_LOGGED_IN_KEY);
+  localStorage.removeItem(NAV_REHEARSALS_KEY);
 }
 
 /** Fetch /auth/me and populate currentUser. Call once on app init. */
@@ -92,8 +96,8 @@ export async function logout(): Promise<void> {
   currentUser.set(null);
 }
 
-/** Rehearsals stay admin-only until explicitly extended to writers. */
-export const canAccessRehearsals = derived(currentUser, $u => $u?.isAdmin === true && $u.status === 'approved');
+/** Approved admins and writers can view and manage rehearsals. */
+export const canAccessRehearsals = derived(currentUser, $u => $u?.status === 'approved' && ($u.isAdmin === true || $u.role === 'writer'));
 
 export function isAdmin(): boolean {
   return get(currentUser)?.isAdmin === true;
