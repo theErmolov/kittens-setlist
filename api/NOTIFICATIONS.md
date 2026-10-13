@@ -73,8 +73,8 @@ via TTL; each user's preference/latest control pointer does not expire.
 - Digests read live learning progress, include only assigned attending musicians,
   and deduplicate songs. Queue/structure → learn; mastering → polish; ready is
   included only when `RehearsalSong.refreshFor` explicitly names the musician.
-  This refresh marker is independent of progress, and is editable in song details.
-  Explicit requests can return “nothing to prepare”; automatic empty digests skip.
+  This legacy refresh marker is independent of progress; the song-details checkbox has been removed.
+  Empty explicit requests show “Всё готово — учить ничего не нужно.” in a Telegram modal without sending a private message; automatic empty digests skip.
   Readers get a catalog link; rehearsal access rules remain enforced by the app.
 
 ## Rollout reset

@@ -337,6 +337,20 @@ test('truncated song quote stays quoted and ends before the footer', async () =>
   assert.ok(payload.entities[0].offset + payload.entities[0].length < payload.text.indexOf('Полный список'));
 });
 
+test('empty preparation requests show a modal without sending or changing personal controls', async () => {
+  put('kittens-rehearsals', rehearsal());
+  put('kittens-songs', { ...song, progress: { ...song.progress, Bass: 'ready' } });
+  put('kittens-notifications', { id: 'preference:100', enabled: false, latestMessageId: 42, latestRehearsalId: 'r' });
+  await handleReminderCallback(callback('empty-request', 'prep:r'), now);
+  assert.equal(messages('100').length, 0);
+  assert.equal(calls.filter(c => c.method === 'editMessageReplyMarkup').length, 0);
+  assert.equal(state('preference:100').latestMessageId, 42);
+  assert.equal(state('request:100:r'), undefined);
+  const ack = calls.find(c => c.method === 'answerCallbackQuery').payload;
+  assert.equal(ack.show_alert, true);
+  assert.equal(ack.text, 'Всё готово — учить ничего не нужно.');
+});
+
 test('readers can request songs silently, use stop/resume and manage their own preference', async () => {
   put('kittens-rehearsals', rehearsal());
   const reader = { ...admin, id: 'reader', telegramId: '400', isAdmin: false, role: 'reader', musicianName: 'Keys' };

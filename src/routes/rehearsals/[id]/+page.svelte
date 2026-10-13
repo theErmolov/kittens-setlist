@@ -22,6 +22,7 @@
   let expanded = $state<string | null>(null), lyrics = $state<Song | null>(null);
   let notes = $state<Record<string, string>>({});
   const id = $derived(page.params.id!);
+  const sortedSongs = $derived([...(rehearsal?.songs ?? [])].sort((a, b) => a.song.artist.localeCompare(b.song.artist, 'en', { sensitivity: 'base' }) || a.song.title.localeCompare(b.song.title, 'en', { sensitivity: 'base' })));
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
   const formInitial = $derived(rehearsal ? { ...rehearsal, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
@@ -69,10 +70,6 @@
     if (!rehearsal) return;
     action({ attendees: rehearsal.attendees.includes(name) ? rehearsal.attendees.filter(n => n !== name) : [...rehearsal.attendees, name] });
   }
-  function move(index: number, delta: number) {
-    if (!rehearsal) return;
-    const songs = [...rehearsal.songs]; [songs[index], songs[index + delta]] = [songs[index + delta], songs[index]]; action({ songs });
-  }
   async function progress(item: RehearsalSong, name: string, stage: LearningStage) {
     if (!rehearsal || busy) return;
     busy = true; error = '';
@@ -82,12 +79,6 @@
       catalog = catalog.map(song => song.id === item.songId ? { ...song, progress: { ...(song.progress ?? {}), [name]: stage } } : song);
     } catch { error = $rt.progressError; }
     finally { busy = false; }
-  }
-  async function refresh(item: RehearsalSong, name: string, input: HTMLInputElement) {
-    if (!rehearsal) return;
-    const names = item.refreshFor ?? [];
-    await action({ songs: rehearsal.songs.map(song => rehearsalSongKey(song) === rehearsalSongKey(item) ? { ...song, refreshFor: names.includes(name) ? names.filter(n => n !== name) : [...names, name] } : song) });
-    input.checked = rehearsal.songs.find(song => rehearsalSongKey(song) === rehearsalSongKey(item))?.refreshFor?.includes(name) ?? false;
   }
   async function toggleCancelled() { if (rehearsal && (rehearsal.cancelled || confirm($rt.cancelConfirm))) await action({ cancelled: !rehearsal.cancelled }); }
   async function remove() {
@@ -120,7 +111,7 @@
     <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><button class="primary" onclick={() => { showPicker = true; }} disabled={busy || rehearsal.cancelled}>+ {$rt.addSongs}</button></div>
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
-    {#each rehearsal.songs as item, index (rehearsalSongKey(item))}
+    {#each sortedSongs as item (rehearsalSongKey(item))}
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, rehearsal.attendees)}
       {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !rehearsal!.attendees.includes(name))}
@@ -128,7 +119,6 @@
         <div class="song-row">
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><strong>{item.song.title}</strong><small>{item.song.artist}</small></button>
           <span class="pct" style={pct !== null ? pctBubbleStyle(pct) : ''} title={$rt.sessionReadiness}>{pct !== null ? `${pct}%` : '—'}</span>
-          <div class="order"><button aria-label={$rt.up} onclick={() => move(index, -1)} disabled={busy || rehearsal.cancelled || index === 0}>↑</button><button aria-label={$rt.down} onclick={() => move(index, 1)} disabled={busy || rehearsal.cancelled || index === rehearsal!.songs.length - 1}>↓</button></div>
         </div>
         {#if pct === null}<p class="song-hint">{$rt.noPlayers}</p>{/if}
         {#if missing.length}<p class="song-hint">{$rt.missing}: {missing.join(', ')}</p>{/if}
@@ -142,7 +132,6 @@
               <div class="musician" class:absent={!rehearsal.attendees.includes(name)}><span>{name} <small>{role.instruments.map(i => INSTRUMENT_ICONS[i]).join(' ')}</small></span>
                 <LearningProgress {name} value={item.song.progress?.[name] ?? 'queue'} onchange={stage => progress(item, name, stage)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name) || (item.sourceMissing && !catalog.some(s => s.id === item.songId))} />
               </div>
-              <label class="refresh-setting"><input type="checkbox" checked={item.refreshFor?.includes(name) ?? false} onchange={event => refresh(item, name, event.currentTarget)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name)} /> {$rt.refresh} · {name}</label>
             {/each}
             {#if item.song.comment}<p class="note muted">{item.song.comment}</p>{/if}
             <label class="note-label">{$rt.songNote}<textarea bind:value={notes[songKey]} maxlength="4000" rows="2" disabled={busy || rehearsal.cancelled}></textarea></label>
@@ -164,7 +153,6 @@
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
-  .refresh-setting { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .85rem; color: var(--text-muted); }
   .loading { padding: 40px 20px; }
   .page { max-width: 820px; margin: 0 auto; padding: 22px 16px 48px; }
   .back { display: inline-block; margin-bottom: 22px; color: var(--text-muted); text-decoration: none; font-size: .85rem; }
@@ -179,7 +167,7 @@
   .song-list { display: flex; flex-direction: column; gap: 10px; } .song { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
   .song-title { flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; } .song-title strong { font-size: .95rem; } .song-title small { display: block; font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-  .pct { padding: 5px 8px; border-radius: 12px; font-size: .8rem; font-weight: 650; flex-shrink: 0; } .order { display: flex; gap: 4px; } .order button { padding: 5px 8px; }
+  .pct { padding: 5px 8px; border-radius: 12px; font-size: .8rem; font-weight: 650; flex-shrink: 0; }
   .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 14px 9px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 14px 12px; overflow-wrap: anywhere; }
   .details { padding: 14px; border-top: 1px solid var(--border); } .details > p:first-child { margin-top: 0; }
   .musician { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; font-size: .85rem; } .musician small { margin-left: 5px; } .absent { opacity: .5; }
@@ -188,5 +176,5 @@
   .detail-actions, footer { display: flex; gap: 8px; flex-wrap: wrap; } .detail-actions { margin-top: 10px; } footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
   .danger { color: #dc2626; } .empty { color: var(--text-muted); padding: 22px 0; } .cancelled { padding: 12px; border-radius: 8px; background: var(--bg); color: var(--text-muted); }
   .error { color: #dc2626; padding: 12px 0; font-size: .85rem; }
-  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } .order { flex-direction: column; } textarea { font-size: 16px; } .musician { flex-wrap: wrap; } .song-heading .primary { font-size: .75rem; } }
+  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } textarea { font-size: 16px; } .musician { flex-wrap: wrap; } .song-heading .primary { font-size: .75rem; } }
 </style>

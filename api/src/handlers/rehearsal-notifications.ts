@@ -71,7 +71,7 @@ async function sendPersonal(user: User & { telegramId: string }, rehearsals: Reh
   if (!user.musicianName) return 'empty';
   const live = await Promise.all(rehearsals.map(r => hydrate(r)));
   const digest = preparationText(live, user.musicianName, now);
-  if (!digest.hasWork && !requested) return 'empty';
+  if (!digest.hasWork) return 'empty';
   const preference = await getState(preferenceId(user.telegramId));
   if (!requested && preference?.enabled === false) return 'empty';
   if (!await removePreviousControl(user, preference?.latestMessageId, preference?.latestRehearsalId)) return 'rejected';
@@ -142,8 +142,8 @@ interface Callback {
   id: string; from: { id: number }; data?: string;
   message?: { message_id: number; chat: { id: number; type: string }; reply_markup?: { inline_keyboard: InlineButton[][] } };
 }
-async function answer(callback: Callback, text = '') {
-  await telegramCall('answerCallbackQuery', { callback_query_id: callback.id, ...(text ? { text } : {}), show_alert: false });
+async function answer(callback: Callback, text = '', showAlert = false) {
+  await telegramCall('answerCallbackQuery', { callback_query_id: callback.id, ...(text ? { text } : {}), show_alert: showAlert });
 }
 export async function handleReminderCallback(callback: Callback, now = Date.now()): Promise<void> {
   const telegramId = String(callback.from.id);
@@ -177,6 +177,10 @@ export async function handleReminderCallback(callback: Callback, now = Date.now(
   const id = `callback:${callback.id}`;
   if (!await claimDelivery(id, now)) { await answer(callback); return; }
   const result = await sendPersonal(user, relevant, now, true);
+  if (result === 'empty') {
+    await answer(callback, 'Всё готово — учить ничего не нужно.', true);
+    return;
+  }
   if (result === 'sent') {
     for (const r of relevant) await setStateFields(requestKey(telegramId, r), { lastRequestedAt: now, expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 });
     await answer(callback);
