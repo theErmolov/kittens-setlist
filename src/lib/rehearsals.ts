@@ -32,3 +32,24 @@ export function calendarDays(month: Date): Date[] {
   start.setDate(start.getDate() - (start.getDay() + 6) % 7);
   return Array.from({ length: 42 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index));
 }
+
+/** Date-only events remain candidates throughout their day. */
+function eventTime(setlist: Setlist): string {
+  return `${setlist.date}T${setlist.startTime || '23:59'}`;
+}
+
+export function closestUpcomingSetlist(setlists: Setlist[], date: string, time: string): Setlist | undefined {
+  const from = `${date}T${time}`;
+  return setlists.filter(s => s.date && eventTime(s) >= from)
+    .sort((a, b) => eventTime(a).localeCompare(eventTime(b)) || a.name.localeCompare(b.name))[0];
+}
+
+/** Today's and future events in date order; undated setlists last. */
+export function upcomingSetlists(setlists: Setlist[], today = localDate()): Setlist[] {
+  return setlists.filter(s => !s.date || s.date >= today).sort((a, b) => {
+    if (!a.date && !b.date) return a.name.localeCompare(b.name);
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return eventTime(a).localeCompare(eventTime(b)) || a.name.localeCompare(b.name);
+  });
+}

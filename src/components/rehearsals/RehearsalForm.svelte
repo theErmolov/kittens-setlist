@@ -1,9 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { lang } from '$lib/i18n';
+  import { formatDate } from '$lib/utils';
   import { modalDialog } from '$lib/modalDialog';
   import type { RehearsalDraft, Setlist, BandMusician } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { localDate, setlistParticipants } from '$lib/rehearsals';
+  import { localDate, setlistParticipants, closestUpcomingSetlist, upcomingSetlists } from '$lib/rehearsals';
   let { initial = {}, title, setlists, musicians, onsubmit, onclose }: {
     initial?: Partial<RehearsalDraft>; title?: string; setlists: Setlist[]; musicians: BandMusician[];
     onsubmit: (draft: RehearsalDraft) => Promise<void>; onclose: () => void;
@@ -16,7 +18,10 @@
   const timeZone = seed.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   let location = $state(seed.location ?? '');
   let note = $state(seed.note ?? '');
-  let setlistId = $state(seed.setlistId ?? '');
+  let autoSelect = $state(seed.setlistId === undefined && seed.attendees === undefined && seed.songs === undefined);
+  let attendanceTouched = $state(false);
+  let setlistId = $state(seed.setlistId ?? untrack(() => autoSelect ? closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '' : ''));
+  const sortedSetlists = $derived(upcomingSetlists(setlists));
   const defaults = (id: string) => {
     const setlist = setlists.find(s => s.id === id);
     return setlist ? setlistParticipants(setlist) : musicians.filter(m => !m.guest).map(m => m.name);
@@ -27,10 +32,20 @@
   let busy = $state(false);
   let error = $state('');
   const names = $derived([...new Set([...defaults(setlistId), ...attendees, ...guests])]);
-  function toggle(name: string) { attendees = attendees.includes(name) ? attendees.filter(n => n !== name) : [...attendees, name]; }
+  $effect(() => {
+    if (!autoSelect || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const next = closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '';
+    untrack(() => {
+      if (setlistId === next) return;
+      setlistId = next;
+      if (!attendanceTouched) attendees = defaults(next);
+    });
+  });
+  function toggle(name: string) { attendanceTouched = true; attendees = attendees.includes(name) ? attendees.filter(n => n !== name) : [...attendees, name]; }
   function addGuest() {
     const name = guest.trim();
     if (!name) return;
+    attendanceTouched = true;
     guests = [...new Set([...guests, name])]; attendees = [...new Set([...attendees, name])]; guest = '';
   }
   async function save(event: SubmitEvent) {
@@ -66,13 +81,16 @@
         </div>
         <label>{$rt.location}<input bind:value={location} maxlength="500" /></label>
         <label>{$rt.setlist}
-          <select bind:value={setlistId} onchange={() => { attendees = defaults(setlistId); }}>
+          <select bind:value={setlistId} onchange={() => { autoSelect = false; attendanceTouched = false; attendees = defaults(setlistId); }}>
             <option value="">{$rt.noSetlist}</option>
-            {#if setlistId && !setlists.some(s => s.id === setlistId)}<option value={setlistId}>{$rt.unavailableSetlist}</option>{/if}
-            {#each setlists as setlist}<option value={setlist.id}>{setlist.name}</option>{/each}
+            {#if setlistId && !sortedSetlists.some(s => s.id === setlistId)}
+              {@const current = setlists.find(s => s.id === setlistId)}
+              <option value={setlistId} disabled>{current ? `${current.name}${current.date ? ` · ${formatDate(current.date, $lang)}` : ''}` : $rt.unavailableSetlist}</option>
+            {/if}
+            {#each sortedSetlists as setlist}<option value={setlist.id}>{setlist.name}{setlist.date ? ` · ${formatDate(setlist.date, $lang)}` : ''}</option>{/each}
           </select>
         </label>
-        <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => { attendees = [...names]; }}>{$rt.all}</button><button type="button" onclick={() => { attendees = []; }}>{$rt.none}</button></div>
+        <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => { attendanceTouched = true; attendees = [...names]; }}>{$rt.all}</button><button type="button" onclick={() => { attendanceTouched = true; attendees = []; }}>{$rt.none}</button></div>
         <p class="hint">{$rt.attendeesHint}</p>
         <div class="chips">
           {#each names as name}<button type="button" class:chosen={attendees.includes(name)} aria-pressed={attendees.includes(name)} onclick={() => toggle(name)}>{name}{attendees.includes(name) ? ' ✓' : ''}</button>{/each}
