@@ -1,14 +1,15 @@
 <script lang="ts">
+  import LearningProgress from '$components/shared/LearningProgress.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
   import { authLoading, canAccessRehearsals } from '$lib/auth';
-  import { lang, t } from '$lib/i18n';
+  import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { getRehearsal, getSetlists, getSongs, getMusicians, updateRehearsal, createRehearsal, deleteRehearsal, updateRehearsalProgress } from '$lib/api';
   import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants } from '$lib/rehearsals';
-  import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle } from '$lib/utils';
+  import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, BandMusician, LearningStage } from '$lib/types';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
   import RehearsalSongPicker from '$components/rehearsals/RehearsalSongPicker.svelte';
@@ -22,7 +23,7 @@
   let notes = $state<Record<string, string>>({});
   const id = $derived(page.params.id!);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
-  const attendeeOptions = $derived([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])]);
+  const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
   const formInitial = $derived(rehearsal ? { ...rehearsal, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
   $effect(() => {
     if ($authLoading) return;
@@ -122,7 +123,7 @@
     {#each rehearsal.songs as item, index (rehearsalSongKey(item))}
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, rehearsal.attendees)}
-      {@const missing = Object.keys(item.song.musicians).filter(name => item.song.musicians[name].instruments.length && !rehearsal!.attendees.includes(name))}
+      {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !rehearsal!.attendees.includes(name))}
       <article class="song">
         <div class="song-row">
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><strong>{item.song.title}</strong><small>{item.song.artist}</small></button>
@@ -136,12 +137,11 @@
           <div class="details">
             <p class="muted">{$rt.fullReadiness}: {rehearsalReadiness(item.song) ?? '—'}{rehearsalReadiness(item.song) !== null ? '%' : ''}</p>
             {#if item.sourceMissing}<p class="muted">{$rt.sourceMissing}</p>{/if}
-            {#each Object.entries(item.song.musicians).filter(([, role]) => role.instruments.length) as [name, role]}
-              <label class="musician" class:absent={!rehearsal.attendees.includes(name)}><span>{name} <small>{role.instruments.map(i => INSTRUMENT_ICONS[i]).join(' ')}</small></span>
-                <select value={item.song.progress?.[name] ?? 'queue'} aria-label={`${name} · ${$t.song.progress}`} onchange={event => progress(item, name, event.currentTarget.value as LearningStage)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name) || (item.sourceMissing && !catalog.some(s => s.id === item.songId))}>
-                  {#each ['queue', 'structure', 'mastering', 'ready'] as stage}<option value={stage}>{$t.progress[stage as LearningStage]}</option>{/each}
-                </select>
-              </label>
+            {#each orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length) as name}
+              {@const role = item.song.musicians[name]}
+              <div class="musician" class:absent={!rehearsal.attendees.includes(name)}><span>{name} <small>{role.instruments.map(i => INSTRUMENT_ICONS[i]).join(' ')}</small></span>
+                <LearningProgress {name} value={item.song.progress?.[name] ?? 'queue'} onchange={stage => progress(item, name, stage)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name) || (item.sourceMissing && !catalog.some(s => s.id === item.songId))} />
+              </div>
               <label class="refresh-setting"><input type="checkbox" checked={item.refreshFor?.includes(name) ?? false} onchange={event => refresh(item, name, event.currentTarget)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name)} /> {$rt.refresh} · {name}</label>
             {/each}
             {#if item.song.comment}<p class="note muted">{item.song.comment}</p>{/if}
@@ -183,10 +183,10 @@
   .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 14px 9px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 14px 12px; overflow-wrap: anywhere; }
   .details { padding: 14px; border-top: 1px solid var(--border); } .details > p:first-child { margin-top: 0; }
   .musician { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; font-size: .85rem; } .musician small { margin-left: 5px; } .absent { opacity: .5; }
-  select, textarea { border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); padding: 8px; font: inherit; }
+  textarea { border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); padding: 8px; font: inherit; }
   .note-label { display: flex; flex-direction: column; gap: 8px; font-size: .8rem; margin-top: 18px; color: var(--text-muted); }
   .detail-actions, footer { display: flex; gap: 8px; flex-wrap: wrap; } .detail-actions { margin-top: 10px; } footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
   .danger { color: #dc2626; } .empty { color: var(--text-muted); padding: 22px 0; } .cancelled { padding: 12px; border-radius: 8px; background: var(--bg); color: var(--text-muted); }
   .error { color: #dc2626; padding: 12px 0; font-size: .85rem; }
-  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } .order { flex-direction: column; } select, textarea { font-size: 16px; } .musician { flex-wrap: wrap; } .song-heading .primary { font-size: .75rem; } }
+  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } .order { flex-direction: column; } textarea { font-size: 16px; } .musician { flex-wrap: wrap; } .song-heading .primary { font-size: .75rem; } }
 </style>

@@ -50,8 +50,8 @@ export function preparationGroups(rehearsals: Rehearsal[], interval = HOUR): Pre
 export function reminderDue(group: PreparationGroup, now: number): boolean {
   return now >= group.due && now <= group.deadline;
 }
-export function personalTrialAllowed(user?: User | null): user is User & { telegramId: string } {
-  return user?.status === 'approved' && user.isAdmin === true && Boolean(user.telegramId);
+export function personalNotificationsAllowed(user?: User | null): user is User & { telegramId: string } {
+  return user?.status === 'approved' && Boolean(user.telegramId);
 }
 export function rehearsalLabelText(r: Rehearsal): NotificationText {
   const date = new Intl.DateTimeFormat('ru-RU', { timeZone: r.timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(rehearsalStart(r));

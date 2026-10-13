@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { lang } from '$lib/i18n';
-  import { formatDate } from '$lib/utils';
+  import { orderMusicianNames, formatDate } from '$lib/utils';
   import { modalDialog } from '$lib/modalDialog';
   import type { RehearsalDraft, Setlist, BandMusician } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
@@ -31,7 +31,7 @@
   let guest = $state('');
   let busy = $state(false);
   let error = $state('');
-  const names = $derived([...new Set([...defaults(setlistId), ...attendees, ...guests])]);
+  const names = $derived(orderMusicianNames([...new Set([...defaults(setlistId), ...attendees, ...guests])], musicians));
   $effect(() => {
     if (!autoSelect || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     const next = closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '';

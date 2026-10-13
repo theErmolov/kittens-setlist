@@ -5,6 +5,7 @@ import plan from '../dist/lib/rehearsal-reminder-plan.js';
 import notifications from '../dist/handlers/rehearsal-notifications.js';
 import preferences from '../dist/handlers/notification-preferences.js';
 import telegram from '../dist/lib/telegram.js';
+import entrypoint from '../dist/index.js';
 const { HOUR, preparationGroups, preparationText, rehearsalStart, zonedTime, morningAfter } = plan;
 const { runRehearsalNotifications, handleReminderCallback, rehearsalNotificationsHandler } = notifications;
 const originalSend = dynamo.db.send, originalFetch = globalThis.fetch;
@@ -12,7 +13,7 @@ const tables = new Map();
 const calls = [];
 let nextMessage, failure;
 const table = name => { if (!tables.has(name)) tables.set(name, new Map()); return tables.get(name); };
-const put = (name, item) => table(name).set(item.id, structuredClone(item));
+const put = (name, item) => table(name).set(item.id ?? item.token, structuredClone(item));
 const state = id => table('kittens-notifications').get(id);
 const conditionFailure = () => { const error = new Error('Conditional failure'); error.name = 'ConditionalCheckFailedException'; throw error; };
 dynamo.db.send = async command => {
@@ -24,7 +25,7 @@ dynamo.db.send = async command => {
     input.TransactItems.forEach(item => put(item.Put.TableName, item.Put.Item)); return {};
   }
   const values = input.ExpressionAttributeValues ?? {}, names = input.ExpressionAttributeNames ?? {};
-  const current = table(input.TableName).get((input.Key ?? input.Item)?.id);
+  const current = table(input.TableName).get((input.Key ?? input.Item)?.id ?? input.Key?.token);
   const expressions = [input.UpdateExpression, input.ConditionExpression, input.KeyConditionExpression].filter(Boolean).join(' ');
   for (const key of Object.keys(values)) assert.ok(expressions.includes(key), `Unused ${key}`);
   for (const key of Object.keys(names)) assert.ok(expressions.includes(key), `Unused ${key}`);
@@ -55,6 +56,7 @@ function callback(id, data, user = 100, messageId = 20, privateChat = false) {
   return { id, data, from: { id: user }, message: { message_id: messageId, chat: { id: privateChat ? user : -1003138570084, type: privateChat ? 'private' : 'supergroup' }, reply_markup: { inline_keyboard: [[{ text: 'Open', url: 'https://kittens.band/rehearsals/r' }], [{ text: 'Stop notifications', callback_data: 'notify:stop' }]] } } };
 }
 beforeEach(() => {
+  delete process.env.NOTIFICATION_DELIVERY_VERSION;
   tables.clear(); calls.length = 0; nextMessage = 1000; failure = undefined;
   process.env.REMINDER_CHECK_MINUTES = '60'; process.env.TELEGRAM_BOT_TOKEN = 'test-only'; process.env.REHEARSAL_GROUP_CHAT_ID = '-1003138570084';
   put('kittens-people', { id: '__people_control__', activeStore: 'people' });
@@ -103,12 +105,14 @@ test('announcement waits strictly more than an hour, reads current details and s
   await runRehearsalNotifications(now + HOUR);
   assert.equal(messages('-1003138570084').length, 1);
 });
-test('scheduled personal delivery is approved-admin-only and repeated ticks do not resend', async () => {
+test('scheduled personal delivery reaches approved writers/readers and repeated ticks do not resend', async () => {
   put('kittens-rehearsals', rehearsal());
   put('kittens-people', { ...admin, id: 'pending', telegramId: '300', status: 'pending' });
+  put('kittens-people', { ...admin, id: 'reader', telegramId: '400', isAdmin: false, role: 'reader', musicianName: 'Keys' });
   await runRehearsalNotifications(now);
   assert.equal(messages('100').length, 1);
-  assert.equal(messages('200').length, 0);
+  assert.equal(messages('200').length, 1);
+  assert.equal(messages('400').length, 1);
   assert.equal(messages('300').length, 0);
   await runRehearsalNotifications(now + HOUR);
   assert.equal(messages('100').length, 1);
@@ -138,9 +142,10 @@ test('manual request immediately sends latest progress; 48h cutoff is strict and
     assert.equal(messages('100').length, hours === 48 ? 0 : 1);
   }
 });
-test('group request by nonadmin, wrong chat, cancelled, past or absent user sends no private message', async () => {
+test('group request by pending user, wrong chat, cancelled, past or absent user sends no private message', async () => {
   put('kittens-rehearsals', rehearsal());
-  await handleReminderCallback(callback('writer', 'prep:r', 200), now);
+  put('kittens-people', { ...admin, id: 'pending', telegramId: '300', status: 'pending' });
+  await handleReminderCallback(callback('pending', 'prep:r', 300), now);
   await handleReminderCallback(callback('wrong', 'prep:r', 100, 20, true), now);
   put('kittens-rehearsals', rehearsal('r', undefined, undefined, { cancelled: true }));
   await handleReminderCallback(callback('cancelled', 'prep:r'), now);
@@ -218,14 +223,14 @@ test('logistical edits, cancellation, restoration and deletion notify announced 
   await runRehearsalNotifications(now + 5 * HOUR);
   assert.equal(messages('-1003138570084').length, 5);
 });
-test('webhook rejects untrusted callers and invalid JSON; preference endpoint is admin-only', async () => {
+test('webhook rejects untrusted callers and invalid JSON; preference endpoint requires an approved Telegram account', async () => {
   const event = { requestContext: { http: { method: 'POST' } }, headers: {}, body: '{}' };
   assert.equal((await rehearsalNotificationsHandler(event)).statusCode, 403);
   assert.equal((await rehearsalNotificationsHandler({ ...event, headers: { 'x-telegram-bot-api-secret-token': 'é'.repeat(64) } })).statusCode, 403);
   const headers = { 'x-telegram-bot-api-secret-token': telegram.telegramWebhookSecret() };
   assert.equal((await rehearsalNotificationsHandler({ ...event, headers, body: 'bad' })).statusCode, 400);
   assert.equal((await rehearsalNotificationsHandler({ ...event, headers })).statusCode, 200);
-  for (const user of [{ ...admin, isAdmin: false }, { ...admin, status: 'pending' }]) assert.equal((await preferences.notificationPreferencesHandler(event, user)).statusCode, 403);
+  for (const user of [{ ...admin, telegramId: undefined }, { ...admin, status: 'pending' }]) assert.equal((await preferences.notificationPreferencesHandler(event, user)).statusCode, 403);
   const response = await preferences.notificationPreferencesHandler({ ...event, requestContext: { http: { method: 'PATCH' } }, body: '{"enabled":false}' }, admin);
   assert.equal(response.statusCode, 200); assert.equal(state('preference:100').enabled, false);
 });
@@ -330,4 +335,66 @@ test('truncated song quote stays quoted and ends before the footer', async () =>
   const payload = messages('100')[0].payload;
   assert.equal(payload.entities[0].length, 3700);
   assert.ok(payload.entities[0].offset + payload.entities[0].length < payload.text.indexOf('Полный список'));
+});
+
+test('readers can request songs silently, use stop/resume and manage their own preference', async () => {
+  put('kittens-rehearsals', rehearsal());
+  const reader = { ...admin, id: 'reader', telegramId: '400', isAdmin: false, role: 'reader', musicianName: 'Keys' };
+  put('kittens-people', reader);
+  await handleReminderCallback(callback('reader-request', 'prep:r', 400), now);
+  assert.equal(messages('400').length, 1);
+  assert.equal(messages('400')[0].payload.reply_markup.inline_keyboard[0][0].url, 'https://kittens.band/backlog');
+  const ack = calls.filter(c => c.method === 'answerCallbackQuery').at(-1).payload;
+  assert.equal(ack.show_alert, false); assert.equal(ack.text, undefined);
+  await handleReminderCallback(callback('reader-stop', 'notify:stop', 400, state('preference:400').latestMessageId, true), now);
+  assert.equal(state('preference:400').enabled, false);
+  const event = { requestContext: { http: { method: 'PATCH' } }, body: '{"enabled":true}' };
+  assert.equal((await preferences.notificationPreferencesHandler(event, reader)).statusCode, 200);
+  assert.equal(state('preference:400').enabled, true);
+  assert.equal(state('preference:100'), undefined);
+});
+
+test('ten-minute checks send the 24h reminder in its last ten-minute window and never late', async () => {
+  process.env.REMINDER_CHECK_MINUTES = '10';
+  const r = rehearsal(); put('kittens-rehearsals', r);
+  await runRehearsalNotifications(now);
+  await runRehearsalNotifications(rehearsalStart(r) - 24 * HOUR - 11 * 60_000);
+  assert.equal(messages('-1003138570084').length, 1);
+  await runRehearsalNotifications(rehearsalStart(r) - 24 * HOUR - 5 * 60_000);
+  await runRehearsalNotifications(rehearsalStart(r) - 24 * HOUR + 60_000);
+  assert.equal(messages('-1003138570084').length, 2);
+});
+
+test('delivery version resets trial announcements and requests while preserving opt-outs and rehearsal data', async () => {
+  const r = rehearsal(); put('kittens-rehearsals', r);
+  put('kittens-notifications', { id: 'announcement:r', status: 'sent', chatId: '-1003912884262', rehearsalId: 'r', fingerprint: 'old' });
+  put('kittens-notifications', { id: `personal:100:r:${rehearsalStart(r)}`, status: 'sent' });
+  put('kittens-notifications', { id: 'request:100:r', lastRequestedAt: now });
+  put('kittens-notifications', { id: 'preference:200', enabled: false, latestMessageId: 42 });
+  process.env.NOTIFICATION_DELIVERY_VERSION = 'rollout-test';
+  await runRehearsalNotifications(now);
+  assert.equal(messages('-1003138570084').length, 1);
+  assert.equal(messages('-1003912884262').length, 0);
+  assert.equal(messages('100').length, 1);
+  assert.equal(messages('200').length, 0);
+  assert.equal(state('v:rollout-test:announcement:r').status, 'sent');
+  assert.deepEqual(state('preference:200'), { id: 'preference:200', enabled: false, latestMessageId: 42 });
+  assert.deepEqual(table('kittens-rehearsals').get('r'), r);
+  await runRehearsalNotifications(now + HOUR);
+  assert.equal(messages('-1003138570084').length, 1);
+  assert.equal(messages('100').length, 1);
+  delete process.env.NOTIFICATION_DELIVERY_VERSION;
+});
+
+test('HTTP API permits readers only their own reminder preference, preserving shared and rehearsal access gates', async () => {
+  put('kittens-people', { ...admin, id: 'reader', telegramId: '400', isAdmin: false, role: 'reader' });
+  put('kittens-sessions', { token: 'reader-token', telegramId: '400', expiresAt: Math.floor(Date.now() / 1000) + 3600 });
+  const request = (method, path, body) => entrypoint.handler({ rawPath: path, requestContext: { stage: '$default', http: { method } }, headers: { authorization: 'Bearer reader-token' }, body: body ? JSON.stringify(body) : undefined });
+  assert.equal((await request('GET', '/notification-preferences')).statusCode, 200);
+  assert.equal((await request('PATCH', '/notification-preferences', { enabled: false, telegramId: '100' })).statusCode, 200);
+  assert.equal(state('preference:400').enabled, false);
+  assert.equal(state('preference:100'), undefined);
+  assert.equal((await request('PUT', '/songs/s', song)).statusCode, 403);
+  assert.equal((await request('GET', '/rehearsals')).statusCode, 403);
+  assert.equal((await request('PATCH', '/notification-preferences/100', { enabled: false })).statusCode, 403);
 });

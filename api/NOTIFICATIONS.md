@@ -30,24 +30,24 @@ and database boundaries. Tests do not send real messages.
 
 ## Rehearsals
 
-Group delivery is enabled for `RehearsalGroupChatId` (default: the trial chat
-«Подготовка анонсов Котят», current supergroup ID `-1003912884262`). Empty disables the rehearsal worker. Personal digests, manual
-requests and preference controls are **approved-admin-only during the trial**.
-The gate is `personalTrialAllowed`; there is no broadcast to other musicians.
+Group delivery is enabled for `RehearsalGroupChatId` (default: musicians group
+«Котятки-музыканты», `-1003138570084`). Empty disables the rehearsal worker.
+Personal digests, manual requests and preference controls are available to all
+approved Telegram accounts. Automatic preparation also requires a linked musician
+who attends and has songs to prepare. No messages go to pending/rejected users.
 
-One EventBridge Scheduler cron runs every minute during the trial
-(`ReminderCheckMinutes=1`), or hourly with `ReminderCheckMinutes=60`, with flexible
+One EventBridge Scheduler cron runs every ten minutes (`ReminderCheckMinutes=10`).
+One-minute and hourly checks remain configurable (`1` or `60`), with flexible
 windows and automatic invocation retries disabled. It invokes a dedicated Lambda
 which also receives Telegram callbacks, with reserved concurrency 1. No SQS,
 long polling, or per-rehearsal schedules. Each run recomputes dates/grouping from
-current rehearsals. Faster trial checks do not shorten the one-hour announcement
+current rehearsals. The interval does not shorten the one-hour announcement
 delay or personal reminder windows. Low-volume delivery state lives in the on-demand
 `kittens-notifications` table. Temporary attempts and request records expire
 via TTL; each user's preference/latest control pointer does not expire.
 
 - Announce upcoming, uncancelled rehearsals only when `now - createdAt > 1 hour`.
-  Normally this means 60–61 minutes after creation in the trial, or 1–2 hours
-  with hourly checks; failures may delay it. Existing
+  Normally this means 60–70 minutes after creation with ten-minute checks; failures may delay it. Existing
   upcoming rehearsals will also be announced on the first run.
 - The 24h group reminder uses the configured scheduler slot before that deadline. An announcement
   sent in that same slot already carries the logistics, so do not duplicate it.
@@ -64,7 +64,7 @@ via TTL; each user's preference/latest control pointer does not expire.
   rehearsal finishes. No automatic personal delivery outside the 24–72h window.
 - The group button `А мне чё учить?` sends a fresh digest immediately, even while
   automatic reminders are disabled. Expired/cancelled rehearsals, unlinked users,
-  absent musicians, other group chats and nonadmins cannot request personal data.
+  absent musicians, other group chats and unapproved users cannot request personal data.
 - A successful request records timestamps per covered rehearsal. Skip automatic
   preparation if every relevant rehearsal was requested within 48h of the
   **projected** reminder time (exactly 48h also skips). A new unrequested rehearsal
@@ -75,10 +75,26 @@ via TTL; each user's preference/latest control pointer does not expire.
   included only when `RehearsalSong.refreshFor` explicitly names the musician.
   This refresh marker is independent of progress, and is editable in song details.
   Explicit requests can return “nothing to prepare”; automatic empty digests skip.
+  Readers get a catalog link; rehearsal access rules remain enforced by the app.
+
+## Rollout reset
+
+`NotificationDeliveryVersion=rollout-20261013` starts a fresh delivery/request
+namespace. Existing upcoming rehearsals are reannounced to the musicians group
+and preparation eligibility is recalculated, without changing rehearsal
+`createdAt`, dates, progress, attendance or opt-out preferences. Existing
+rehearsals older than an hour are eligible on the next check. Trial records
+remain for diagnostics and expire via TTL; only the current version/current
+chat is used for changes and deduplication. Keeping the version fixed prevents
+subsequent deployments from resetting history again.
+
+Successful requests and repeated taps dismiss the Telegram spinner without a
+popup or toast. Errors use non-modal callback feedback. Stop/resume saves the
+preference as before.
 
 ## Personal controls and delivery failures
 
-The admin-only setting on the rehearsal list and `GET/PATCH
+The personal setting on the catalog and rehearsal list and `GET/PATCH
 /notification-preferences` control automatic personal reminders. Auth approval
 notifications and group posts are independent. Manual preparation requests remain
 available while opted out.

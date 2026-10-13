@@ -5,20 +5,26 @@ import { dbScan } from '../lib/dynamo.js';
 import { listUsers, getUserByTelegramId } from '../lib/people.js';
 import { hydrate } from './rehearsals.js';
 import type { Rehearsal, User } from '../lib/types.js';
-import { HOUR, personalTrialAllowed, preparationGroups, preparationText, rehearsalLabel, rehearsalLabelText, rehearsalStart, reminderDue } from '../lib/rehearsal-reminder-plan.js';
-import { claimDelivery, claimDeliveries, getState, notificationTable, preferenceId, releaseDelivery, setStateFields, type ReminderState } from '../lib/reminder-state.js';
+import { HOUR, personalNotificationsAllowed, preparationGroups, preparationText, rehearsalLabel, rehearsalLabelText, rehearsalStart, reminderDue } from '../lib/rehearsal-reminder-plan.js';
+import { claimDelivery, claimDeliveries, deliveryStateId, getState, notificationTable, preferenceId, releaseDelivery, setStateFields, type ReminderState } from '../lib/reminder-state.js';
 import { sendBotMessage, telegramCall, telegramWebhookSecret, type InlineButton, type TelegramResult } from '../lib/telegram.js';
 import { ok, err } from '../lib/response.js';
 
 const groupChat = () => process.env.REHEARSAL_GROUP_CHAT_ID ?? '';
-const schedulerInterval = () => process.env.REMINDER_CHECK_MINUTES === '1' ? HOUR / 60 : HOUR;
+const schedulerInterval = () => {
+  const minutes = Number(process.env.REMINDER_CHECK_MINUTES ?? '60');
+  return [1, 10, 60].includes(minutes) ? minutes * HOUR / 60 : HOUR;
+};
 const rehearsalsTable = () => process.env.REHEARSALS_TABLE ?? 'kittens-rehearsals';
 const url = (r: Rehearsal) => `https://kittens.band/rehearsals/${encodeURIComponent(r.id)}`;
 const digestKey = (telegramId: string, r: Rehearsal) => `personal:${telegramId}:${r.id}:${rehearsalStart(r)}`;
 const requestKey = (telegramId: string, r: Rehearsal) => `request:${telegramId}:${r.id}`;
 const fingerprint = (r?: Rehearsal) => createHash('sha256').update(JSON.stringify(r ? [r.date, r.startTime, r.endTime, r.timeZone, r.location, r.cancelled] : ['deleted'])).digest('hex').slice(0, 24);
 const groupButtons = (r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: 'А мне чё учить?', callback_data: `prep:${r.id}` }]];
-const personalButtons = (enabled: boolean, r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: enabled ? 'Отключить напоминания' : 'Включить напоминания', callback_data: enabled ? 'notify:stop' : 'notify:resume' }]];
+const personalLink = (user: User, rehearsalId: string): InlineButton => user.isAdmin || user.role === 'writer'
+  ? { text: 'Открыть репетицию', url: `https://kittens.band/rehearsals/${encodeURIComponent(rehearsalId)}` }
+  : { text: 'Открыть каталог', url: 'https://kittens.band/backlog' };
+const personalButtons = (enabled: boolean, r: Rehearsal, user: User): InlineButton[][] => [[personalLink(user, r.id)], [{ text: enabled ? 'Отключить напоминания' : 'Включить напоминания', callback_data: enabled ? 'notify:stop' : 'notify:resume' }]];
 
 async function finishDelivery(id: string, receipt: string, result: TelegramResult<{ message_id: number }>, now: number): Promise<boolean> {
   if (result.ok) { await setStateFields(id, { status: 'sent', sentAt: now, messageId: result.result.message_id }); return true; }
@@ -56,9 +62,9 @@ async function notifyChange(state: ReminderState, r: Rehearsal | undefined, now:
   const result = await sendBotMessage(state.chatId, message.text, !cancelled && r ? groupButtons(r) : [], message.entities);
   if (await finishDelivery(id, receipt, result, now)) await setStateFields(state.id, { fingerprint: nextFingerprint, ...(r ? { startAt: rehearsalStart(r), label: rehearsalLabel(r), expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 } : {}) });
 }
-async function removePreviousControl(telegramId: string, messageId?: number, rehearsalId?: string): Promise<boolean> {
+async function removePreviousControl(user: User & { telegramId: string }, messageId?: number, rehearsalId?: string): Promise<boolean> {
   if (!messageId) return true;
-  const result = await telegramCall('editMessageReplyMarkup', { chat_id: telegramId, message_id: messageId, reply_markup: { inline_keyboard: rehearsalId ? [[{ text: 'Открыть репетицию', url: `https://kittens.band/rehearsals/${encodeURIComponent(rehearsalId)}` }]] : [] } });
+  const result = await telegramCall('editMessageReplyMarkup', { chat_id: user.telegramId, message_id: messageId, reply_markup: { inline_keyboard: rehearsalId ? [[personalLink(user, rehearsalId)]] : [] } });
   return result.ok || result.unchanged === true || result.missing === true;
 }
 async function sendPersonal(user: User & { telegramId: string }, rehearsals: Rehearsal[], now: number, requested: boolean): Promise<'sent' | 'empty' | 'rejected' | 'uncertain'> {
@@ -68,10 +74,10 @@ async function sendPersonal(user: User & { telegramId: string }, rehearsals: Reh
   if (!digest.hasWork && !requested) return 'empty';
   const preference = await getState(preferenceId(user.telegramId));
   if (!requested && preference?.enabled === false) return 'empty';
-  if (!await removePreviousControl(user.telegramId, preference?.latestMessageId, preference?.latestRehearsalId)) return 'rejected';
+  if (!await removePreviousControl(user, preference?.latestMessageId, preference?.latestRehearsalId)) return 'rejected';
   // Clear the pointer before sending, so a removed button is immediately stale.
   await setStateFields(preferenceId(user.telegramId), { latestMessageId: 0 });
-  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0]), digest.entities);
+  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0], user), digest.entities);
   if (!result.ok) {
     if (result.uncertain) console.warn('Personal message outcome unknown; not resending');
     return result.uncertain ? 'uncertain' : 'rejected';
@@ -85,7 +91,7 @@ export async function runRehearsalNotifications(now = Date.now()): Promise<void>
   const runStarted = Date.now();
   const rehearsals = await dbScan<Rehearsal>(rehearsalsTable());
   const byId = new Map(rehearsals.map(r => [r.id, r]));
-  const previousAnnouncements = (await dbScan<ReminderState>(notificationTable())).filter(s => s.id.startsWith('announcement:') && s.status === 'sent');
+  const previousAnnouncements = (await dbScan<ReminderState>(notificationTable())).filter(s => s.id.startsWith(deliveryStateId('announcement:')) && s.status === 'sent' && s.chatId === groupChat());
   for (const state of previousAnnouncements) {
     if (Date.now() - runStarted > 40_000) return;
     const r = byId.get(state.rehearsalId!);
@@ -103,7 +109,7 @@ export async function runRehearsalNotifications(now = Date.now()): Promise<void>
       if (announcement?.sentAt && now - announcement.sentAt >= schedulerInterval()) await deliverGroup(r, 'reminder', now);
     }
   }
-  const users = (await listUsers()).filter(personalTrialAllowed);
+  const users = (await listUsers()).filter(personalNotificationsAllowed);
   for (const group of preparationGroups(rehearsals, schedulerInterval())) {
     if (!reminderDue(group, now)) continue;
     for (const user of users) {
@@ -136,13 +142,13 @@ interface Callback {
   id: string; from: { id: number }; data?: string;
   message?: { message_id: number; chat: { id: number; type: string }; reply_markup?: { inline_keyboard: InlineButton[][] } };
 }
-async function answer(callback: Callback, text: string) {
-  await telegramCall('answerCallbackQuery', { callback_query_id: callback.id, text, show_alert: true });
+async function answer(callback: Callback, text = '') {
+  await telegramCall('answerCallbackQuery', { callback_query_id: callback.id, ...(text ? { text } : {}), show_alert: false });
 }
 export async function handleReminderCallback(callback: Callback, now = Date.now()): Promise<void> {
   const telegramId = String(callback.from.id);
   const user = await getUserByTelegramId(telegramId);
-  if (!personalTrialAllowed(user)) { await answer(callback, 'Личные уведомления пока тестируются только администраторами.'); return; }
+  if (!personalNotificationsAllowed(user)) { await answer(callback, 'Сначала войдите в приложение и дождитесь одобрения аккаунта.'); return; }
   const data = callback.data ?? '';
   if (data === 'notify:stop' || data === 'notify:resume') {
     const state = await getState(preferenceId(telegramId));
@@ -166,14 +172,14 @@ export async function handleReminderCallback(callback: Callback, now = Date.now(
   const relevant = group.rehearsals.filter(r => rehearsalStart(r) > now && r.attendees.includes(user.musicianName!));
   if (!relevant.length) { await answer(callback, 'Вас нет в составе этой репетиции.'); return; }
   const prior = await getState(requestKey(telegramId, selected));
-  if (prior?.lastRequestedAt && now - prior.lastRequestedAt < 30_000) { await answer(callback, 'Список уже отправлен — проверьте личные сообщения.'); return; }
+  if (prior?.lastRequestedAt && now - prior.lastRequestedAt < 30_000) { await answer(callback); return; }
   // Claim the callback itself to avoid a webhook retry posting twice.
   const id = `callback:${callback.id}`;
-  if (!await claimDelivery(id, now)) { await answer(callback, 'Этот запрос уже обработан.'); return; }
+  if (!await claimDelivery(id, now)) { await answer(callback); return; }
   const result = await sendPersonal(user, relevant, now, true);
   if (result === 'sent') {
     for (const r of relevant) await setStateFields(requestKey(telegramId, r), { lastRequestedAt: now, expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 });
-    await answer(callback, 'Отправлено в личные сообщения.');
+    await answer(callback);
   } else await answer(callback, 'Не удалось отправить. Откройте @kittens_control_center_bot, нажмите Start и попробуйте снова. Настройки напоминаний доступны в приложении.');
 }
 export async function rehearsalNotificationsHandler(event: APIGatewayProxyEventV2 | Record<string, unknown>) {

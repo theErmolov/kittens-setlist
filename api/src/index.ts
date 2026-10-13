@@ -45,6 +45,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
   // Presence heartbeats — public (works anonymous), user resolved opportunistically
   const isPresence = /^\/presence\/[^/]+$/.test(path);
 
+  const isNotificationPreferences = path === '/notification-preferences';
   const isPersonalComment = /^\/(songs|setlists)\/[^/]+\/personal-comment$/.test(path);
   let user: User | null = null;
   if (isPresence || isPublicSetlistGet) {
@@ -55,9 +56,9 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
     user = await resolveAuth(event);
     if (!user) return err('Unauthorized', 401);
     if (user.status !== 'approved') return err('Your account is pending approval', 403);
-    // Readers may also edit their own private notes; shared mutations require writer/admin.
+    // Readers may edit their own private notes and notification preferences; shared mutations require writer/admin.
     const method = event.requestContext.http.method;
-    if (user.role !== 'writer' && !user.isAdmin && method !== 'GET' && !isPersonalComment) return err('Forbidden', 403);
+    if (user.role !== 'writer' && !user.isAdmin && method !== 'GET' && !isPersonalComment && !isNotificationPreferences) return err('Forbidden', 403);
   }
 
   if (path === '/notification-preferences') return notificationPreferencesHandler(event, user!);

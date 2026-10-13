@@ -2,16 +2,16 @@
   import { base } from '$app/paths';
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { formatDate } from '$lib/utils';
-  import type { Rehearsal } from '$lib/types';
-  let { rehearsal, setlistName }: { rehearsal: Rehearsal; setlistName?: string } = $props();
+  import { formatDate, orderMusicianNames } from '$lib/utils';
+  import type { Rehearsal, BandMusician } from '$lib/types';
+  let { rehearsal, setlistName, musicians }: { rehearsal: Rehearsal; setlistName?: string; musicians: BandMusician[] } = $props();
 </script>
 <a class="card" class:cancelled={rehearsal.cancelled} href="{base}/rehearsals/{rehearsal.id}">
   <div class="date">{formatDate(rehearsal.date, $lang)} <span>{rehearsal.startTime}</span></div>
   {#if rehearsal.cancelled}<strong class="status">{$rt.cancelled}</strong>{/if}
   {#if rehearsal.location}<div class="location">{rehearsal.location}</div>{/if}
   {#if setlistName}<div class="setlist">{setlistName}</div>{/if}
-  <div class="people">{rehearsal.attendees.join(' · ') || '—'}</div>
+  <div class="people">{orderMusicianNames(rehearsal.attendees, musicians).join(' · ') || '—'}</div>
   <div class="count">{$rt.songs}: {rehearsal.songs.length}</div>
 </a>
 <style>

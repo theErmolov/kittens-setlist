@@ -250,6 +250,6 @@ export const deleteRehearsal = (rehearsal: Rehearsal): Promise<void> => req(`/re
 export const updateRehearsalProgress = (id: string, song: RehearsalSongRef, musicianName: string, stage: LearningStage): Promise<Rehearsal> => req(`/rehearsals/${encodeURIComponent(id)}/progress`, { method: 'PATCH', body: JSON.stringify({ ...song, musicianName, stage }) });
 type RehearsalSongRef = { songId: string; sourceSetlistId?: string };
 
-// Personal rehearsal reminders are admin-only during the trial.
+// Approved users can manage their own personal rehearsal reminders.
 export const getNotificationPreferences = (): Promise<{ enabled: boolean }> => req('/notification-preferences');
 export const updateNotificationPreferences = (enabled: boolean): Promise<{ enabled: boolean }> => req('/notification-preferences', { method: 'PATCH', body: JSON.stringify({ enabled }) });

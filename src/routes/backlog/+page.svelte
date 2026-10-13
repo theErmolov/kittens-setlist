@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import ReminderPreferences from '$components/shared/ReminderPreferences.svelte';
   import SongTable from '$components/backlog/SongTable.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
   import type { Song, Setlist, BandMusician } from '$lib/types';
@@ -37,6 +38,8 @@
   }
 </script>
 
+<div class="reminder-preferences"><ReminderPreferences /></div>
+
 <SongTable
   {songs}
   {setlists}
@@ -53,3 +56,7 @@
     onsave={handleAdd}
   />
 {/if}
+
+<style>
+  .reminder-preferences { max-width: 1400px; margin: 0 auto; padding: 16px 16px 0; }
+</style>

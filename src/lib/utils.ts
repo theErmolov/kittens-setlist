@@ -218,3 +218,13 @@ export function buildBudgetReport(entries: BudgetEntry[], setlists: Setlist[], n
   lines.push(`${lang === 'ru' ? 'Итого наш баланс пока' : 'Current balance'}: ${formatReportTotal(t.balance, lang)}`);
   return lines.join('\n');
 }
+
+/** Display roster members in users-list order, then ad-hoc guests in saved order. */
+export function orderMusicianNames(names: string[], roster: { name: string }[]): string[] {
+  const remaining = new Set(names);
+  const ordered: string[] = [];
+  for (const musician of roster) {
+    if (remaining.delete(musician.name)) ordered.push(musician.name);
+  }
+  return [...ordered, ...remaining];
+}

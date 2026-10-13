@@ -2,20 +2,12 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
+  import LearningProgress from '$components/shared/LearningProgress.svelte';
   import { t } from '$lib/i18n';
 
   const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
   const instrumentIcons: Record<Instrument, string> = {
     guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤'
-  };
-
-  // Stages that appear as progress bar segments (in order)
-  const PROGRESS_SEGS: LearningStage[] = ['structure', 'mastering', 'ready'];
-  const STAGE_ORDER: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
-  const BAR_COLOR: Partial<Record<LearningStage, string>> = {
-    structure: '#8A000A',
-    mastering: '#856100',
-    ready:     '#005909',
   };
 
   let {
@@ -287,16 +279,7 @@
               </div>
               {#if hasInst}
                 <div class="prog-wrap">
-                  <div class="prog-bar" style="--fill: {BAR_COLOR[curStage] ?? 'var(--border)'}">
-                    {#each PROGRESS_SEGS as seg}
-                      <button
-                        class="prog-seg"
-                        class:filled={STAGE_ORDER.indexOf(curStage) >= STAGE_ORDER.indexOf(seg)}
-                        onclick={() => setProgress(bm.name, curStage === seg ? 'queue' : seg)}
-                        title={$t.progress[seg]}
-                      ></button>
-                    {/each}
-                  </div>
+                  <LearningProgress name={bm.name} value={curStage} onchange={stage => setProgress(bm.name, stage)} />
                 </div>
               {/if}
             </div>
@@ -328,16 +311,7 @@
               </div>
               {#if !isAdd && row.instruments.length > 0}
                 <div class="prog-wrap">
-                  <div class="prog-bar" style="--fill: {BAR_COLOR[row.progress] ?? 'var(--border)'}">
-                    {#each PROGRESS_SEGS as seg}
-                      <button
-                        class="prog-seg"
-                        class:filled={STAGE_ORDER.indexOf(row.progress) >= STAGE_ORDER.indexOf(seg)}
-                        onclick={() => { guestRows = guestRows.map(r => r.id === row.id ? { ...r, progress: r.progress === seg ? 'queue' : seg } : r); }}
-                        title={$t.progress[seg]}
-                      ></button>
-                    {/each}
-                  </div>
+                  <LearningProgress name={row.name} value={row.progress} onchange={stage => { guestRows = guestRows.map(r => r.id === row.id ? { ...r, progress: stage } : r); }} />
                 </div>
               {/if}
               {#if !isAdd}
@@ -511,21 +485,6 @@
     display: flex; align-items: center; gap: 6px;
   }
 
-  .prog-bar {
-    display: flex; gap: 2px;
-  }
-
-  .prog-seg {
-    width: 36px; height: 20px;
-    border: none; cursor: pointer; padding: 0;
-    background: var(--border);
-    transition: background 0.15s;
-  }
-  .prog-seg:first-child { border-radius: 5px 0 0 5px; }
-  .prog-seg:last-child { border-radius: 0 5px 5px 0; }
-  .prog-seg.filled { background: var(--fill, var(--accent)); }
-  .prog-seg:hover { opacity: 0.75; }
-
   .ghost-row {
     border-style: dashed;
     opacity: 0.75;
@@ -617,7 +576,6 @@
     .roster-name { order: 1; min-width: 0; flex: 1 1 auto; width: auto; }
     .guest-name { order: 1; flex: 1 1 auto; min-width: 0; width: auto !important; }
     .prog-wrap { order: 2; margin-left: auto; }
-    .prog-seg { height: 28px; width: 44px; }
     .remove-guest-btn { order: 3; margin-left: 8px; width: auto; }
     .inst-grid {
       order: 4; width: 100%;

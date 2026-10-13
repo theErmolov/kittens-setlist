@@ -27,6 +27,7 @@ Globals:
         REHEARSAL_GROUP_CHAT_ID: !Ref RehearsalGroupChatId
         NOTIFICATIONS_TABLE: !Ref NotificationsTable
         REMINDER_CHECK_MINUTES: !Ref ReminderCheckMinutes
+        NOTIFICATION_DELIVERY_VERSION: !Ref NotificationDeliveryVersion
 
 Parameters:
   StageName:
@@ -44,18 +45,25 @@ Parameters:
 
   RehearsalGroupChatId:
     Type: String
-    Default: '-1003912884262'
+    Default: '-1003138570084'
     AllowedPattern: '^(-[0-9]+)?$'
-    Description: Trial announcements chat; empty disables rehearsal notifications
+    Description: Musicians group chat; empty disables rehearsal notifications
 
   ReminderCheckMinutes:
     Type: String
-    Default: '1'
-    AllowedValues: ['1', '60']
-    Description: One-minute checks during the trial; 60 for hourly checks
+    Default: '10'
+    AllowedValues: ['1', '10', '60']
+    Description: Check interval in minutes
+
+  NotificationDeliveryVersion:
+    Type: String
+    Default: 'rollout-20261013'
+    AllowedPattern: '^[a-zA-Z0-9_-]+$'
+    Description: Delivery history version; changing it reannounces upcoming rehearsals and resets preparation request history
 
 Conditions:
   MinuteReminderChecks: !Equals [!Ref ReminderCheckMinutes, '1']
+  TenMinuteReminderChecks: !Equals [!Ref ReminderCheckMinutes, '10']
 
 Resources:
 
@@ -159,7 +167,10 @@ Resources:
         ReminderCheck:
           Type: ScheduleV2
           Properties:
-            ScheduleExpression: !If [MinuteReminderChecks, 'cron(* * * * ? *)', 'cron(0 * * * ? *)']
+            ScheduleExpression: !If
+              - MinuteReminderChecks
+              - 'cron(* * * * ? *)'
+              - !If [TenMinuteReminderChecks, 'cron(0/10 * * * ? *)', 'cron(0 * * * ? *)']
             FlexibleTimeWindow:
               Mode: 'OFF'
             RetryPolicy:

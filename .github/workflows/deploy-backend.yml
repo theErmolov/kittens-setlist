@@ -55,7 +55,10 @@ jobs:
         run: |
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --parameter-overrides \
-              TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }}
+              TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }} \
+              RehearsalGroupChatId=-1003138570084 \
+              ReminderCheckMinutes=10 \
+              NotificationDeliveryVersion=rollout-20261013
 
       - name: Configure Telegram callback webhook
         env:
