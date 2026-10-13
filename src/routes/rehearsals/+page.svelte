@@ -89,7 +89,7 @@
         </div>
       </section>
       <section class="day-list">
-        <div class="day-heading"><h2>{formatDate(selectedDate, $lang)}</h2><button onclick={plan}>+ {$rt.new}</button></div>
+        <div class="day-heading"><h2>{formatDate(selectedDate, $lang)}</h2></div>
         {#if daySessions.length}<div class="session-list">{#each daySessions as rehearsal (rehearsal.id)}<RehearsalCard {rehearsal} {musicians} setlistName={setlistName(rehearsal.setlistId)} />{/each}</div>
         {:else}<p class="empty">{$rt.noSessions}</p>{/if}
       </section>
