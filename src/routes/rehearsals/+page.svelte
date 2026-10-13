@@ -68,7 +68,7 @@
     <h2>{$rt.upcoming}</h2>
     {#if upcoming.length}
       <div class="upcoming" aria-label={$rt.upcoming}>
-        {#each upcoming as rehearsal (rehearsal.id)}<div class="card-slot"><RehearsalCard {rehearsal} setlistName={setlistName(rehearsal.setlistId)} /></div>{/each}
+        {#each upcoming as rehearsal (rehearsal.id)}<div class="card-slot"><RehearsalCard {rehearsal} {musicians} setlistName={setlistName(rehearsal.setlistId)} /></div>{/each}
       </div>
     {:else}<p class="empty upcoming-empty">{$rt.noUpcoming}</p>{/if}
     <section class="calendar" aria-label={monthLabel}>
@@ -90,7 +90,7 @@
     </section>
     <section class="day-list">
       <div class="day-heading"><h2>{formatDate(selectedDate, $lang)}</h2><button onclick={plan}>+ {$rt.new}</button></div>
-      {#if daySessions.length}<div class="session-list">{#each daySessions as rehearsal (rehearsal.id)}<RehearsalCard {rehearsal} setlistName={setlistName(rehearsal.setlistId)} />{/each}</div>
+      {#if daySessions.length}<div class="session-list">{#each daySessions as rehearsal (rehearsal.id)}<RehearsalCard {rehearsal} {musicians} setlistName={setlistName(rehearsal.setlistId)} />{/each}</div>
       {:else}<p class="empty">{$rt.noSessions}</p>{/if}
     </section>
   {/if}
