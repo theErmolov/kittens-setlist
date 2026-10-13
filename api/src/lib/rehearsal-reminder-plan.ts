@@ -53,9 +53,13 @@ export function reminderDue(group: PreparationGroup, now: number): boolean {
 export function personalTrialAllowed(user?: User | null): user is User & { telegramId: string } {
   return user?.status === 'approved' && user.isAdmin === true && Boolean(user.telegramId);
 }
-export function rehearsalLabel(r: Rehearsal): string {
+export function rehearsalLabelText(r: Rehearsal): NotificationText {
   const date = new Intl.DateTimeFormat('ru-RU', { timeZone: r.timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(rehearsalStart(r));
-  return `${date}, ${r.startTime}${r.endTime ? `–${r.endTime}` : ''}${r.location ? ` · ${r.location}` : ''}`;
+  const dateTime = `${date}, ${r.startTime}${r.endTime ? `–${r.endTime}` : ''}`;
+  return { text: `${dateTime}${r.location ? ` · ${r.location}` : ''}`, entities: [{ type: 'bold', offset: 0, length: dateTime.length }] };
+}
+export function rehearsalLabel(r: Rehearsal): string {
+  return rehearsalLabelText(r).text;
 }
 export function preparationText(group: Rehearsal[], name: string, now: number): NotificationText & { hasWork: boolean } {
   const sections = { learn: [] as { artist: string; title: string; note?: string }[], polish: [] as { artist: string; title: string; note?: string }[], refresh: [] as { artist: string; title: string; note?: string }[] };
@@ -75,7 +79,11 @@ export function preparationText(group: Rehearsal[], name: string, now: number): 
     if (!existing || rank[section] < rank[existing.section]) work.set(item.songId, { section, artist: item.song.artist, title: item.song.title, notes });
   }
   for (const item of work.values()) sections[item.section].push({ artist: item.artist, title: item.title, note: [...item.notes].join('; ') || undefined });
-  const result: NotificationText = { text: `${name}, подготовка к репетиции:\n${upcoming.map(rehearsalLabel).join('\n')}`, entities: [] };
+  const result: NotificationText = { text: `${name}, подготовка к репетиции:`, entities: [] };
+  for (const r of upcoming) {
+    result.text += '\n';
+    appendNotificationText(result, rehearsalLabelText(r));
+  }
   for (const section of Object.keys(sections) as (keyof typeof sections)[]) {
     if (!sections[section].length) continue;
     result.text += `\n\n${labels[section]}:\n`;

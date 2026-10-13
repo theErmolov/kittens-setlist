@@ -284,8 +284,11 @@ test('group and personal songs sort by artist and bold only literal titles, incl
     assert.ok(payload.text.indexOf('alpha & friends') < payload.text.indexOf('Zulu'));
     assert.ok(payload.text.indexOf('Zulu') < payload.text.indexOf('Альфа'));
     assert.equal(payload.parse_mode, undefined);
-    assert.deepEqual(payload.entities.map(e => payload.text.slice(e.offset, e.offset + e.length)), ['\u{1f3b8} <First & song>', 'Last', 'Русская']);
-    assert.ok(payload.entities.every(e => e.type === 'bold'));
+    assert.deepEqual(payload.entities.filter(e => e.type === 'bold' && payload.text.slice(e.offset, e.offset + e.length) !== plan.rehearsalLabel(rehearsal())).map(e => payload.text.slice(e.offset, e.offset + e.length)), ['\u{1f3b8} <First & song>', 'Last', 'Русская']);
+    const quotes = payload.entities.filter(e => e.type === 'blockquote');
+    assert.equal(quotes.length, 1);
+    assert.ok(payload.text.slice(quotes[0].offset, quotes[0].offset + quotes[0].length).startsWith('• alpha & friends'));
+    assert.ok(payload.entities.some(e => e.type === 'bold' && payload.text.slice(e.offset, e.offset + e.length) === plan.rehearsalLabel(rehearsal())));
   }
   assert.match(messages('100')[0].payload.text, /<b>Keep this literal<\/b>/);
   assert.equal(messages('100')[0].payload.reply_markup.inline_keyboard[1][0].text, 'Отключить напоминания');
@@ -302,4 +305,29 @@ test('clipping keeps bold entities only for retained song lines, never for the a
   assert.ok(!payload.text.includes('Title'));
   assert.deepEqual(payload.entities, []);
   assert.match(payload.text, /Полный список/);
+});
+
+test('date/time bold excludes location; every preparation section gets its own quote panel', async () => {
+  const r = rehearsal('r', undefined, undefined, { location: 'Studio' });
+  r.songs = ['queue', 'mastering', 'ready'].map((stage, i) => ({ songId: `s${i}`, song: { ...song, id: `s${i}`, title: `Song ${i}`, progress: { Bass: stage } }, ...(stage === 'ready' ? { refreshFor: ['Bass'] } : {}) }));
+  for (const item of r.songs) put('kittens-songs', item.song);
+  put('kittens-rehearsals', r);
+  await runRehearsalNotifications(now);
+  for (const chat of ['100', '-1003138570084']) {
+    const { text, entities } = messages(chat)[0].payload;
+    const bold = entities.filter(e => e.type === 'bold').map(e => text.slice(e.offset, e.offset + e.length));
+    assert.ok(bold.some(value => value.includes('19:00') && value.includes('15 октября')));
+    assert.ok(bold.every(value => !value.includes('Studio')));
+    const quotes = entities.filter(e => e.type === 'blockquote');
+    assert.equal(quotes.length, chat === '100' ? 3 : 1);
+    for (const quote of quotes) assert.ok(text.slice(quote.offset, quote.offset + quote.length).startsWith('• Artist'));
+  }
+});
+
+test('truncated song quote stays quoted and ends before the footer', async () => {
+  const text = 'Header\n' + 'x'.repeat(3700) + '\n' + 'y'.repeat(400);
+  await telegram.sendBotMessage('100', text, [], [{ type: 'blockquote', offset: 7, length: text.length - 7 }]);
+  const payload = messages('100')[0].payload;
+  assert.equal(payload.entities[0].length, 3700);
+  assert.ok(payload.entities[0].offset + payload.entities[0].length < payload.text.indexOf('Полный список'));
 });

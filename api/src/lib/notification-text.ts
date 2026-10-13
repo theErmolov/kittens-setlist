@@ -1,5 +1,5 @@
-export interface BoldEntity { type: 'bold'; offset: number; length: number }
-export interface NotificationText { text: string; entities: BoldEntity[] }
+export interface NotificationEntity { type: 'bold' | 'blockquote'; offset: number; length: number }
+export interface NotificationText { text: string; entities: NotificationEntity[] }
 interface NotificationSong { artist: string; title: string; note?: string }
 
 /** Plain text + UTF-16 entities avoid treating song titles or notes as markup. */
@@ -13,6 +13,7 @@ export function songListText(songs: NotificationSong[]): NotificationText {
     result.text += song.title;
     if (song.note) result.text += `\n  ${song.note}`;
   }
+  if (result.text.trimEnd()) result.entities.unshift({ type: 'blockquote', offset: 0, length: result.text.trimEnd().length });
   return result;
 }
 export function appendNotificationText(target: NotificationText, part: NotificationText): void {

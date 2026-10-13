@@ -1,11 +1,11 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { songListText } from '../lib/notification-text.js';
+import { songListText, appendNotificationText, type NotificationText } from '../lib/notification-text.js';
 import { dbScan } from '../lib/dynamo.js';
 import { listUsers, getUserByTelegramId } from '../lib/people.js';
 import { hydrate } from './rehearsals.js';
 import type { Rehearsal, User } from '../lib/types.js';
-import { HOUR, personalTrialAllowed, preparationGroups, preparationText, rehearsalLabel, rehearsalStart, reminderDue } from '../lib/rehearsal-reminder-plan.js';
+import { HOUR, personalTrialAllowed, preparationGroups, preparationText, rehearsalLabel, rehearsalLabelText, rehearsalStart, reminderDue } from '../lib/rehearsal-reminder-plan.js';
 import { claimDelivery, claimDeliveries, getState, notificationTable, preferenceId, releaseDelivery, setStateFields, type ReminderState } from '../lib/reminder-state.js';
 import { sendBotMessage, telegramCall, telegramWebhookSecret, type InlineButton, type TelegramResult } from '../lib/telegram.js';
 import { ok, err } from '../lib/response.js';
@@ -34,11 +34,12 @@ async function deliverGroup(r: Rehearsal, kind: 'announcement' | 'reminder', now
   const id = kind === 'announcement' ? `announcement:${r.id}` : `group-reminder:${r.id}:${rehearsalStart(r)}`;
   const receipt = await claimDelivery(id, now);
   if (!receipt) return false;
-  const prefix = `${kind === 'announcement' ? 'Запланирована репетиция' : 'Напоминание о репетиции'}\n${rehearsalLabel(r)}${r.note ? `\n\n${r.note}` : ''}\n\n${r.songs.length ? 'Песни:\n' : 'План песен пока составляется.'}`;
-  const list = songListText(r.songs.map(item => item.song));
-  const text = prefix + list.text;
+  const message: NotificationText = { text: `${kind === 'announcement' ? 'Запланирована репетиция' : 'Напоминание о репетиции'}\n`, entities: [] };
+  appendNotificationText(message, rehearsalLabelText(r));
+  message.text += `${r.note ? `\n\n${r.note}` : ''}\n\n${r.songs.length ? 'Песни:\n' : 'План песен пока составляется.'}`;
+  appendNotificationText(message, songListText(r.songs.map(item => item.song)));
   if (kind === 'announcement') await setStateFields(id, { rehearsalId: r.id, chatId, fingerprint: fingerprint(r), startAt: rehearsalStart(r), label: rehearsalLabel(r), expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 });
-  const result = await sendBotMessage(chatId, text, groupButtons(r), list.entities.map(entity => ({ ...entity, offset: entity.offset + prefix.length })));
+  const result = await sendBotMessage(chatId, message.text, groupButtons(r), message.entities);
   const sent = await finishDelivery(id, receipt, result, now);
   return sent;
 }
@@ -49,7 +50,10 @@ async function notifyChange(state: ReminderState, r: Rehearsal | undefined, now:
   const receipt = await claimDelivery(id, now);
   if (!receipt) return;
   const cancelled = !r || r.cancelled;
-  const result = await sendBotMessage(state.chatId, cancelled ? `Репетиция отменена.\n${r ? rehearsalLabel(r) : state.label ?? ''}` : `Изменились детали репетиции:\n${rehearsalLabel(r)}`, !cancelled && r ? groupButtons(r) : []);
+  const message: NotificationText = { text: cancelled ? 'Репетиция отменена.\n' : 'Изменились детали репетиции:\n', entities: [] };
+  const storedLabel = state.label ?? '';
+  appendNotificationText(message, r ? rehearsalLabelText(r) : { text: storedLabel, entities: storedLabel ? [{ type: 'bold', offset: 0, length: storedLabel.split(' · ')[0].length }] : [] });
+  const result = await sendBotMessage(state.chatId, message.text, !cancelled && r ? groupButtons(r) : [], message.entities);
   if (await finishDelivery(id, receipt, result, now)) await setStateFields(state.id, { fingerprint: nextFingerprint, ...(r ? { startAt: rehearsalStart(r), label: rehearsalLabel(r), expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 } : {}) });
 }
 async function removePreviousControl(telegramId: string, messageId?: number, rehearsalId?: string): Promise<boolean> {
