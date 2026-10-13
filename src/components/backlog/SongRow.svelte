@@ -110,7 +110,7 @@
     {#if mobileBubbles.length > 0}
       <div class="mobile-musicians">
         {#each mobileBubbles as b}
-          <span class="mob-bubble" class:mob-guest={b.isGuest} style={[b.progBg ? `background: ${b.progBg}` : '', b.progColor ? `color: ${b.progColor}` : ''].filter(Boolean).join('; ')}>
+          <span class="mob-bubble" class:mob-guest={b.isGuest} class:progress-chip={showProgress && !b.isGuest} style={[b.progBg ? `background: ${b.progBg}` : '', b.progColor ? `color: ${b.progColor}` : ''].filter(Boolean).join('; ')}>
             <span class="mob-icons">{#each b.instruments as inst (inst)}<span>{instrumentIcons[inst]}</span>{/each}</span>
             <span class="mob-name">{b.name}</span>
           </span>
@@ -214,6 +214,10 @@
     mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
   }
   :global([data-theme="dark"]) .mob-bubble:not(.mob-guest) { background: #78350f; }
+  /* Match the editor's four status colors without brightening instrument SVGs. */
+  :global([data-theme="dark"]) .mob-bubble.progress-chip { filter: brightness(2); }
+  :global([data-theme="dark"]) .mob-bubble.progress-chip .mob-icons { filter: brightness(0.5); }
+
 
   .td-actions { white-space: nowrap; text-align: center; }
   .action-btn {
