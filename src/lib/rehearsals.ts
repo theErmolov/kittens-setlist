@@ -44,12 +44,12 @@ export function closestUpcomingSetlist(setlists: Setlist[], date: string, time: 
     .sort((a, b) => eventTime(a).localeCompare(eventTime(b)) || a.name.localeCompare(b.name))[0];
 }
 
-/** Today's and future events in date order; undated setlists last. */
+/** Today's and future events, furthest future first; undated setlists last. */
 export function upcomingSetlists(setlists: Setlist[], today = localDate()): Setlist[] {
   return setlists.filter(s => !s.date || s.date >= today).sort((a, b) => {
     if (!a.date && !b.date) return a.name.localeCompare(b.name);
     if (!a.date) return 1;
     if (!b.date) return -1;
-    return eventTime(a).localeCompare(eventTime(b)) || a.name.localeCompare(b.name);
+    return eventTime(b).localeCompare(eventTime(a)) || a.name.localeCompare(b.name);
   });
 }

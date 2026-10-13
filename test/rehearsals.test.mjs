@@ -53,6 +53,6 @@ test('setlists exclude past dates, include today regardless of start time, and p
     { id: 'past-recent', name: 'Recent', date: '2026-10-12' },
     { id: 'today', name: 'Today', date: '2026-10-13', startTime: '10:00' },
   ];
-  assert.deepEqual(upcomingSetlists(setlists, '2026-10-13').map(s => s.id), ['today', 'future-next', 'future-later', 'undated']);
+  assert.deepEqual(upcomingSetlists(setlists, '2026-10-13').map(s => s.id), ['future-later', 'future-next', 'today', 'undated']);
   assert.equal(setlists[0].id, 'undated');
 });
