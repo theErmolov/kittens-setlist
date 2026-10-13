@@ -15,6 +15,7 @@ import {
 } from '../lib/people.js';
 import { logAudit, queryAuditLog } from '../lib/audit.js';
 import { mergeUserRecords, refreshTelegramIdentity, removeMusicianFields } from '../lib/people-domain.js';
+import { notifyAuthenticationRequest } from '../lib/notifications.js';
 
 const SESSIONS_TABLE = process.env.SESSIONS_TABLE ?? 'kittens-sessions';
 const SESSION_TTL_SECONDS = 180 * 24 * 60 * 60;
@@ -121,6 +122,10 @@ export async function authHandler(event: APIGatewayProxyEventV2, path: string): 
     const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
     const session: KittensSession = { token, telegramId: data.id, expiresAt };
     await dbPut(SESSIONS_TABLE, session as unknown as Record<string, unknown>);
+    // Only a new pending request needs attention; repeat logins must not spam the admin.
+    if (user.status === 'pending' && !existing?.status) {
+      await notifyAuthenticationRequest(user);
+    }
     return ok({ token, user });
   }
 

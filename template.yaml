@@ -23,6 +23,7 @@ Globals:
         PRESENCE_TABLE: !Ref PresenceTable
         RECEIPTS_BUCKET: !Ref ReceiptsBucket
         TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+        AUTH_APPROVAL_TELEGRAM_ID: !Ref AuthApprovalTelegramId
 
 Parameters:
   StageName:
@@ -32,6 +33,11 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Telegram bot token from BotFather
+  AuthApprovalTelegramId:
+    Type: String
+    Default: '165854464'
+    AllowedPattern: '^([0-9]+)?$'
+    Description: Approved admin receiving new access requests (Ilya); empty disables notifications
 
 Resources:
 
