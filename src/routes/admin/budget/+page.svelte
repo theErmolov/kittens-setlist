@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import { lang, t } from '$lib/i18n';
@@ -91,7 +92,7 @@
 {#if $currentUser?.isAdmin}
 <div>
   {#if loading}
-    <p class="loading">…</p>
+    <p class="loading"><LoadingCat /></p>
   {:else}
     <!-- Dashboard: Наличка + Переводы = На руках − Долги = Баланс -->
     <div class="dash">

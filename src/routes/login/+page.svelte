@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
@@ -101,7 +102,7 @@
       <p class="subtitle">{$t.login.subtitle}</p>
       <div id="tg-widget" class="widget-wrap"></div>
       {#if status === 'loading'}
-        <p class="hint">…</p>
+        <p class="hint"><LoadingCat /></p>
       {/if}
     {:else if status === 'pending'}
       <p class="status-msg">{$t.login.pending}</p>

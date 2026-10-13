@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { getAuditLog } from '$lib/api';
@@ -56,7 +57,7 @@
       <div class="audit-header">
         <select bind:value={auditPageSize} class="page-size-select"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select>
       </div>
-      {#if auditLoading}<p class="hint">…</p>
+      {#if auditLoading}<p class="hint"><LoadingCat /></p>
       {:else if auditItems.length === 0}<p class="hint">{$t.admin.auditEmpty}</p>
       {:else}
         <div class="audit-table">

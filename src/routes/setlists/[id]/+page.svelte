@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
   import SetlistEditor from '$components/setlist/SetlistEditor.svelte';
   import { getSetlist, getSongs, getMusicians } from '$lib/api';
@@ -35,7 +36,7 @@
 </script>
 
 {#if loading}
-  <div class="not-found"><p>…</p></div>
+  <div class="not-found"><p><LoadingCat /></p></div>
 {:else if setlist}
   <SetlistEditor {setlist} {allSongs} {musicians} />
 {:else}

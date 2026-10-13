@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import PeopleManager from '$components/admin/PeopleManager.svelte';
@@ -26,7 +27,7 @@
 {#if $currentUser?.isAdmin}
 <div>
   {#if loading}
-    <p class="hint">…</p>
+    <p class="hint"><LoadingCat /></p>
   {:else}
     <PeopleManager bind:users />
   {/if}

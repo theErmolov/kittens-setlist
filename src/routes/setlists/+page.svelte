@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { onMount } from 'svelte';
   import SetlistCard from '$components/setlist/SetlistCard.svelte';
   import { createSetlist, deleteSetlist, getSetlists } from '$lib/api';
@@ -69,7 +70,7 @@
   {/if}
 
   {#if loading}
-    <p class="loading">…</p>
+    <p class="loading"><LoadingCat /></p>
   {:else if setlists.length === 0}
     <div class="empty">
       <p>{$t.setlists.empty}</p>

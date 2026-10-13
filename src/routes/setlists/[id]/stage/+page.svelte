@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { base } from '$app/paths';
@@ -48,7 +49,7 @@
 </script>
 
 {#if loading}
-  <div class="not-found"><p>…</p></div>
+  <div class="not-found"><p><LoadingCat /></p></div>
 {:else if setlist}
   <StageView {setlist} {musicians} {canMark} {pollInterval} />
 {:else}

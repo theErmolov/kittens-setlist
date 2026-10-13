@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import type { Song, Setlist, Category, Instrument, BandMusician } from '$lib/types';
   import SongRow from './SongRow.svelte';
   import SongEditModal from './SongEditModal.svelte';
@@ -248,7 +249,7 @@
           />
         {/each}
         {#if loading}
-          <tr><td colspan={4 + permanentNames.length} class="empty">…</td></tr>
+          <tr><td colspan={4 + permanentNames.length} class="empty"><LoadingCat /></td></tr>
         {:else if filtered().length === 0}
           <tr><td colspan={4 + permanentNames.length} class="empty">{$t.backlog.empty}</td></tr>
         {/if}
