@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
-  import { currentUser } from '$lib/auth';
   import { getOnlinePresence, getSetlists } from '$lib/api';
   import { t } from '$lib/i18n';
   import type { PresenceEntry } from '$lib/types';
@@ -13,16 +12,18 @@
   let failed = $state(false);
   let now = $state(Date.now());
   const people = $derived.by(() => {
-    const grouped = new Map<string, { name: string; rooms: Set<string> }>();
+    const grouped = new Map<string, { name: string; rooms: Map<string, Set<string>> }>();
     for (const entry of entries) {
-      if (entry.expiresAt * 1000 <= now || entry.userId === $currentUser?.id) continue;
+      if (entry.expiresAt * 1000 <= now) continue;
       const key = entry.userId ?? `guest:${entry.clientId}`;
       let person = grouped.get(key);
       if (!person) {
-        person = { name: entry.userId ? entry.name : $t.admin.onlineGuest, rooms: new Set() };
+        person = { name: entry.userId ? entry.name : $t.admin.onlineGuest, rooms: new Map() };
         grouped.set(key, person);
       }
-      person.rooms.add(entry.room);
+      let tabs = person.rooms.get(entry.room);
+      if (!tabs) { tabs = new Set(); person.rooms.set(entry.room, tabs); }
+      tabs.add(entry.clientId);
     }
     return [...grouped.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name));
   });
@@ -75,8 +76,8 @@
         <li>
           <span class="person"><span class="dot" aria-hidden="true"></span>{person.name}</span>
           <span class="pages">
-            {#each [...person.rooms] as room (room)}
-              <a href={roomHref(room)}>{roomLabel(room)}</a>
+            {#each [...person.rooms] as [room, tabs] (room)}
+              <a href={roomHref(room)}>{roomLabel(room)}{#if tabs.size > 1}{' ×'}{tabs.size}{/if}</a>
             {/each}
           </span>
         </li>
