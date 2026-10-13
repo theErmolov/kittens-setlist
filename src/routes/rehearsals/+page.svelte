@@ -60,11 +60,10 @@
 
 {#if $canAccessRehearsals}
 <div class="page">
-  <header><button class="primary" onclick={plan} disabled={loading || !!error}>{$rt.new}</button></header>
+  <header><ReminderPreferences /><button class="primary" onclick={plan} disabled={loading || !!error}>{$rt.new}</button></header>
   {#if loading}<p class="loading"><LoadingCat /></p>
   {:else if error}<p class="error" role="alert">{error}</p><button onclick={load}>{$rt.retry}</button>
   {:else}
-    <ReminderPreferences />
     <h2>{$rt.upcoming}</h2>
     {#if upcoming.length}
       <div class="upcoming" aria-label={$rt.upcoming}>
@@ -101,7 +100,7 @@
   .loading { padding: 40px 20px; }
   .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
   header, .day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  header { justify-content: flex-end; margin-bottom: 24px; } h2 { font-size: 1rem; margin: 0 0 12px; }
+  header { flex-wrap: nowrap; margin-bottom: 24px; } header .primary { flex-shrink: 0; margin-left: auto; } h2 { font-size: 1rem; margin: 0 0 12px; }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
   .primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .upcoming { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 12px; margin-bottom: 20px; }
