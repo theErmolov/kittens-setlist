@@ -149,7 +149,7 @@
       <span class="link-icon">🛡️</span><span class="link-label">{$t.nav.antispam}</span>
     </a>
   {/if}
-  <button class="lang-toggle" onclick={toggleLang}>{$lang === 'ru' ? 'EN' : 'RU'}</button>
+  <button class="lang-toggle" onclick={toggleLang}>{$lang.toUpperCase()}</button>
   <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if navLoggedIn}
     <button class="logout-btn" onclick={handleLogout} title={$t.common.logout}>🚪</button>
