@@ -101,7 +101,7 @@
   header, .day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header { justify-content: flex-end; margin-bottom: 24px; } h2 { font-size: 1rem; margin: 0 0 12px; }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
-  .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
   .upcoming { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 12px; margin-bottom: 20px; }
   .card-slot { flex: 0 0 265px; scroll-snap-align: start; }
   .calendar { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 16px; }
@@ -120,5 +120,5 @@
   .day-list { margin-top: 26px; } .day-heading { margin-bottom: 12px; } .day-heading h2 { margin: 0; }
   .session-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
   .empty { color: var(--text-muted); padding: 16px 0; font-size: .9rem; } .upcoming-empty { margin-bottom: 20px; } .error { color: #dc2626; }
-  @media(max-width: 600px) { .page { padding: 18px 10px 40px; } header .primary { font-size: .78rem; } .calendar { padding: 10px 6px; } .dates { gap: 3px; } .day { min-height: 65px; padding: 5px 3px; } .marker { font-size: .58rem; padding: 1px 2px; } .calendar-header { gap: 5px; } .calendar-header h2 { font-size: 1rem; } .card-slot { flex-basis: 245px; } }
+  @media(max-width: 600px) { .page { padding: 18px 10px 40px; } .calendar { padding: 10px 6px; } .dates { gap: 3px; } .day { min-height: 65px; padding: 5px 3px; } .marker { font-size: .58rem; padding: 1px 2px; } .calendar-header { gap: 5px; } .calendar-header h2 { font-size: 1rem; } .card-slot { flex-basis: 245px; } }
 </style>
