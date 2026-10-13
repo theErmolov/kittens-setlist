@@ -357,7 +357,7 @@
   />
 {/if}
 
-{#if addToSetlistSong}
+{#if addToSetlistSong && $canWrite}
   <div class="modal-backdrop" onmousedown={e => { addToSetlistSongDragInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop'); }} onclick={e => { if (addToSetlistSongDragInModal) { addToSetlistSongDragInModal = false; return; } if ((e.target as HTMLElement).classList.contains('modal-backdrop')) addToSetlistSong = null; }} role="dialog" aria-modal="true">
     <div class="picker-modal">
       <div class="modal-header">

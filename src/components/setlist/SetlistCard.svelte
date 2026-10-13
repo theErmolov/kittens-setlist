@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { canWrite } from '$lib/auth';
   import Note from '$components/shared/Note.svelte';
   import type { Setlist } from '$lib/types';
   import { lang, t } from '$lib/i18n';
@@ -26,7 +27,7 @@
   </a>
   <div class="card-actions">
     <a href="{base}/setlists/{setlist.id}/stage" class="stage-link">{$t.setlists.stage}</a>
-    <button class="delete-btn" onclick={ondelete} title={$t.song.remove}>🗑</button>
+    {#if $canWrite}<button class="delete-btn" onclick={ondelete} title={$t.song.remove}>🗑</button>{/if}
   </div>
 </div>
 

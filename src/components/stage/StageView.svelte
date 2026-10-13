@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentUser } from '$lib/auth';
   import Note from '$components/shared/Note.svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -303,7 +304,7 @@
       >🎛️ <span class="filter-btn-label">{$t.stage.filter}</span></button>
     </div>
     <Note value={localComment} label={$t.common.setlistComment} collapsible />
-    {#if !canMark}
+    {#if !canMark && !$currentUser}
       <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
     {/if}
     {#if filterOpen}

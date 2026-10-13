@@ -68,6 +68,7 @@
 
 </script>
 
+{#if $currentUser?.isAdmin}
 <div class="admin">
   <h1>{$t.admin.title}</h1>
   {#if loading}
@@ -101,6 +102,8 @@
     </section>
   {/if}
 </div>
+
+{/if}
 
 <style>
   .admin { max-width: 900px; margin: 0 auto; padding: 24px 16px; }

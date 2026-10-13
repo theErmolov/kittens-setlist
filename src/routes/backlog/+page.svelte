@@ -45,7 +45,7 @@
   onadd={() => { showAddModal = true; }}
 />
 
-{#if showAddModal}
+{#if showAddModal && $canWrite}
   <SongEditModal
     song={null}
     {musicians}

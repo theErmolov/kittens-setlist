@@ -257,7 +257,7 @@
   }
 
   async function toggleSubsetMembership(entry: SetlistEntry) {
-    if (activeSubsetId === null || !entry.songId) return;
+    if (!$canWrite || activeSubsetId === null || !entry.songId) return;
     if (entry.subsetId && entry.subsetId !== activeSubsetId) return; // belongs to another subset
     const subsetId = activeSubsetId;
     const subset = localSubsets.find(s => s.id === subsetId);
@@ -292,7 +292,7 @@
   }
 
   function handleRowClick(e: MouseEvent, entry: SetlistEntry) {
-    if (activeSubsetId === null || !entry.songId) return;
+    if (!$canWrite || activeSubsetId === null || !entry.songId) return;
     const target = e.target as HTMLElement;
     if (target.closest('input, textarea, button, a')) return;
     toggleSubsetMembership(entry);
@@ -314,7 +314,7 @@
     for (const layoutItem of currentLayout()) {
       if (layoutItem.kind === 'subset') {
         items.push({ kind: 'header', subset: layoutItem.subset });
-        if (activeSubsetId === layoutItem.subset.id) items.push({ kind: 'hint', subset: layoutItem.subset });
+        if ($canWrite && activeSubsetId === layoutItem.subset.id) items.push({ kind: 'hint', subset: layoutItem.subset });
         for (const entry of layoutItem.entries) items.push({ kind: 'entry', entry });
       } else {
         if (layoutItem.entry.songId && localSubsets.length > 0 && !restDividerAdded) {
@@ -720,7 +720,7 @@
   }
 
   function onSubsetDragStart(e: DragEvent, subsetId: string) {
-    if (isFiltered || window.matchMedia('(max-width: 700px)').matches) {
+    if (!$canWrite || isFiltered || window.matchMedia('(max-width: 700px)').matches) {
       e.preventDefault();
       return;
     }
@@ -799,6 +799,7 @@
 
   // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
   function handleDragHandleTouchStart(e: TouchEvent, key: string) {
+    if (!$canWrite) return;
     e.stopPropagation();
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
@@ -832,11 +833,11 @@
   }
 </script>
 
-<div class="editor">
+<div class="editor" class:read-only={!$canWrite}>
   <SetlistRehearsals setlistId={setlist.id} />
   <div class="editor-header">
     <div class="meta">
-      {#if editingMeta}
+      {#if editingMeta && $canWrite}
         <div class="meta-form">
           <input class="meta-input meta-name" bind:value={draftMeta.name} placeholder={$t.editor.namePlaceholder} />
           <input class="meta-input" type="date" bind:value={draftMeta.date} />
@@ -865,23 +866,25 @@
             applyUpdate(updated);
           } : undefined} />
         </div>
-        <button class="edit-meta-btn" onclick={startEditMeta} title={$t.editor.edit}>✏️</button>
+        {#if $canWrite}<button class="edit-meta-btn" onclick={startEditMeta} title={$t.editor.edit}>✏️</button>{/if}
       {/if}
     </div>
     <div class="header-actions">
-      <div class="break-wrap">
-        <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ {$t.editor.break}</button>
-        {#if showBreakPicker}
-          <div class="break-picker">
-            {#each [5, 10, 20, 30] as min}
-              <button class="break-opt" onclick={() => handleAddBreak(min)}>{$t.editor.minutes(min)}</button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <button class="btn-secondary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongs}</button>
-      <button class="btn-secondary" onclick={() => { showSetlistOnlyModal = true; }}>{$t.editor.addSetlistOnly}</button>
-      <button class="btn-secondary" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
+      {#if $canWrite}
+        <div class="break-wrap">
+          <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ {$t.editor.break}</button>
+          {#if showBreakPicker}
+            <div class="break-picker">
+              {#each [5, 10, 20, 30] as min}
+                <button class="break-opt" onclick={() => handleAddBreak(min)}>{$t.editor.minutes(min)}</button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        <button class="btn-secondary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongs}</button>
+        <button class="btn-secondary" onclick={() => { showSetlistOnlyModal = true; }}>{$t.editor.addSetlistOnly}</button>
+        <button class="btn-secondary" onclick={handleNewSubset}>{$t.editor.newSubset}</button>
+      {/if}
       <a href="{base}/setlists/{setlist.id}/stage" class="btn-stage">{$t.editor.stageView}</a>
     </div>
   </div>
@@ -954,13 +957,15 @@
         onclick={() => { filterNotReady = !filterNotReady; }}
       >{$t.editor.notReady(songCount - readyCount)}</button>
     </div>
-    <div class="filter-sep-h"></div>
-    <div class="filter-group mob-break-group">
-      <span class="mob-break-label">⏸ {$t.editor.break}:</span>
-      {#each [5, 10, 20, 30] as min}
-        <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{$t.editor.minutes(min)}</button>
-      {/each}
-    </div>
+    {#if $canWrite}
+      <div class="filter-sep-h"></div>
+      <div class="filter-group mob-break-group">
+        <span class="mob-break-label">⏸ {$t.editor.break}:</span>
+        {#each [5, 10, 20, 30] as min}
+          <button class="filter-chip" onclick={() => { handleAddBreak(min); filterOpen = false; }}>{$t.editor.minutes(min)}</button>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- Mobile bottom bar -->
@@ -971,14 +976,16 @@
       onclick={() => { filterOpen = !filterOpen; }}
     >🎛️ {$t.editor.filter}</button>
     <a href="{base}/setlists/{setlist.id}/stage" class="bottom-btn bottom-stage">{$t.editor.stageView}</a>
-    <button class="bottom-subset" onclick={handleNewSubset} title={$t.editor.newSubset}>⏭</button>
-    <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>{$t.editor.add}</button>
+    {#if $canWrite}
+      <button class="bottom-subset" onclick={handleNewSubset} title={$t.editor.newSubset}>⏭</button>
+      <button class="bottom-add-btn" onclick={() => { showAddModal = true; }}>{$t.editor.add}</button>
+    {/if}
   </div>
 
   {#if sortedEntries.length === 0}
     <div class="empty">
       <p>{$t.editor.empty}</p>
-      <button class="btn-primary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongsBtn}</button>
+      {#if $canWrite}<button class="btn-primary" onclick={() => { showAddModal = true; }}>{$t.editor.addSongsBtn}</button>{/if}
     </div>
   {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1026,17 +1033,17 @@
                 class:active={activeSubsetId === item.subset.id}
                 class:dragging={draggedSubsetId === item.subset.id}
                 class:drag-over={overSubsetId === item.subset.id && draggedSubsetId !== item.subset.id}
-                draggable={!isFiltered && activeSubsetId !== item.subset.id}
+                draggable={$canWrite && !isFiltered && activeSubsetId !== item.subset.id}
                 data-subset-block-id={item.subset.id}
-                onclick={() => handleSubsetHeaderClick(item.subset)}
+                onclick={$canWrite ? () => handleSubsetHeaderClick(item.subset) : undefined}
                 ondragstart={(e) => onSubsetDragStart(e, item.subset.id)}
                 ondragover={(e) => onSubsetDragOver(e, item.subset.id)}
                 ondragend={clearSubsetDrag}
               >
                 <td colspan={totalCols}>
                   <div class="subset-header-inner">
-                    <span class="subset-drag desktop-only">⠿</span>
-                    {#if activeSubsetId === item.subset.id}
+                    {#if $canWrite}<span class="subset-drag desktop-only">⠿</span>{/if}
+                    {#if $canWrite && activeSubsetId === item.subset.id}
                       <input
                         class="subset-name-input"
                         bind:value={draftSubsetName}
@@ -1050,8 +1057,8 @@
                       <span class="subset-header-name">⏭ {item.subset.name}</span>
                     {/if}
                     <span class="subset-header-count">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</span>
-                    <span class="subset-mobile-hint">{$t.editor.subsetTapEdit}</span>
-                    {#if activeSubsetId !== item.subset.id}
+                    {#if $canWrite}<span class="subset-mobile-hint">{$t.editor.subsetTapEdit}</span>{/if}
+                    {#if $canWrite && activeSubsetId !== item.subset.id}
                       <button class="subset-edit desktop-only" onclick={(e) => { e.stopPropagation(); openSubsetEdit(item.subset); }} title={$t.editor.subsetEdit}>✏️</button>
                     {/if}
                   </div>
@@ -1080,7 +1087,7 @@
               {@const isDragging = draggedEntryKey === key}
               {@const isOver = overEntryKey === key && draggedEntryKey !== key}
               {@const songNum = displayEntries().slice(0, entryIndex + 1).filter(e => e.songId).length}
-              {@const canDrag = !isFiltered}
+              {@const canDrag = $canWrite && !isFiltered}
               {#if entry.songId}
                 {@const song = entry.song}
                 {#if song}
@@ -1103,10 +1110,12 @@
                     ondragend={canDrag ? clearEntryDrag : undefined}
                   >
                     <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>
-                      {#if activeSubsetId !== null}
-                        <span class="subset-tap-indicator">{entry.subsetId === activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
-                      {:else}
-                        <span class="drag-handle">⠿</span>
+                      {#if $canWrite}
+                        {#if activeSubsetId !== null}
+                          <span class="subset-tap-indicator">{entry.subsetId === activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
+                        {:else}
+                          <span class="drag-handle">⠿</span>
+                        {/if}
                       {/if}
                     </td>
                     <td class="td-num">
@@ -1137,10 +1146,14 @@
                           {/each}
                         </div>
                       {/if}
-                      <CommentInput
-                        value={entry.comment ?? ''}
-                        onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
-                      />
+                      {#if $canWrite}
+                        <CommentInput
+                          value={entry.comment ?? ''}
+                          onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
+                        />
+                      {:else}
+                        <Note value={entry.comment} label={$t.song.comment} />
+                      {/if}
                       <Note value={entry.personalComment} label="🔒" />
                     </td>
                     {#each allMusicians as name, mi}
@@ -1158,8 +1171,12 @@
                       </td>
                     {/each}
                     <td class="td-actions">
-                      <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title={$t.editor.editEntry}>✏️</button>
-                      <button class="remove-btn desktop-only" onclick={() => handleRemoveClick(entry)} title={activeSubsetId !== null && entry.subsetId === activeSubsetId ? $t.editor.subsetRemove : $t.editor.remove}>✕</button>
+                      {#if $currentUser?.status === 'approved'}
+                        <button class="edit-btn" onclick={() => { editingEntry = entry; }} ontouchstart={(e) => e.stopPropagation()} ontouchend={(e) => { e.stopPropagation(); e.preventDefault(); editingEntry = entry; }} title={$canWrite ? $t.editor.editEntry : $t.common.personalComment}>{$canWrite ? '✏️' : '🔒'}</button>
+                      {/if}
+                      {#if $canWrite}
+                        <button class="remove-btn desktop-only" onclick={() => handleRemoveClick(entry)} title={activeSubsetId !== null && entry.subsetId === activeSubsetId ? $t.editor.subsetRemove : $t.editor.remove}>✕</button>
+                      {/if}
                     </td>
                   </tr>
                 {/if}
@@ -1174,14 +1191,14 @@
                   ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
                   ondragend={canDrag ? clearEntryDrag : undefined}
                 >
-                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}><span class="drag-handle">⠿</span></td>
+                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>{#if $canWrite}<span class="drag-handle">⠿</span>{/if}</td>
                   <td class="td-num"></td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
                     <div class="break-inner">
                     <span class="break-icon">⏸</span>
                     <div class="break-body">
-                      {#if editingBreakOrder === entry.order}
+                      {#if $canWrite && editingBreakOrder === entry.order}
                         <div class="break-edit-row">
                           {#each [5, 10, 20, 30] as min}
                             <button
@@ -1192,17 +1209,23 @@
                           {/each}
                           <button class="break-opt-cancel" onclick={(e) => { e.stopPropagation(); editingBreakOrder = null; }}>✕</button>
                         </div>
-                      {:else}
+                      {:else if $canWrite}
                         <button class="break-label" onclick={(e) => { e.stopPropagation(); editingBreakOrder = entry.order; }}>
                           {$t.editor.breakLabel(entry.breakMinutes!)}
                         </button>
+                      {:else}
+                        <span class="break-label">{$t.editor.breakLabel(entry.breakMinutes!)}</span>
                       {/if}
-                      <CommentInput
-                        value={entry.comment ?? ''}
-                        onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
-                      />
+                      {#if $canWrite}
+                        <CommentInput
+                          value={entry.comment ?? ''}
+                          onsave={(v) => updateEntryComment(setlist.id, entry.order, v).then(applyUpdate)}
+                        />
+                      {:else}
+                        <Note value={entry.comment} label={$t.song.comment} />
+                      {/if}
                     </div>
-                    <button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>
+                    {#if $canWrite}<button class="remove-btn break-remove" onclick={(e) => { e.stopPropagation(); handleRemoveBreak(entry.order); }}>✕</button>{/if}
                     </div>
                   </td>
                 </tr>
@@ -1225,7 +1248,7 @@
   {/if}
 </div>
 
-{#if showAddModal}
+{#if showAddModal && $canWrite}
   <AddSongsModal
     songs={allSongs}
     {existingIds}
@@ -1235,7 +1258,7 @@
   />
 {/if}
 
-{#if showSetlistOnlyModal}
+{#if showSetlistOnlyModal && $canWrite}
   <SongEditModal
     song={null}
     {musicians}
@@ -1258,7 +1281,7 @@
   />
 {/if}
 
-{#if editingEntry}
+{#if editingEntry && $currentUser?.status === 'approved'}
   <SongEditModal
     song={editingEntry.song ? { ...editingEntry.song, comment: editingEntry.comment ?? '', personalComment: editingEntry.personalComment ?? '' } : null}
     personalOnly={!$canWrite}
@@ -1272,6 +1295,7 @@
 
 <style>
   .editor { display: flex; flex-direction: column; height: calc(100dvh - 56px); }
+  .read-only .song-row, .read-only .song-row:active, .read-only .break-row, .read-only .subset-header, .read-only .break-label { cursor: default; }
   .editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
   .meta { display: flex; align-items: flex-start; gap: 8px; }
   .meta-view h1 { margin: 0 0 4px; font-size: 1.4rem; }

@@ -88,6 +88,7 @@
   }
 </script>
 
+{#if $currentUser?.isAdmin}
 <div class="page">
   <h1>{$t.budget.title}</h1>
 
@@ -171,6 +172,8 @@
 
 {#if modalKind}
   <BudgetEntryModal kind={modalKind} entry={editEntry} {setlists} onclose={closeModal} onsaved={onSaved} />
+{/if}
+
 {/if}
 
 <style>

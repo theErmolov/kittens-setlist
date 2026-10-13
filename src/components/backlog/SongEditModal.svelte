@@ -206,7 +206,7 @@
   }
 
   let modalTitle = $derived(
-    mode === 'entry'
+    personalOnly ? $t.common.personalComment : mode === 'entry'
       ? ($t.song.editTitle + ' ' + $t.song.entrySuffix)
       : mode === 'setlist-only'
         ? (song?.id ? $t.song.editSetlistOnlyTitle : $t.song.addSetlistOnlyTitle)
