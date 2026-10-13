@@ -17,7 +17,6 @@
 {#if $currentUser?.isAdmin}
   <div class="admin-shell">
     <header>
-      <h2>{$t.admin.title}</h2>
       <nav class="admin-nav" aria-label={$t.admin.title}>
         <a href="{base}/admin" class:active={path === '/admin' || path === '/admin/'} aria-current={path === '/admin' || path === '/admin/' ? 'page' : undefined}>{$t.admin.users}</a>
         <a href="{base}/admin/audit" class:active={path.startsWith('/admin/audit')} aria-current={path.startsWith('/admin/audit') ? 'page' : undefined}>{$t.admin.auditLog}</a>
@@ -34,7 +33,6 @@
 <style>
   .admin-shell { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
   .admin-content { padding-top: 24px; }
-  h2 { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; }
   .admin-nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   a { padding: 8px 12px; border-radius: 6px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
   a:hover { background: var(--row-hover); color: var(--text); }
