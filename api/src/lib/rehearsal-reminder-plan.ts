@@ -1,3 +1,4 @@
+import { songListText, appendNotificationText, type NotificationText } from './notification-text.js';
 import type { Rehearsal, User } from './types.js';
 
 export const HOUR = 3_600_000;
@@ -56,11 +57,11 @@ export function rehearsalLabel(r: Rehearsal): string {
   const date = new Intl.DateTimeFormat('ru-RU', { timeZone: r.timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(rehearsalStart(r));
   return `${date}, ${r.startTime}${r.endTime ? `–${r.endTime}` : ''}${r.location ? ` · ${r.location}` : ''}`;
 }
-export function preparationText(group: Rehearsal[], name: string, now: number): { text: string; hasWork: boolean } {
-  const sections = { learn: new Map<string, string>(), polish: new Map<string, string>(), refresh: new Map<string, string>() };
+export function preparationText(group: Rehearsal[], name: string, now: number): NotificationText & { hasWork: boolean } {
+  const sections = { learn: [] as { artist: string; title: string; note?: string }[], polish: [] as { artist: string; title: string; note?: string }[], refresh: [] as { artist: string; title: string; note?: string }[] };
   const labels: Record<keyof typeof sections, string> = { learn: 'Разобрать', polish: 'Доработать', refresh: 'Освежить' };
   // A song appears once; keep the least-ready stage across different arrangements.
-  const work = new Map<string, { section: keyof typeof sections; title: string; notes: Set<string> }>();
+  const work = new Map<string, { section: keyof typeof sections; artist: string; title: string; notes: Set<string> }>();
   const rank = { learn: 0, polish: 1, refresh: 2 };
   const upcoming = group.filter(r => rehearsalStart(r) > now && r.attendees.includes(name));
   for (const r of upcoming) for (const item of r.songs) {
@@ -71,10 +72,15 @@ export function preparationText(group: Rehearsal[], name: string, now: number): 
     const existing = work.get(item.songId);
     const notes = existing?.notes ?? new Set<string>();
     if (item.note) notes.add(item.note);
-    if (!existing || rank[section] < rank[existing.section]) work.set(item.songId, { section, title: `${item.song.artist} — ${item.song.title}`, notes });
+    if (!existing || rank[section] < rank[existing.section]) work.set(item.songId, { section, artist: item.song.artist, title: item.song.title, notes });
   }
-  for (const [id, item] of work) sections[item.section].set(id, `• ${item.title}${item.notes.size ? `\n  ${[...item.notes].join('; ')}` : ''}`);
-  const heading = `${name}, подготовка к репетиции:\n${upcoming.map(rehearsalLabel).join('\n')}`;
-  const body = (Object.keys(sections) as (keyof typeof sections)[]).filter(section => sections[section].size).map(section => `${labels[section]}:\n${[...sections[section].values()].join('\n')}`).join('\n\n');
-  return { text: `${heading}\n\n${body || 'Всё готово — учить ничего не нужно.'}`, hasWork: work.size > 0 };
+  for (const item of work.values()) sections[item.section].push({ artist: item.artist, title: item.title, note: [...item.notes].join('; ') || undefined });
+  const result: NotificationText = { text: `${name}, подготовка к репетиции:\n${upcoming.map(rehearsalLabel).join('\n')}`, entities: [] };
+  for (const section of Object.keys(sections) as (keyof typeof sections)[]) {
+    if (!sections[section].length) continue;
+    result.text += `\n\n${labels[section]}:\n`;
+    appendNotificationText(result, songListText(sections[section]));
+  }
+  if (!work.size) result.text += '\n\nВсё готово — учить ничего не нужно.';
+  return { ...result, hasWork: work.size > 0 };
 }

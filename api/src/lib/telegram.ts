@@ -1,4 +1,5 @@
 import { createHmac, createHash } from 'crypto';
+import type { BoldEntity } from './notification-text.js';
 import type { User } from './types.js';
 
 export interface BotNotification {
@@ -102,11 +103,12 @@ export async function telegramCall<T>(method: string, payload: Record<string, un
 export function telegramWebhookSecret(token = process.env.TELEGRAM_BOT_TOKEN ?? ''): string {
   return createHmac('sha256', token).update('kittens-setlist:telegram-webhook:v1').digest('hex');
 }
-export async function sendBotMessage(chatId: string, text: string, buttons: InlineButton[][]): Promise<TelegramResult<{ message_id: number }>> {
+export async function sendBotMessage(chatId: string, text: string, buttons: InlineButton[][], entities: BoldEntity[] = []): Promise<TelegramResult<{ message_id: number }>> {
   // Telegram messages are capped at 4096 Unicode characters. Keep complete lines
   // within a conservative UTF-16 limit; the link always opens the full plan.
-  const clipped = text.length <= 3900 ? text : `${text.slice(0, 3800).split('\n').slice(0, -1).join('\n')}\n\nПолный список — по ссылке ниже.`;
-  const result = await telegramCall<{ message_id: number }>('sendMessage', { chat_id: chatId, text: clipped, link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: buttons } });
+  const retained = text.length <= 3900 ? text : text.slice(0, 3800).split('\n').slice(0, -1).join('\n');
+  const clipped = text.length <= 3900 ? text : `${retained}\n\nПолный список — по ссылке ниже.`;
+  const result = await telegramCall<{ message_id: number }>('sendMessage', { chat_id: chatId, text: clipped, entities: entities.filter(entity => entity.offset + entity.length <= retained.length), link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: buttons } });
   if (result.ok && (!Number.isSafeInteger(result.result?.message_id) || result.result.message_id <= 0)) return { ok: false, uncertain: true };
   return result;
 }

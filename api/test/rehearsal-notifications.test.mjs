@@ -268,3 +268,38 @@ test('one-minute trial checks still wait an hour and send logistical reminders w
   await runRehearsalNotifications(rehearsalStart(r) - 24 * HOUR + 30_000);
   assert.equal(messages('-1003138570084').length, 2);
 });
+
+test('group and personal songs sort by artist and bold only literal titles, including Unicode and markup characters', async () => {
+  const r = rehearsal();
+  r.songs = [
+    { songId: 'z', song: { ...song, id: 'z', artist: 'Zulu', title: 'Last' } },
+    { songId: 'ru', song: { ...song, id: 'ru', artist: 'Альфа', title: 'Русская' } },
+    { songId: 'a', song: { ...song, id: 'a', artist: 'alpha & friends', title: '\u{1f3b8} <First & song>' }, note: '<b>Keep this literal</b>' },
+  ];
+  for (const item of r.songs) put('kittens-songs', item.song);
+  put('kittens-rehearsals', r);
+  await runRehearsalNotifications(now);
+  for (const chat of ['-1003138570084', '100']) {
+    const payload = messages(chat)[0].payload;
+    assert.ok(payload.text.indexOf('alpha & friends') < payload.text.indexOf('Zulu'));
+    assert.ok(payload.text.indexOf('Zulu') < payload.text.indexOf('Альфа'));
+    assert.equal(payload.parse_mode, undefined);
+    assert.deepEqual(payload.entities.map(e => payload.text.slice(e.offset, e.offset + e.length)), ['\u{1f3b8} <First & song>', 'Last', 'Русская']);
+    assert.ok(payload.entities.every(e => e.type === 'bold'));
+  }
+  assert.match(messages('100')[0].payload.text, /<b>Keep this literal<\/b>/);
+  assert.equal(messages('100')[0].payload.reply_markup.inline_keyboard[1][0].text, 'Отключить напоминания');
+  const messageId = state('preference:100').latestMessageId;
+  await handleReminderCallback(callback('stop-russian', 'notify:stop', 100, messageId, true), now);
+  assert.equal(calls.filter(c => c.method === 'editMessageReplyMarkup').at(-1).payload.reply_markup.inline_keyboard[1][0].text, 'Включить напоминания');
+});
+
+test('clipping keeps bold entities only for retained song lines, never for the appended footer', async () => {
+  const text = 'x'.repeat(3780) + '\n' + 'padding'.repeat(4) + '\nTitle\n' + 'x'.repeat(200);
+  const offset = text.indexOf('Title');
+  await telegram.sendBotMessage('100', text, [], [{ type: 'bold', offset, length: 5 }]);
+  const payload = messages('100')[0].payload;
+  assert.ok(!payload.text.includes('Title'));
+  assert.deepEqual(payload.entities, []);
+  assert.match(payload.text, /Полный список/);
+});

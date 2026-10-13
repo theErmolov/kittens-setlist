@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import { songListText } from '../lib/notification-text.js';
 import { dbScan } from '../lib/dynamo.js';
 import { listUsers, getUserByTelegramId } from '../lib/people.js';
 import { hydrate } from './rehearsals.js';
@@ -17,7 +18,7 @@ const digestKey = (telegramId: string, r: Rehearsal) => `personal:${telegramId}:
 const requestKey = (telegramId: string, r: Rehearsal) => `request:${telegramId}:${r.id}`;
 const fingerprint = (r?: Rehearsal) => createHash('sha256').update(JSON.stringify(r ? [r.date, r.startTime, r.endTime, r.timeZone, r.location, r.cancelled] : ['deleted'])).digest('hex').slice(0, 24);
 const groupButtons = (r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: 'А мне чё учить?', callback_data: `prep:${r.id}` }]];
-const personalButtons = (enabled: boolean, r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: enabled ? 'Stop notifications' : 'Resume notifications', callback_data: enabled ? 'notify:stop' : 'notify:resume' }]];
+const personalButtons = (enabled: boolean, r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: enabled ? 'Отключить напоминания' : 'Включить напоминания', callback_data: enabled ? 'notify:stop' : 'notify:resume' }]];
 
 async function finishDelivery(id: string, receipt: string, result: TelegramResult<{ message_id: number }>, now: number): Promise<boolean> {
   if (result.ok) { await setStateFields(id, { status: 'sent', sentAt: now, messageId: result.result.message_id }); return true; }
@@ -33,9 +34,11 @@ async function deliverGroup(r: Rehearsal, kind: 'announcement' | 'reminder', now
   const id = kind === 'announcement' ? `announcement:${r.id}` : `group-reminder:${r.id}:${rehearsalStart(r)}`;
   const receipt = await claimDelivery(id, now);
   if (!receipt) return false;
-  const text = `${kind === 'announcement' ? 'Запланирована репетиция' : 'Напоминание о репетиции'}\n${rehearsalLabel(r)}${r.note ? `\n\n${r.note}` : ''}\n\n${r.songs.length ? `Песни:\n${r.songs.map(s => `• ${s.song.artist} — ${s.song.title}`).join('\n')}` : 'План песен пока составляется.'}`;
+  const prefix = `${kind === 'announcement' ? 'Запланирована репетиция' : 'Напоминание о репетиции'}\n${rehearsalLabel(r)}${r.note ? `\n\n${r.note}` : ''}\n\n${r.songs.length ? 'Песни:\n' : 'План песен пока составляется.'}`;
+  const list = songListText(r.songs.map(item => item.song));
+  const text = prefix + list.text;
   if (kind === 'announcement') await setStateFields(id, { rehearsalId: r.id, chatId, fingerprint: fingerprint(r), startAt: rehearsalStart(r), label: rehearsalLabel(r), expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 });
-  const result = await sendBotMessage(chatId, text, groupButtons(r));
+  const result = await sendBotMessage(chatId, text, groupButtons(r), list.entities.map(entity => ({ ...entity, offset: entity.offset + prefix.length })));
   const sent = await finishDelivery(id, receipt, result, now);
   return sent;
 }
@@ -64,7 +67,7 @@ async function sendPersonal(user: User & { telegramId: string }, rehearsals: Reh
   if (!await removePreviousControl(user.telegramId, preference?.latestMessageId, preference?.latestRehearsalId)) return 'rejected';
   // Clear the pointer before sending, so a removed button is immediately stale.
   await setStateFields(preferenceId(user.telegramId), { latestMessageId: 0 });
-  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0]));
+  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0]), digest.entities);
   if (!result.ok) {
     if (result.uncertain) console.warn('Personal message outcome unknown; not resending');
     return result.uncertain ? 'uncertain' : 'rejected';
@@ -145,7 +148,7 @@ export async function handleReminderCallback(callback: Callback, now = Date.now(
     const enabled = data === 'notify:resume';
     await setStateFields(preferenceId(telegramId), { enabled });
     const buttons = callback.message.reply_markup?.inline_keyboard ?? [];
-    const keyboard = buttons.map(row => row.map(button => button.callback_data?.startsWith('notify:') ? { text: enabled ? 'Stop notifications' : 'Resume notifications', callback_data: enabled ? 'notify:stop' : 'notify:resume' } : button));
+    const keyboard = buttons.map(row => row.map(button => button.callback_data?.startsWith('notify:') ? { text: enabled ? 'Отключить напоминания' : 'Включить напоминания', callback_data: enabled ? 'notify:stop' : 'notify:resume' } : button));
     await telegramCall('editMessageReplyMarkup', { chat_id: telegramId, message_id: state!.latestMessageId, reply_markup: { inline_keyboard: keyboard } });
     await answer(callback, enabled ? 'Личные напоминания включены.' : 'Личные напоминания выключены. Запросить песни вручную всё ещё можно.');
     return;
