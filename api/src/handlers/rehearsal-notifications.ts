@@ -8,6 +8,7 @@ import type { Rehearsal, User } from '../lib/types.js';
 import { HOUR, personalNotificationsAllowed, preparationGroups, preparationText, rehearsalLabel, rehearsalLabelText, rehearsalStart, reminderDue } from '../lib/rehearsal-reminder-plan.js';
 import { claimDelivery, claimDeliveries, deliveryStateId, getState, notificationTable, preferenceId, releaseDelivery, setStateFields, type ReminderState } from '../lib/reminder-state.js';
 import { sendBotMessage, telegramCall, telegramWebhookSecret, type InlineButton, type TelegramResult } from '../lib/telegram.js';
+import { personalLink, personalButtons } from '../lib/notification-buttons.js';
 import { ok, err } from '../lib/response.js';
 
 const groupChat = () => process.env.REHEARSAL_GROUP_CHAT_ID ?? '';
@@ -21,10 +22,7 @@ const digestKey = (telegramId: string, r: Rehearsal) => `personal:${telegramId}:
 const requestKey = (telegramId: string, r: Rehearsal) => `request:${telegramId}:${r.id}`;
 const fingerprint = (r?: Rehearsal) => createHash('sha256').update(JSON.stringify(r ? [r.date, r.startTime, r.endTime, r.timeZone, r.location, r.cancelled] : ['deleted'])).digest('hex').slice(0, 24);
 const groupButtons = (r: Rehearsal): InlineButton[][] => [[{ text: 'Открыть репетицию', url: url(r) }], [{ text: 'А мне чё учить?', callback_data: `prep:${r.id}` }]];
-const personalLink = (user: User, rehearsalId: string): InlineButton => user.isAdmin || user.role === 'writer'
-  ? { text: 'Открыть репетицию', url: `https://kittens.band/rehearsals/${encodeURIComponent(rehearsalId)}` }
-  : { text: 'Открыть каталог', url: 'https://kittens.band/backlog' };
-const personalButtons = (enabled: boolean, r: Rehearsal, user: User): InlineButton[][] => [[personalLink(user, r.id)], [{ text: enabled ? 'Отключить напоминания' : 'Включить напоминания', callback_data: enabled ? 'notify:stop' : 'notify:resume' }]];
+
 
 async function finishDelivery(id: string, receipt: string, result: TelegramResult<{ message_id: number }>, now: number): Promise<boolean> {
   if (result.ok) { await setStateFields(id, { status: 'sent', sentAt: now, messageId: result.result.message_id }); return true; }
@@ -77,7 +75,7 @@ async function sendPersonal(user: User & { telegramId: string }, rehearsals: Reh
   if (!await removePreviousControl(user, preference?.latestMessageId, preference?.latestRehearsalId)) return 'rejected';
   // Clear the pointer before sending, so a removed button is immediately stale.
   await setStateFields(preferenceId(user.telegramId), { latestMessageId: 0 });
-  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0], user), digest.entities);
+  const result = await sendBotMessage(user.telegramId, digest.text, personalButtons(preference?.enabled !== false, live[0].id, user), digest.entities);
   if (!result.ok) {
     if (result.uncertain) console.warn('Personal message outcome unknown; not resending');
     return result.uncertain ? 'uncertain' : 'rejected';

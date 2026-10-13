@@ -98,6 +98,9 @@ The personal setting on the catalog and rehearsal list and `GET/PATCH
 /notification-preferences` control automatic personal reminders. Auth approval
 notifications and group posts are independent. Manual preparation requests remain
 available while opted out.
+Changing the app switch also updates the latest private message's stop/resume
+button, retaining its navigation link. A deleted message or Telegram failure does
+not prevent saving the preference; no new message is sent for a setting change.
 
 Only the latest personal message has the stop/resume control. Remove its previous
 stop/resume button (keeping the rehearsal link) **before** posting another personal digest, invalidate the old pointer,

@@ -235,6 +235,24 @@ test('webhook rejects untrusted callers and invalid JSON; preference endpoint re
   assert.equal(response.statusCode, 200); assert.equal(state('preference:100').enabled, false);
 });
 
+test('app preference changes synchronize only the latest private button and preserve its link', async () => {
+  put('kittens-notifications', { id: 'preference:100', latestMessageId: 42, latestRehearsalId: 'r' });
+  const event = { requestContext: { http: { method: 'PATCH' } } };
+  for (const enabled of [false, true]) {
+    const response = await preferences.notificationPreferencesHandler({ ...event, body: JSON.stringify({ enabled }) }, admin);
+    assert.equal(response.statusCode, 200);
+    const edit = calls.filter(c => c.method === 'editMessageReplyMarkup').at(-1).payload;
+    assert.equal(edit.chat_id, '100');
+    assert.equal(edit.message_id, 42);
+    assert.equal(edit.reply_markup.inline_keyboard[0][0].url, 'https://kittens.band/rehearsals/r');
+    assert.equal(edit.reply_markup.inline_keyboard[1][0].callback_data, enabled ? 'notify:stop' : 'notify:resume');
+  }
+  failure = method => method === 'editMessageReplyMarkup' ? 'reject' : undefined;
+  assert.equal((await preferences.notificationPreferencesHandler({ ...event, body: '{"enabled":false}' }, admin)).statusCode, 200);
+  assert.equal(state('preference:100').enabled, false);
+  assert.equal(messages().length, 0);
+});
+
 test('close rehearsals share one automatic digest and later ticks do not resend after the first ends', async () => {
   const first = rehearsal('a');
   const second = rehearsal('b', '2026-10-16', '10:00', { songs: [{ songId: 'other', song: { ...song, id: 'other', title: 'Other song' } }] });
