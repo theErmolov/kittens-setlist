@@ -41,6 +41,9 @@ jobs:
       - name: Install API dependencies
         run: cd api && npm ci
 
+      - name: Test API
+        run: npm --prefix api test
+
       - name: Install esbuild
         run: npm install -g esbuild
 

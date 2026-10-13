@@ -6,6 +6,7 @@
   import FilterChips from '$components/shared/FilterChips.svelte';
   import { updatePersonalSongComment, updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
   import { formatDuration } from '$lib/utils';
+  import { isSetlistOpen, matchesBacklogFilters } from '$lib/backlog';
   import { lang, t } from '$lib/i18n';
   import { canWrite } from '$lib/auth';
 
@@ -41,13 +42,7 @@
   let flashing = $state(new Set<string>());
 
   // Setlists still relevant for adding: not more than 24h past their start time
-  function isSetlistOpen(sl: Setlist): boolean {
-    if (!sl.date) return true;
-    const start = new Date(`${sl.date}T${sl.startTime || '00:00'}`);
-    if (isNaN(start.getTime())) return true;
-    return Date.now() - start.getTime() < 24 * 60 * 60 * 1000;
-  }
-  let openSetlists = $derived(localSetlists.filter(isSetlistOpen));
+  let openSetlists = $derived(localSetlists.filter(sl => isSetlistOpen(sl)));
   let hasActiveFilters = $derived(
     search.length > 0 || categoryFilter.size > 0 || selectedMusicians.size > 0 || selectedInstruments.size > 0
   );
@@ -97,31 +92,9 @@
   }
 
   let filtered = $derived(() => {
-    const f = scoped().filter(s => {
-    const q = search.toLowerCase();
-    if (q && !s.artist.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q)) return false;
-    if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
-    // AND: every selected musician must actively participate (has an instrument)
-    for (const m of selectedMusicians) {
-      const role = s.musicians[m];
-      if (!role || role.instruments.length === 0) return false;
-    }
-    if (selectedInstruments.size > 0) {
-      if (selectedMusicians.size > 0) {
-        // instrument filter scoped to selected musicians:
-        // at least one selected musician plays one of the selected instruments
-        const match = [...selectedMusicians].some(m => {
-          const role = s.musicians[m];
-          return role && role.instruments.some(i => selectedInstruments.has(i));
-        });
-        if (!match) return false;
-      } else {
-        // no musician selected — any musician playing one of the instruments
-        if (!Object.values(s.musicians).some(r => r.instruments.some(i => selectedInstruments.has(i)))) return false;
-      }
-    }
-    return true;
-    });
+    const f = scoped().filter(s => matchesBacklogFilters(
+      s, search, categoryFilter, selectedMusicians, selectedInstruments,
+    ));
     return [...f].sort((a, b) => a[sortCol].localeCompare(b[sortCol], undefined, { sensitivity: 'base' }) * sortDir);
   });
 

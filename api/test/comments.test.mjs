@@ -163,3 +163,43 @@ test('reader setlist edits propagate only their own note and never change shared
   assert.deepEqual(items('kittens-songs'), beforeSong);
   assert.deepEqual(items('kittens-setlists'), beforeSetlist);
 });
+
+test('shared mutations reject readers, pending accounts and anonymous callers before writing', async () => {
+  const before = structuredClone([...tables]);
+  for (const [user, status] of [['b', 403], ['pending', 403], [null, 401]]) {
+    for (const [method, path, body] of [
+      ['POST', '/songs', song], ['PUT', '/songs/s1', song], ['DELETE', '/songs/s1'],
+      ['POST', '/setlists', { name: 'Injected' }],
+      ['POST', '/setlists/show/songs', { songs: [song] }],
+      ['PUT', '/setlists/show/order', { entries: [] }], ['DELETE', '/setlists/show'],
+    ]) {
+      assert.equal((await request(method, path, body, user)).status, status, `${user} ${method} ${path}`);
+    }
+  }
+  assert.deepEqual([...tables], before);
+});
+
+test('budget reads and writes are admin-only, including approved writers', async () => {
+  for (const user of ['a', 'b']) {
+    assert.equal((await request('GET', '/budget', undefined, user)).status, 403);
+    assert.equal((await request('POST', '/budget', { kind: 'income', amount: 1000 }, user)).status, 403);
+  }
+  assert.equal((await request('GET', '/budget', undefined, 'admin')).status, 200);
+});
+
+test('expired or unknown sessions cannot read protected data but public stage still works', async () => {
+  put('kittens-sessions', { token: 'expired', telegramId: 'a', expiresAt: Math.floor(Date.now() / 1000) - 1 });
+  for (const user of ['expired', 'unknown', null]) {
+    assert.equal((await request('GET', '/songs', undefined, user)).status, 401);
+    assert.equal((await request('GET', '/setlists/show', undefined, user)).status, 200);
+  }
+});
+
+test('catalog edits and archival preserve the arrangement already saved in a setlist', async () => {
+  await addSong();
+  const before = structuredClone(items('kittens-setlists')[0].entries[0].song);
+  assert.equal((await request('PUT', '/songs/s1', { ...song, title: 'Changed', archived: true, musicians: { Bass: { instruments: ['bass'] } } })).status, 200);
+  const snapshot = (await request('GET', '/setlists/show')).body.entries[0].song;
+  assert.deepEqual(snapshot, before);
+  assert.equal((await request('GET', '/songs/s1')).body.title, 'Changed');
+});

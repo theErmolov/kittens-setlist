@@ -23,7 +23,11 @@ export function appendSongsToSetlist(
   const startOrder = nextVisualOrder(setlist);
   const preparedSongs = setlistOnly
     ? songs.map(song => ({ ...song, id: createId() }))
-    : songs.filter(song => !existing.has(song.id));
+    : songs.filter(song => {
+      if (existing.has(song.id)) return false;
+      existing.add(song.id);
+      return true;
+    });
 
   const newEntries: SetlistEntry[] = preparedSongs.map((song, index) => ({
     songId: song.id,
