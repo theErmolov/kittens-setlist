@@ -52,9 +52,8 @@
 </script>
 
 {#if $currentUser?.isAdmin}
-    <section class="audit-section">
+    <section>
       <div class="audit-header">
-        <h1>{$t.admin.auditLog}</h1>
         <select bind:value={auditPageSize} class="page-size-select"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select>
       </div>
       {#if auditLoading}<p class="hint">…</p>
@@ -79,12 +78,9 @@
 {/if}
 
 <style>
-  h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 24px; }
   .hint { font-size: 0.8rem; color: var(--text-muted); }
   .page-size-select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 0.85rem; }
-  .audit-section { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
-  .audit-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .audit-header h1 { margin: 0; }
+  .audit-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
   .audit-table { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .audit-row { display: grid; grid-template-columns: 9rem 7rem 1fr 1fr; gap: 8px; padding: 8px 12px; font-size: 0.83rem; border-bottom: 1px solid var(--border); }
   .audit-row:last-child { border-bottom: 0; }

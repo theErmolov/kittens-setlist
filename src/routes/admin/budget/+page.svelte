@@ -89,9 +89,7 @@
 </script>
 
 {#if $currentUser?.isAdmin}
-<div class="page">
-  <h1>{$t.budget.title}</h1>
-
+<div>
   {#if loading}
     <p class="loading">…</p>
   {:else}
@@ -177,8 +175,6 @@
 {/if}
 
 <style>
-  .page { padding: 20px 16px; max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 1.4rem; margin-bottom: 16px; }
   .loading, .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 
   .dash { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }

@@ -272,7 +272,6 @@
 
 <section class="people-section">
   <div class="people-title">
-    <h2>{$t.admin.users}</h2>
     <button class="btn primary" onclick={startStandaloneMusician}>{$t.musicians.addBtn}</button>
   </div>
 
@@ -421,8 +420,7 @@
 
 <style>
   .people-section { margin-bottom: 28px; }
-  .people-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  h2 { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+  .people-title { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
   .people-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .people-header, .people-row { display: grid; grid-template-columns: minmax(190px, 1.2fr) minmax(90px, 0.5fr) minmax(120px, 0.65fr) minmax(250px, 1.35fr); gap: 12px; align-items: center; }
   .people-header { padding: 8px 12px; background: var(--surface); color: var(--text-muted); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }

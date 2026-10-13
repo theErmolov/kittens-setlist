@@ -24,8 +24,7 @@
 </script>
 
 {#if $currentUser?.isAdmin}
-<div class="admin-users">
-  <h1>{$t.admin.users}</h1>
+<div>
   {#if loading}
     <p class="hint">…</p>
   {:else}
@@ -35,7 +34,5 @@
 {/if}
 
 <style>
-  .admin-users { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
-  h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 24px; }
   .hint { font-size: 0.8rem; color: var(--text-muted); }
 </style>
