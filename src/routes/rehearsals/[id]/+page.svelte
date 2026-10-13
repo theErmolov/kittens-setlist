@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
@@ -95,7 +96,7 @@
 <div class="page">
   <a class="back" href="{base}/rehearsals">‹ {$rt.title}</a>
   {#if error}<div class="error" role="alert">{error} <button onclick={reload} disabled={busy}>{$rt.reload}</button></div>{/if}
-  {#if loading}<p>{$rt.loading}</p>
+  {#if loading}<p class="loading"><LoadingCat /></p>
   {:else if rehearsal}
     <header>
       <div><h1>{formatDate(rehearsal.date, $lang)}</h1><div class="time">{rehearsal.startTime}</div></div>
@@ -156,6 +157,7 @@
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
+  .loading { padding: 40px 20px; }
   .page { max-width: 820px; margin: 0 auto; padding: 22px 16px 48px; }
   .back { display: inline-block; margin-bottom: 22px; color: var(--text-muted); text-decoration: none; font-size: .85rem; }
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; } h1 { font-size: 1.5rem; margin: 0 0 8px; } h2 { font-size: 1rem; margin: 0; }

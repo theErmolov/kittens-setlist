@@ -1,4 +1,5 @@
 <script lang="ts">
+  import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
@@ -58,8 +59,8 @@
 
 {#if $canAccessRehearsals}
 <div class="page">
-  <header><h1>{$rt.title}</h1><button class="primary" onclick={plan} disabled={loading || !!error}>{$rt.new}</button></header>
-  {#if loading}<p class="empty">{$rt.loading}</p>
+  <header><button class="primary" onclick={plan} disabled={loading || !!error}>{$rt.new}</button></header>
+  {#if loading}<p class="loading"><LoadingCat /></p>
   {:else if error}<p class="error" role="alert">{error}</p><button onclick={load}>{$rt.retry}</button>
   {:else}
     <h2>{$rt.upcoming}</h2>
@@ -95,9 +96,10 @@
 {#if showNew && !loading}<RehearsalForm {initial} {setlists} {musicians} onsubmit={save} onclose={closeForm} />{/if}
 {/if}
 <style>
+  .loading { padding: 40px 20px; }
   .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
   header, .day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  header { margin-bottom: 24px; } h1 { font-size: 1.5rem; margin: 0; } h2 { font-size: 1rem; margin: 0 0 12px; }
+  header { justify-content: flex-end; margin-bottom: 24px; } h2 { font-size: 1rem; margin: 0 0 12px; }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
   .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .upcoming { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 12px; margin-bottom: 20px; }

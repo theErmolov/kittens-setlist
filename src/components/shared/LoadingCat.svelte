@@ -8,7 +8,7 @@
 </span>
 
 <style>
-  .loading-cat { display: inline-flex; vertical-align: middle; }
+  .loading-cat { display: flex; width: 100%; justify-content: center; }
   .spinner { display: block; animation: spin 1.5s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) {

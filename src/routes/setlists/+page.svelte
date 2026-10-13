@@ -43,10 +43,11 @@
 </script>
 
 <div class="page">
-  <div class="page-header">
-    <h1>{$t.setlists.title}</h1>
-    {#if $canWrite}<button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>{/if}
-  </div>
+  {#if $canWrite}
+    <div class="page-header">
+      <button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>
+    </div>
+  {/if}
 
   {#if showNew && $canWrite}
     <div class="new-form">
@@ -89,8 +90,7 @@
 
 <style>
   .page { padding: 20px 16px; max-width: 640px; margin: 0 auto; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  .page-header h1 { font-size: 1.4rem; }
+  .page-header { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 20px; }
   .new-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
   .new-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
   .new-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

@@ -57,7 +57,7 @@
       <div class="audit-header">
         <select bind:value={auditPageSize} class="page-size-select"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select>
       </div>
-      {#if auditLoading}<p class="hint"><LoadingCat /></p>
+      {#if auditLoading}<p class="loading"><LoadingCat /></p>
       {:else if auditItems.length === 0}<p class="hint">{$t.admin.auditEmpty}</p>
       {:else}
         <div class="audit-table">
@@ -79,6 +79,7 @@
 {/if}
 
 <style>
+  .loading { padding: 40px 20px; }
   .hint { font-size: 0.8rem; color: var(--text-muted); }
   .page-size-select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 0.85rem; }
   .audit-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }

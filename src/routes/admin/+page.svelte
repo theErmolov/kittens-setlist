@@ -3,7 +3,6 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import PeopleManager from '$components/admin/PeopleManager.svelte';
-  import { t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { getUsers } from '$lib/api';
   import type { User } from '$lib/types';
@@ -27,7 +26,7 @@
 {#if $currentUser?.isAdmin}
 <div>
   {#if loading}
-    <p class="hint"><LoadingCat /></p>
+    <p class="loading"><LoadingCat /></p>
   {:else}
     <PeopleManager bind:users />
   {/if}
@@ -35,5 +34,5 @@
 {/if}
 
 <style>
-  .hint { font-size: 0.8rem; color: var(--text-muted); }
+  .loading { padding: 40px 20px; }
 </style>
