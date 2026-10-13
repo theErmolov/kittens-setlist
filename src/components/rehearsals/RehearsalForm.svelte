@@ -105,7 +105,7 @@
 </div>
 <style>
   .overlay { position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .modal { width: min(560px, 100%); max-height: 90dvh; overflow-y: auto; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+  .modal { margin: auto; width: min(560px, 100%); max-height: 90dvh; overflow-y: auto; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
   .modal::backdrop { background: #0008; }
   h2 { font-size: 1.2rem; margin: 0 0 20px; }
   fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
