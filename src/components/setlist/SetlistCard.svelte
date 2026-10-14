@@ -34,7 +34,7 @@
 <style>
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 12px; transition: border-color 0.15s; }
   .card:hover { border-color: var(--accent); }
-  .card-link { flex: 1; text-decoration: none; color: inherit; }
+  .card-link { flex: 1; min-width: 0; text-decoration: none; color: inherit; }
   .card-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
   .card-meta { display: flex; gap: 12px; align-items: center; }
   .date, .count { font-size: 0.82rem; color: var(--text-muted); }

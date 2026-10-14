@@ -861,7 +861,7 @@
             <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes, $lang)})</span>
             {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}
           </div>
-          <Note value={localComment} label={$t.common.setlistComment} onsave={$canWrite ? async (value) => {
+          <Note value={localComment} label={$t.common.setlistComment} mobileCollapsible onsave={$canWrite ? async (value) => {
             const updated = await updateSetlistComment(setlist.id, value);
             applyUpdate(updated);
           } : undefined} />

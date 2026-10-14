@@ -1,15 +1,44 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { t } from '$lib/i18n';
 
-  let { value = '', label, onsave, preview = false, collapsible = false }: {
+  let { value = '', label, onsave, preview = false, collapsible = false, mobileCollapsible = false }: {
     value?: string;
     label: string;
     onsave?: (value: string) => Promise<void>;
     preview?: boolean;
     collapsible?: boolean;
+    mobileCollapsible?: boolean;
   } = $props();
   let expanded = $state(false);
   let long = $derived(collapsible && (value.length > 240 || value.split('\n').length > 3));
+  let mobile = $state(false);
+  let textElement = $state<HTMLDivElement>();
+  let mobileOverflow = $state(false);
+  let canExpand = $derived(long || (mobileCollapsible && mobile && mobileOverflow));
+
+  onMount(() => {
+    const query = window.matchMedia('(max-width: 700px)');
+    const update = () => { mobile = query.matches; };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  });
+
+  $effect(() => {
+    const element = textElement;
+    value;
+    expanded;
+    if (!mobileCollapsible || !element) return;
+    const measure = () => {
+      mobileOverflow = element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 3 + 1;
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  });
+
   let editing = $state(false);
   let draft = $state('');
   let saving = $state(false);
@@ -41,8 +70,8 @@
       </div>
       {#if failed}<span class="error" role="alert">{$t.common.commentSaveFailed}</span>{/if}
     {:else}
-      {#if value}<div class="text" class:collapsed={long && !expanded}><span class="label">{label}: </span>{value}</div>{/if}
-      {#if long}<button class="edit" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</button>{/if}
+      {#if value}<div bind:this={textElement} class="text" class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded}><span class="label">{label}: </span>{value}</div>{/if}
+      {#if canExpand}<button class="edit" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</button>{/if}
       {#if onsave}<button class="edit" onclick={() => { draft = value; editing = true; failed = false; }}>{value ? $t.common.edit : $t.common.addComment} · {label}</button>{/if}
     {/if}
   </div>
@@ -50,7 +79,7 @@
 
 <style>
   .note { margin-top: 5px; font-size: 0.85rem; color: var(--text); min-width: 0; }
-  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .text { line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
   .text .label { margin-right: 4px; }
   .label { color: var(--text-muted); font-size: 0.78rem; }
   .collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -61,5 +90,8 @@
   .edit { background: transparent; border: none; padding: 2px 0; }
   .actions { display: flex; gap: 6px; }
   .error { color: #ef4444; }
-  @media (max-width: 700px) { textarea { font-size: 16px; } }
+  @media (max-width: 700px) {
+    .mobile-collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    textarea { font-size: 16px; }
+  }
 </style>
