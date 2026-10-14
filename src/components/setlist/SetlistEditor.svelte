@@ -834,7 +834,7 @@
 </script>
 
 <div class="editor" class:read-only={!$canWrite}>
-  <SetlistRehearsals setlistId={setlist.id} />
+  <div class="setlist-rehearsals"><SetlistRehearsals setlistId={setlist.id} /></div>
   <div class="editor-header">
     <div class="meta">
       {#if editingMeta && $canWrite}
@@ -1556,6 +1556,7 @@
   .entry-time-mob { display: none; }
 
   @media (max-width: 700px) {
+    .setlist-rehearsals { display: none; }
     .editor { height: calc(100dvh - 56px - 64px); }
     .th-musician { display: none; }
     .td-musician { display: none; }

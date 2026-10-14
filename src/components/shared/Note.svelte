@@ -31,7 +31,7 @@
     expanded;
     if (!mobileCollapsible || !element) return;
     const measure = () => {
-      mobileOverflow = element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 3 + 1;
+      mobileOverflow = element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) + 1;
     };
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -58,7 +58,7 @@
 {#if value || onsave || editing}
   <!-- Keep editing notes from triggering row editing, adding, playing, or dragging. -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="note" class:preview onclick={(e) => { if (onsave) e.stopPropagation(); }} onkeydown={(e) => { if (onsave) e.stopPropagation(); }} onmousedown={(e) => { if (onsave) e.stopPropagation(); }} ondragstart={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+  <div class="note" class:preview class:compact-actions={mobileCollapsible} onclick={(e) => { if (onsave) e.stopPropagation(); }} onkeydown={(e) => { if (onsave) e.stopPropagation(); }} onmousedown={(e) => { if (onsave) e.stopPropagation(); }} ondragstart={(e) => { e.stopPropagation(); e.preventDefault(); }}>
     {#if editing}
       <label>
         <span class="label">{label}</span>
@@ -72,7 +72,7 @@
     {:else}
       {#if value}<div bind:this={textElement} class="text" class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded}><span class="label">{label}: </span>{value}</div>{/if}
       {#if canExpand}<button class="edit" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</button>{/if}
-      {#if onsave}<button class="edit" onclick={() => { draft = value; editing = true; failed = false; }}>{value ? $t.common.edit : $t.common.addComment} · {label}</button>{/if}
+      {#if onsave}<button class="edit" onclick={() => { draft = value; editing = true; failed = false; }}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible} · {label}{/if}</button>{/if}
     {/if}
   </div>
 {/if}
@@ -88,10 +88,11 @@
   button { cursor: pointer; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 4px 7px; font: inherit; font-size: 0.78rem; }
   button:disabled { opacity: 0.5; cursor: default; }
   .edit { background: transparent; border: none; padding: 2px 0; }
+  .compact-actions .edit { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
   .actions { display: flex; gap: 6px; }
   .error { color: #ef4444; }
   @media (max-width: 700px) {
-    .mobile-collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .mobile-collapsed, .preview .text { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     textarea { font-size: 16px; }
   }
 </style>
