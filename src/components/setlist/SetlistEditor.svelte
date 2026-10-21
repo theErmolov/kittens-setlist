@@ -1,7 +1,7 @@
 <script lang="ts">
   import SetlistRehearsals from '$components/rehearsals/SetlistRehearsals.svelte';
   import Note from '$components/shared/Note.svelte';
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import type { Setlist, Song, Instrument, SetlistEntry, SetlistSubset, BandMusician, LearningStage } from '$lib/types';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import AddSongsModal from './AddSongsModal.svelte';
@@ -115,6 +115,7 @@
   let autoScrollSpeed = 0;
   let lastDragClientX = 0;
   let lastDragClientY = 0;
+  let cancelTouchReorder: (() => void) | null = null;
   const AUTO_SCROLL_EDGE = 80;
   const AUTO_SCROLL_MAX_SPEED = 22;
 
@@ -432,55 +433,15 @@
       () => isEventLongOver(localMeta.date, localMeta.startTime) || presence.isPaused(),
     );
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY === null || touchStartX === null) return;
-      const touch = e.touches[0];
-      const dy = Math.abs(touch.clientY - touchStartY);
-      const dx = Math.abs(touch.clientX - touchStartX);
-
-      if (draggedEntryKey === null) {
-        if (touchStartEntryKey !== null && dy > DRAG_THRESHOLD && dy > dx) {
-          draggedEntryKey = touchStartEntryKey;
-        } else {
-          return;
-        }
-      }
-      e.preventDefault();
-      updateDropTargetAtPoint(touch.clientX, touch.clientY);
-      updateDragAutoScroll(touch.clientX, touch.clientY);
-    };
-
-    const handleTouchEnd = () => {
-      if (draggedEntryKey !== null) {
-        if (overSubsetId) dropEntryOnSubset(overSubsetId);
-        else dropEntry();
-      }
-      touchStartEntryKey = null;
-      touchStartY = null;
-      touchStartX = null;
-      stopDragAutoScroll();
-    };
-
-    const handleTouchCancel = () => {
-      touchStartEntryKey = null;
-      touchStartY = null;
-      touchStartX = null;
-      clearEntryDrag();
-    };
-
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchcancel', handleTouchCancel);
-
     return () => {
       stopPoller();
       presence.stop();
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('touchcancel', handleTouchCancel);
+      cancelTouchReorder?.();
       stopDragAutoScroll();
     };
   });
+
+  onDestroy(() => cancelTouchReorder?.());
 
   // songMap kept for AddSongsModal deduplication (existingIds)
   let songMap = $derived(new Map(allSongs.map(s => [s.id, s])));
@@ -792,18 +753,115 @@
     stopDragAutoScroll();
   }
 
-  let touchStartEntryKey = $state<string | null>(null);
-  let touchStartY = $state<number | null>(null);
-  let touchStartX = $state<number | null>(null);
-  const DRAG_THRESHOLD = 8;
+  // Touch reordering uses pointer capture so the gesture stays attached to the
+  // handle, while the finger follows a full-width copy of the original row.
+  function startTouchReorder(event: PointerEvent, key: string) {
+    if (event.pointerType !== 'touch' || !$canWrite || isFiltered) return;
+    const handle = event.currentTarget as HTMLElement;
+    const foundSource = handle.closest<HTMLTableRowElement>('[data-row-key]');
+    if (!foundSource) return;
+    const source: HTMLTableRowElement = foundSource;
+    const foundTable = source.closest('table');
+    if (!foundTable) return;
+    const sourceTable: HTMLTableElement = foundTable;
+    cancelTouchReorder?.();
 
-  // Drag handle touch — drag reorder only, stops propagation so row handler doesn't fire
-  function handleDragHandleTouchStart(e: TouchEvent, key: string) {
-    if (!$canWrite) return;
-    e.stopPropagation();
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    if (!isFiltered) touchStartEntryKey = key;
+    const rowRect = source.getBoundingClientRect();
+    const grabX = event.clientX - rowRect.left;
+    const grabY = event.clientY - rowRect.top;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let x = startX;
+    let y = startY;
+    let moved = false;
+    let preview: HTMLTableElement | null = null;
+
+    handle.setPointerCapture(event.pointerId);
+
+    function positionPreview() {
+      if (!preview) return;
+      preview.style.left = `${Math.max(4, Math.min(x - grabX, window.innerWidth - rowRect.width - 4))}px`;
+      preview.style.top = `${Math.max(4, y - grabY)}px`;
+    }
+
+    function showPreview() {
+      const clone = source.cloneNode(true) as HTMLTableRowElement;
+      clone.classList.remove('dragging', 'drag-over', 'subset-block-dragging', 'subset-block-over');
+      clone.removeAttribute('data-row-key');
+      clone.setAttribute('aria-hidden', 'true');
+      clone.inert = true;
+      clone.style.opacity = '1';
+
+      const table = sourceTable.cloneNode(false) as HTMLTableElement;
+      const tableStyle = getComputedStyle(sourceTable);
+      Object.assign(table.style, {
+        position: 'fixed', left: '0', top: '0', zIndex: '200', margin: '0',
+        width: `${rowRect.width}px`, minWidth: `${rowRect.width}px`, maxWidth: `${rowRect.width}px`,
+        tableLayout: 'fixed', borderCollapse: tableStyle.borderCollapse,
+        borderSpacing: tableStyle.borderSpacing, pointerEvents: 'none',
+        opacity: '1', boxShadow: '0 8px 24px #0005',
+      });
+      const body = document.createElement('tbody');
+      const cells = [...source.cells];
+      [...clone.cells].forEach((cell, index) => {
+        const width = cells[index]?.getBoundingClientRect().width ?? 0;
+        if (width > 0) Object.assign(cell.style, { boxSizing: 'border-box', width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` });
+      });
+      body.append(clone);
+      table.append(body);
+      document.body.append(table);
+      preview = table;
+      positionPreview();
+    }
+
+    function move(e: PointerEvent) {
+      x = e.clientX;
+      y = e.clientY;
+      if (!moved && Math.hypot(x - startX, y - startY) > 5) {
+        moved = true;
+        showPreview();
+        draggedEntryKey = key;
+      }
+      if (!moved) return;
+      positionPreview();
+      updateDropTargetAtPoint(x, y);
+      updateDragAutoScroll(x, y);
+    }
+
+    function cleanup(clearDrag: boolean) {
+      preview?.remove();
+      preview = null;
+      stopDragAutoScroll();
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', finish);
+      handle.removeEventListener('pointercancel', cancel);
+      handle.removeEventListener('lostpointercapture', cancel);
+      document.removeEventListener('keydown', keydown);
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      cancelTouchReorder = null;
+      if (clearDrag) clearEntryDrag();
+    }
+
+    function finish(e: PointerEvent) {
+      if (!moved) { cleanup(false); return; }
+      x = e.clientX;
+      y = e.clientY;
+      updateDropTargetAtPoint(x, y);
+      const targetSubset = overSubsetId;
+      cleanup(false);
+      if (targetSubset) void dropEntryOnSubset(targetSubset);
+      else void dropEntry();
+    }
+
+    function cancel() { cleanup(true); }
+    function keydown(e: KeyboardEvent) { if (e.key === 'Escape') cancel(); }
+
+    cancelTouchReorder = cancel;
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', cancel);
+    handle.addEventListener('lostpointercapture', cancel);
+    document.addEventListener('keydown', keydown);
   }
 
   function guestTagsFor(song: Song): { name: string; instruments: Instrument[] }[] {
@@ -1109,7 +1167,7 @@
                     ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
                     ondragend={canDrag ? clearEntryDrag : undefined}
                   >
-                    <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>
+                    <td class="td-drag" onpointerdown={e => startTouchReorder(e, key)}>
                       {#if $canWrite}
                         {#if activeSubsetId !== null}
                           <span class="subset-tap-indicator">{entry.subsetId === activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
@@ -1191,7 +1249,7 @@
                   ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
                   ondragend={canDrag ? clearEntryDrag : undefined}
                 >
-                  <td class="td-drag" ontouchstart={(e) => handleDragHandleTouchStart(e, key)}>{#if $canWrite}<span class="drag-handle">⠿</span>{/if}</td>
+                  <td class="td-drag" onpointerdown={e => startTouchReorder(e, key)}>{#if $canWrite}<span class="drag-handle">⠿</span>{/if}</td>
                   <td class="td-num"></td>
                   {#if localMeta.startTime}<td class="td-time">{entryTimes().get(entryKey(entry)) ?? ''}</td>{/if}
                   <td colspan={totalCols - 2 - (localMeta.startTime ? 1 : 0)} class="td-break">
@@ -1367,6 +1425,7 @@
   .th-num, .td-num { text-align: right; width: 28px; }
   .th-time, .td-time { width: 42px; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; text-align: right; padding-right: 6px; }
   .th-drag, .td-drag { width: 24px; }
+  .td-drag { touch-action: none; -webkit-user-select: none; user-select: none; }
   .th-musician { text-align: center; width: 6%; min-width: 52px; }
   .td-musician { text-align: left; width: 6%; min-width: 52px; }
   .td-musician.progress-delim, .th-musician.progress-delim { border-right: 1px solid rgba(128,128,128,0.22); }
@@ -1383,7 +1442,7 @@
   .song-row:hover td { background: var(--row-hover); }
   .song-row:active { cursor: grabbing; }
   .song-row.dragging td { opacity: 0.35; }
-  .song-row.drag-over td { outline: 2px dashed var(--accent); outline-offset: -1px; }
+  .song-row.drag-over td { outline: 2px dotted var(--accent); outline-offset: -1px; }
   .song-row.subset-block-dragging td { opacity: 0.35; }
   .song-row.subset-block-over td { background: rgba(124, 58, 237, 0.12); }
 
@@ -1393,7 +1452,7 @@
   .break-row td:last-child { border-right: 1px dashed var(--border); }
   .break-row:hover td { border-color: var(--accent); }
   .break-row.dragging td { opacity: 0.35; }
-  .break-row.drag-over td { outline: 2px dashed var(--accent); outline-offset: -1px; }
+  .break-row.drag-over td { outline: 2px dotted var(--accent); outline-offset: -1px; }
 
   .drop-end-row td { height: 28px; border-radius: 8px; }
   .drop-end-active td { outline: 2px dashed var(--accent); }
