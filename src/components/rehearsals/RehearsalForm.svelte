@@ -58,7 +58,7 @@
 
 <div class="overlay">
   <dialog class="modal" aria-labelledby="rehearsal-form-title" use:modalDialog={() => { if (!busy) onclose(); }}>
-    <h2 id="rehearsal-form-title">{title ?? $rt.new}</h2>
+    <h2 id="rehearsal-form-title" tabindex="-1" autofocus>{title ?? $rt.new}</h2>
     <form onsubmit={save}>
       <fieldset class="form-body" disabled={busy}>
         {#snippet details()}
@@ -108,8 +108,8 @@
   .form-body { border: 0; padding: 0; margin: 0; min-width: 0; min-height: 0; flex: 1; overflow: hidden; }
   .form-footer { flex-shrink: 0; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; background: var(--surface); }
   .details-fields { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  label { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; color: var(--text-muted); }
-  input, select, textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--bg); color: var(--text); font: inherit; }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: .82rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+  input, select, textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 1rem; font-weight: 400; letter-spacing: normal; line-height: normal; text-transform: none; }
   .times { display: flex; flex-wrap: wrap; gap: 10px; }
   .times > label { flex: 1 1 110px; }
   .date-control { flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; }
@@ -121,7 +121,7 @@
   .native-date::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
   button { font: inherit; border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--bg); color: var(--text); cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
-  .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
   .error { color: #dc2626; font-size: .85rem; }
   @media(max-width: 700px), (max-height: 550px) { .form-body { overflow-y: auto; overscroll-behavior: contain; } }
