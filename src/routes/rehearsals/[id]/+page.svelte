@@ -38,8 +38,7 @@
     }).catch(() => { if (active) { error = $rt.error; loading = false; } });
     return () => { active = false; };
   });
-  let dropSide = $state<'before' | 'after'>('before');
-  let dragX = $state(0), dragY = $state(0), dragMoved = $state(false);
+  let dragMoved = $state(false);
   let cancelDrag: (() => void) | undefined;
   onDestroy(() => cancelDrag?.());
   let dragIndex = $state<number | null>(null), dropIndex = $state<number | null>(null);
@@ -59,32 +58,53 @@
     if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
     cancelDrag?.();
     const handle = event.currentTarget as HTMLButtonElement;
+    const source = handle.closest<HTMLElement>('[data-rehearsal-index]')!;
+    const rect = source.getBoundingClientRect();
+    const offsetX = event.clientX - rect.left, offsetY = event.clientY - rect.top;
+    let preview: HTMLElement | null = null;
     handle.setPointerCapture(event.pointerId);
     let x = event.clientX, y = event.clientY, moved = false, frame = 0;
     const startY = y;
     dragIndex = index; dropIndex = index; dragMoved = false;
     function target() {
       const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-rehearsal-index]');
-      if (row) {
-        dropIndex = Number(row.dataset.rehearsalIndex);
-        const rect = row.getBoundingClientRect();
-        dropSide = y < rect.top + rect.height / 2 ? 'before' : 'after';
+      if (row) dropIndex = Number(row.dataset.rehearsalIndex);
+      if (preview) {
+        preview.style.left = `${Math.max(8, Math.min(x - offsetX, window.innerWidth - rect.width - 8))}px`;
+        preview.style.top = `${Math.max(8, y - offsetY)}px`;
       }
-      dragX = Math.max(8, Math.min(x + 14, window.innerWidth - 248));
-      dragY = Math.max(8, Math.min(y + 14, window.innerHeight - 86));
+    }
+    function showPreview() {
+      // Clone the actual card so expanded details, readiness and wrapping stay identical.
+      preview = source.cloneNode(true) as HTMLElement;
+      preview.classList.remove('dragging', 'drop-target');
+      preview.classList.add('drag-preview');
+      preview.removeAttribute('data-rehearsal-index');
+      preview.removeAttribute('id');
+      preview.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+      preview.setAttribute('aria-hidden', 'true');
+      preview.inert = true;
+      preview.style.width = `${rect.width}px`;
+      preview.style.font = getComputedStyle(source).font;
+      const originalFields = source.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+      preview.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select').forEach((field, i) => {
+        field.value = originalFields[i].value;
+        if (field instanceof HTMLInputElement && originalFields[i] instanceof HTMLInputElement) field.checked = originalFields[i].checked;
+      });
+      document.body.append(preview);
     }
     function scroll() {
       if (moved) { const speed = y < 100 ? -12 : y > window.innerHeight - 80 ? 12 : 0; if (speed) { window.scrollBy(0, speed); target(); } }
       frame = requestAnimationFrame(scroll);
     }
-    function move(e: PointerEvent) { x = e.clientX; y = e.clientY; if (Math.abs(y - startY) > 5) { moved = true; dragMoved = true; } if (moved) target(); }
+    function move(e: PointerEvent) { x = e.clientX; y = e.clientY; if (!moved && Math.abs(y - startY) > 5) { showPreview(); moved = true; dragMoved = true; } if (moved) target(); }
     function finish(e: PointerEvent) {
-      const boundary = dropIndex === null ? index : dropIndex + (dropSide === 'after' ? 1 : 0);
-      const to = boundary > index ? boundary - 1 : boundary;
+      const to = dropIndex;
       cleanup();
-      if (e.type === 'pointerup' && moved) reorder(index, to);
+      if (e.type === 'pointerup' && moved && to !== null) reorder(index, to);
     }
     function cleanup() {
+      preview?.remove(); preview = null;
       cancelAnimationFrame(frame); dragIndex = null; dropIndex = null; dragMoved = false; cancelDrag = undefined;
       document.removeEventListener('keydown', keydown);
       handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', finish); handle.removeEventListener('pointercancel', finish); handle.removeEventListener('lostpointercapture', finish);
@@ -175,7 +195,7 @@
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, activeAttendees)}
       {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !activeAttendees.includes(name))}
-      <article class="song" data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index} class:drop-before={dropSide === 'before'} class:drop-after={dropSide === 'after'}>
+      <article class="song" data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index}>
         <div class="song-row">
           <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</button>
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><strong>{item.song.title}</strong><small>{item.song.artist}</small></button>
@@ -210,10 +230,6 @@
   {/if}
 </div>
 {#if showForm && rehearsal}<RehearsalForm title={repeating ? $rt.repeat : $rt.edit} initial={formInitial} {setlists} {musicians} {catalog} onsubmit={saveForm} onclose={() => { showForm = false; }} />{/if}
-{#if dragMoved && dragIndex !== null && rehearsal}
-  {@const item = rehearsal.songs[dragIndex]}
-  <div class="drag-preview" style:left={`${dragX}px`} style:top={`${dragY}px`} aria-hidden="true"><span>⠿</span><div><strong>{item.song.title}</strong><small>{item.song.artist}</small></div></div>
-{/if}
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
@@ -237,13 +253,8 @@
   .drag-handle:hover, .drag-handle:focus-visible { color: var(--accent); border-color: var(--accent); }
   .drag-handle:active { cursor: grabbing; }
   .reorder-hint { font-size: .78rem; color: var(--text-muted); margin: -5px 0 14px; }
-  .dragging { opacity: .35; } .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; }
-  .drop-target::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); pointer-events: none; }
-  .drop-before::after { top: 0; } .drop-after::after { bottom: 0; }
-  .drag-preview { position: fixed; z-index: 200; pointer-events: none; display: flex; align-items: center; gap: 12px; width: 240px; box-sizing: border-box; padding: 12px; border: 2px solid var(--accent); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #0003; }
-  .drag-preview > span { color: var(--accent); font-size: 1.35rem; }
-  .drag-preview div { min-width: 0; } .drag-preview strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
-  .drag-preview small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); margin-top: 4px; font-size: .78rem; }
+  .dragging { opacity: .35; } .drop-target { outline: 2px dotted var(--accent); outline-offset: -2px; }
+  :global(.song.drag-preview) { position: fixed; z-index: 200; pointer-events: none; box-sizing: border-box; margin: 0; opacity: 1; box-shadow: 0 8px 24px #0003; }
 
   .song-title { flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; } .song-title strong { font-size: .95rem; } .song-title small { display: block; font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
   .pct { padding: 5px 8px; border-radius: 12px; font-size: .8rem; font-weight: 650; flex-shrink: 0; }
