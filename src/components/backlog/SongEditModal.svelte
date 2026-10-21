@@ -223,12 +223,12 @@
       <fieldset disabled={saving}>
       <div class="fields-row">
         <div class="field">
-          <label>{$t.song.artist}</label>
-          <input bind:value={draft.artist} placeholder={$t.song.artist} />
+          <label for="song-editor-artist">{$t.song.artist}</label>
+          <input id="song-editor-artist" bind:value={draft.artist} placeholder={$t.song.artist} />
         </div>
         <div class="field">
-          <label>{$t.song.title}</label>
-          <input bind:value={draft.title} placeholder={$t.song.title} />
+          <label for="song-editor-title">{$t.song.title}</label>
+          <input id="song-editor-title" bind:value={draft.title} placeholder={$t.song.title} />
         </div>
       </div>
 
@@ -324,12 +324,12 @@
 
       <div class="fields-row">
         <div class="field" style="flex: 3">
-          <label>{$t.song.comment}</label>
-          <input bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
+          <label for="song-editor-comment">{$t.song.comment}</label>
+          <input id="song-editor-comment" bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
         </div>
         <div class="field field-length">
-          <label>{$t.song.length}</label>
-          <input type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
+          <label for="song-editor-length">{$t.song.length}</label>
+          <input id="song-editor-length" type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
         </div>
       </div>
       {:else}
@@ -375,18 +375,21 @@
   @media (max-width: 700px) { .personal-comment-field textarea { font-size: 16px; } }
 
   .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+    position: fixed; inset: 0; background: #0008;
+    display: flex; align-items: center; justify-content: center; z-index: 150; padding: 16px;
   }
   .modal {
-    background: var(--surface); border-radius: 12px;
-    width: 100%; max-width: 760px; height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+    box-sizing: border-box; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 16px;
+    width: min(760px, 100%); height: min(820px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px);
+    padding: 22px; overflow: hidden; display: flex; flex-direction: column;
   }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .modal-header h2 { margin: 0; font-size: 1.1rem; }
+  .modal button { font-family: inherit; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 20px; flex-shrink: 0; }
+  .modal-header h2 { flex: 1; margin: 0; font-size: 1.2rem; font-weight: 700; }
   .close-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 4px 8px; }
-  .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow-y: auto; }
-  .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+  .modal-body { padding: 0; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
   .footer-left { display: flex; gap: 6px; }
   .footer-right { display: flex; gap: 8px; }
   .btn-icon {
@@ -405,11 +408,12 @@
 
   .fields-row { display: flex; gap: 12px; }
   .fields-row .field { flex: 1; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field > label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
+  .field > label { color: var(--text-muted); }
+  .fields-row .field > input:not([type="radio"]):not([type="checkbox"]) { font-size: 1rem; }
   input:not([type="radio"]):not([type="checkbox"]) {
-    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--bg); color: var(--text); font-size: 0.9rem; width: 100%; box-sizing: border-box;
+    padding: 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--bg); color: var(--text); font: inherit; width: 100%; box-sizing: border-box;
   }
   .cat-chips { display: flex; gap: 6px; }
   .cat-chip {
@@ -548,17 +552,17 @@
 
   .field-length { flex: 1; }
 
-  .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-  .btn-secondary { padding: 8px 20px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+  .btn-primary { padding: 8px 12px; background: var(--accent); color: #fff; border: 1px solid var(--accent); border-radius: 7px; cursor: pointer; font: inherit; font-weight: 600; }
+  .btn-secondary { padding: 8px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font: inherit; }
 
   .back-btn { display: none; }
 
-  @media (max-width: 760px) {
+  @media (max-width: 760px), (max-height: 550px) {
     /* Full-screen modal */
     .modal-backdrop { padding: 0; align-items: stretch; }
-    .modal { max-width: none; max-height: none; border-radius: 0; height: 100dvh; }
+    .modal { width: 100vw; width: 100dvw; max-width: none; max-height: none; height: 100vh; height: 100dvh; border: 0; border-radius: 0; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
     .modal-header { position: sticky; top: 0; z-index: 1; background: var(--surface); }
-    .modal-header h2 { flex: 1; text-align: center; }
+    .modal-header h2 { flex: 1; text-align: left; }
     .back-btn {
       display: flex; align-items: center; gap: 4px;
       background: none; border: none; cursor: pointer;
@@ -566,6 +570,8 @@
     }
     .close-btn { display: none; }
     .fields-row { flex-direction: column; }
+    input:not([type="radio"]):not([type="checkbox"]), textarea { font-size: 16px; }
+    .lyrics-editor { font-size: 16px; }
 
     /* 2-line musician layout:
        Line 1: name  ···  progress bar

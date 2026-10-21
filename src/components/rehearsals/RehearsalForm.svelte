@@ -126,4 +126,22 @@
   .error { color: #dc2626; font-size: .85rem; }
   @media(max-width: 700px), (max-height: 550px) { .form-body { overflow-y: auto; overscroll-behavior: contain; } }
   @media(max-width: 600px) { input, select, textarea { font-size: 16px; } .modal { padding: 16px; } }
+  @media(max-width: 700px), (max-height: 550px) {
+    .overlay { padding: 0; align-items: stretch; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      margin: 0;
+      width: 100vw;
+      width: 100dvw;
+      max-width: none;
+      height: 100vh;
+      height: 100dvh;
+      max-height: none;
+      border: 0;
+      border-radius: 0;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+    .form-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  }
 </style>
