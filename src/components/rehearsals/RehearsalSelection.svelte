@@ -50,7 +50,7 @@
       <div class="tabs">
         {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
         <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
-        <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
+        <button type="button" class="selected-count" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
       </div>
     </div>
     <input class="search" bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
@@ -60,8 +60,8 @@
         {@const coverage = rehearsalCoverage(item.song, attendees)}
         <label class="song" class:incomplete={!coverage.complete} class:chosen={isSelected(item)}>
           <input type="checkbox" checked={isSelected(item)} onchange={() => toggle(item)} />
-          <RehearsalReadiness value={pct} label={$rt.fullReadiness} />
           <span class="song-copy"><RehearsalSongName artist={item.song.artist} title={item.song.title} dimmed={!coverage.complete} /><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
+          <RehearsalReadiness value={pct} label={$rt.fullReadiness} />
         </label>
       {:else}<p>{$rt.noMatches}</p>{/each}
     </div>
@@ -83,16 +83,17 @@
   button:disabled, input:disabled { opacity: .5; cursor: default; }
   .active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .attendees-header, .chips, .guest, .tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .selected-count { box-sizing: border-box; width: 9rem; flex: 0 0 9rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .attendees-header strong { margin-right: auto; font-size: .9rem; }
   .attendees-header button { font-size: .78rem; }
   .chips button { font-size: .85rem; }
-  .chips span { margin-left: 4px; font-size: .75rem; }
+  .chips span { display: inline-block; min-width: calc(2ch + 1px); margin-left: 4px; font-size: .75rem; font-variant-numeric: tabular-nums; text-align: right; }
   .needed { box-shadow: 0 0 0 2px var(--accent); }
   .unused { opacity: .65; }
   .guest { flex-wrap: nowrap; }
   input:not([type=checkbox]) { box-sizing: border-box; min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
   .songs { flex: 1; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-  .song { display: grid; grid-template-columns: 18px 38px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 8px; min-height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .song { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 8px; min-height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--border); cursor: pointer; }
   .song input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
   .song-copy { min-width: 0; overflow-wrap: anywhere; }
   small { display: block; color: var(--text-muted); margin-top: 3px; font-size: .75rem; }

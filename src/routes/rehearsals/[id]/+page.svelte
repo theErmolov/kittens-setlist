@@ -230,8 +230,9 @@
       <article class="song" data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index}>
         <div class="song-row">
           <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</button>
-          <div class="song-order"><span>{index + 1}</span><RehearsalReadiness value={pct} label={$rt.sessionReadiness} /></div>
+          <span class="song-order">{index + 1}</span>
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><RehearsalSongName artist={item.song.artist} title={item.song.title} /></button>
+          <RehearsalReadiness value={pct} label={$rt.sessionReadiness} />
         </div>
         {#if pct === null}<p class="song-hint">{$rt.noPlayers}</p>{/if}
         {#if missing.length}<p class="song-hint">{$rt.missing}: {missing.join(', ')}</p>{/if}
@@ -276,9 +277,9 @@
   .song-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 24px 0 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 3px; } .song { position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: clip; }
-  .song-row { display: grid; grid-template-columns: 32px 38px minmax(0, 1fr); gap: 8px; align-items: center; padding: 7px 8px; }
+  .song-row { display: grid; grid-template-columns: 32px 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 8px; }
   .song:hover { background: var(--row-hover); }
-  .song-order { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: .82rem; color: var(--text-muted); }
+  .song-order { text-align: center; font-size: .82rem; color: var(--text-muted); }
   .drag-handle { touch-action: none; cursor: grab; width: 32px; min-height: 44px; padding: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }
   .drag-handle:hover { color: var(--accent); }
   .drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -288,7 +289,7 @@
   :global(.song.drag-preview) { position: fixed; z-index: 200; pointer-events: none; box-sizing: border-box; margin: 0; opacity: 1; box-shadow: 0 8px 24px #0003; }
 
   .song-title { font: inherit; flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; }
-  .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 8px 6px 94px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 8px 8px 94px; overflow-wrap: anywhere; }
+  .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 8px 6px 76px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 8px 8px 76px; overflow-wrap: anywhere; }
   .details { padding: 14px; border-top: 1px solid var(--border); } .details > p:first-child { margin-top: 0; }
   .musician { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; font-size: .85rem; } .musician small { margin-left: 5px; } .absent { opacity: .5; }
   textarea { border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); padding: 8px; font: inherit; }
