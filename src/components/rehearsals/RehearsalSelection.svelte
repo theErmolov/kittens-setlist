@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RehearsalSongName from './RehearsalSongName.svelte';
+  import RehearsalReadiness from './RehearsalReadiness.svelte';
   import { untrack, type Snippet } from 'svelte';
   import { orderMusicianNames } from '$lib/utils';
   import type { BandMusician, RehearsalSong, Song, Setlist } from '$lib/types';
@@ -43,22 +45,23 @@
     </fieldset>
   </aside>
   <fieldset class="songs-panel" aria-label={$rt.songSelectionTitle} {disabled}>
-    <h3>{$rt.songSelectionTitle}</h3>
-    <div class="tabs">
-      {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
-      <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
-      <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
+    <div class="songs-header">
+      <h3>{$rt.songSelectionTitle}</h3>
+      <div class="tabs">
+        {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
+        <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
+        <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
+      </div>
     </div>
     <input class="search" bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
-    <p class="hint" aria-live="polite">{selected.length} {$rt.selected}</p>
     <div class="songs">
       {#each visible as item (rehearsalSongKey(item))}
         {@const pct = rehearsalReadiness(item.song)}
         {@const coverage = rehearsalCoverage(item.song, attendees)}
         <label class="song" class:incomplete={!coverage.complete} class:chosen={isSelected(item)}>
           <input type="checkbox" checked={isSelected(item)} onchange={() => toggle(item)} />
-          <span class="song-copy"><strong>{item.song.title}</strong><small>{item.song.artist}</small><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
-          <span class="pct" title={$rt.fullReadiness}>{pct === null ? '—' : `${pct}%`}</span>
+          <RehearsalReadiness value={pct} label={$rt.fullReadiness} />
+          <span class="song-copy"><RehearsalSongName artist={item.song.artist} title={item.song.title} dimmed={!coverage.complete} /><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
         </label>
       {:else}<p>{$rt.noMatches}</p>{/each}
     </div>
@@ -68,6 +71,7 @@
   .selection-layout { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(240px, .75fr) minmax(0, 1.6fr); gap: 24px; }
   aside { min-height: 0; overflow-y: auto; padding: 2px 4px 8px 2px; display: flex; flex-direction: column; gap: 22px; }
   fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .songs-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   .songs-panel { min-height: 0; overflow: hidden; }
   .songs-panel > :not(.songs) { flex-shrink: 0; }
   .chips { padding: 2px; }
@@ -88,12 +92,13 @@
   .guest { flex-wrap: nowrap; }
   input:not([type=checkbox]) { box-sizing: border-box; min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
   .songs { flex: 1; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-  .song { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .song { display: grid; grid-template-columns: 18px 38px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 8px; min-height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--border); cursor: pointer; }
   .song input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
   .song-copy { min-width: 0; overflow-wrap: anywhere; }
-  .song strong { font-size: .9rem; } small { display: block; color: var(--text-muted); margin-top: 3px; font-size: .75rem; }
-  .incomplete strong { color: var(--text-muted); } .chosen { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
-  .complete { color: var(--accent); } .pct { margin-left: auto; flex-shrink: 0; font-size: .85rem; color: var(--text-muted); }
+  small { display: block; color: var(--text-muted); margin-top: 3px; font-size: .75rem; }
+  .song:not(.chosen):hover { background: var(--row-hover); }
+  .chosen { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .complete { color: var(--accent); }
   @media(max-width: 700px), (max-height: 550px) {
     .selection-layout { height: auto; display: flex; flex-direction: column; }
     aside { overflow: visible; flex-shrink: 0; }
