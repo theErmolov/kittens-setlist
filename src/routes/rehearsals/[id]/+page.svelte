@@ -49,6 +49,12 @@
     songs.splice(to, 0, songs.splice(from, 1)[0]);
     action({ songs });
   }
+  function orderByReadiness() {
+    if (!rehearsal || busy || rehearsal.cancelled || dragIndex !== null) return;
+    const songs = [...rehearsal.songs].sort((a, b) =>
+      (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity));
+    if (songs.some((song, index) => song !== rehearsal!.songs[index])) action({ songs });
+  }
   function startDrag(event: PointerEvent, index: number) {
     if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
     cancelDrag?.();
@@ -161,7 +167,7 @@
     <section class="attendees"><h2>{$rt.attendees}</h2><p class="muted hint">{$rt.attendeesHint}</p><div class="chips">
       {#each attendeeOptions as name}<button class:chosen={activeAttendees.includes(name)} aria-pressed={activeAttendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{activeAttendees.includes(name) ? ' ✓' : ''}</button>{/each}
     </div></section>
-    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div>
+    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><button onclick={orderByReadiness} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null}>{$rt.leastReadyFirst}</button><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div></div>
     {#if rehearsal.songs.length > 1}<p class="reorder-hint">{$rt.reorderHint}</p>{/if}
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
@@ -222,7 +228,9 @@
   .location { font-size: 1rem; } .setlist { display: inline-block; color: var(--accent); font-size: .85rem; margin: 4px 0 10px; text-decoration: none; }
   .note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; } .muted { color: var(--text-muted); font-size: .8rem; }
   .attendees { margin: 24px 0 30px; } .hint { margin: 8px 0 12px; } .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .song-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
+  .song-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .song-actions > button { font-size: .88rem; }
+  .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 10px; } .song { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
   .drag-handle { touch-action: none; cursor: grab; width: 36px; min-height: 44px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); font-size: 1.35rem; flex-shrink: 0; }
