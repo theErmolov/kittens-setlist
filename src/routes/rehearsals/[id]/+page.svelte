@@ -12,17 +12,15 @@
   import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, BandMusician, LearningStage } from '$lib/types';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
-  import RehearsalSongPicker from '$components/rehearsals/RehearsalSongPicker.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
 
   let rehearsal = $state<Rehearsal | null>(null);
   let setlists = $state<Setlist[]>([]), catalog = $state<Song[]>([]), musicians = $state<BandMusician[]>([]);
   let loading = $state(true), error = $state(''), busy = $state(false);
-  let showForm = $state(false), repeating = $state(false), showPicker = $state(false);
+  let showForm = $state(false), repeating = $state(false);
   let expanded = $state<string | null>(null), lyrics = $state<Song | null>(null);
   let notes = $state<Record<string, string>>({});
   const id = $derived(page.params.id!);
-  const sortedSongs = $derived([...(rehearsal?.songs ?? [])].sort((a, b) => a.song.artist.localeCompare(b.song.artist, 'en', { sensitivity: 'base' }) || a.song.title.localeCompare(b.song.title, 'en', { sensitivity: 'base' })));
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
   const formInitial = $derived(rehearsal ? { ...rehearsal, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
@@ -38,6 +36,42 @@
     }).catch(() => { if (active) { error = $rt.error; loading = false; } });
     return () => { active = false; };
   });
+  let dragIndex = $state<number | null>(null), dropIndex = $state<number | null>(null);
+  function reorder(from: number, to: number) {
+    if (!rehearsal || busy || rehearsal.cancelled || from === to || to < 0 || to >= rehearsal.songs.length) return;
+    const songs = [...rehearsal.songs];
+    songs.splice(to, 0, songs.splice(from, 1)[0]);
+    action({ songs });
+  }
+  function startDrag(event: PointerEvent, index: number) {
+    if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
+    const handle = event.currentTarget as HTMLButtonElement;
+    handle.setPointerCapture(event.pointerId);
+    let x = event.clientX, y = event.clientY, moved = false, frame = 0;
+    const startY = y;
+    dragIndex = index; dropIndex = index;
+    function target() {
+      const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-rehearsal-index]');
+      if (row) dropIndex = Number(row.dataset.rehearsalIndex);
+    }
+    function scroll() {
+      if (moved) { const speed = y < 100 ? -12 : y > window.innerHeight - 80 ? 12 : 0; if (speed) { window.scrollBy(0, speed); target(); } }
+      frame = requestAnimationFrame(scroll);
+    }
+    function move(e: PointerEvent) { x = e.clientX; y = e.clientY; if (Math.abs(y - startY) > 5) moved = true; if (moved) target(); }
+    function finish(e: PointerEvent) {
+      const to = dropIndex;
+      cleanup();
+      if (e.type === 'pointerup' && moved && to !== null) reorder(index, to);
+    }
+    function cleanup() {
+      cancelAnimationFrame(frame); dragIndex = null; dropIndex = null;
+      handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', finish); handle.removeEventListener('pointercancel', finish); handle.removeEventListener('lostpointercapture', finish);
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    }
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', finish); handle.addEventListener('pointercancel', finish); handle.addEventListener('lostpointercapture', finish);
+    frame = requestAnimationFrame(scroll);
+  }
   function resetNotes() { notes = Object.fromEntries((rehearsal?.songs ?? []).map(s => [rehearsalSongKey(s), s.note ?? ''])); }
   async function reload() {
     if (!rehearsal) { location.reload(); return; }
@@ -65,7 +99,6 @@
     if (repeating) { const created = await createRehearsal(draft, rehearsal?.id); showForm = false; await goto(`${base}/rehearsals/${created.id}`); }
     else { await persist(draft); showForm = false; }
   }
-  async function chooseSongs(songs: RehearsalSong[]) { await persist({ songs }); showPicker = false; }
   function toggleAttendee(name: string) {
     if (!rehearsal) return;
     action({ attendees: rehearsal.attendees.includes(name) ? rehearsal.attendees.filter(n => n !== name) : [...rehearsal.attendees, name] });
@@ -108,15 +141,16 @@
     <section class="attendees"><h2>{$rt.attendees}</h2><p class="muted hint">{$rt.attendeesHint}</p><div class="chips">
       {#each attendeeOptions as name}<button class:chosen={rehearsal.attendees.includes(name)} aria-pressed={rehearsal.attendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{rehearsal.attendees.includes(name) ? ' ✓' : ''}</button>{/each}
     </div></section>
-    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><button class="primary" onclick={() => { showPicker = true; }} disabled={busy || rehearsal.cancelled}>+ {$rt.addSongs}</button></div>
+    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div>
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
-    {#each sortedSongs as item (rehearsalSongKey(item))}
+    {#each rehearsal.songs as item, index (rehearsalSongKey(item))}
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, rehearsal.attendees)}
       {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !rehearsal!.attendees.includes(name))}
-      <article class="song">
+      <article class="song" data-rehearsal-index={index} class:dragging={dragIndex === index} class:drop-target={dropIndex === index}>
         <div class="song-row">
+          <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>☰</button>
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><strong>{item.song.title}</strong><small>{item.song.artist}</small></button>
           <span class="pct" style={pct !== null ? pctBubbleStyle(pct) : ''} title={$rt.sessionReadiness}>{pct !== null ? `${pct}%` : '—'}</span>
         </div>
@@ -148,8 +182,7 @@
     <footer><button onclick={() => { repeating = true; showForm = true; }} disabled={busy}>{$rt.repeat}</button><button onclick={toggleCancelled} disabled={busy}>{rehearsal.cancelled ? $rt.restore : $rt.cancelSession}</button><button class="danger" onclick={remove} disabled={busy}>{$rt.delete}</button></footer>
   {/if}
 </div>
-{#if showForm && rehearsal}<RehearsalForm title={repeating ? $rt.repeat : $rt.edit} initial={formInitial} {setlists} {musicians} onsubmit={saveForm} onclose={() => { showForm = false; }} />{/if}
-{#if showPicker && rehearsal}<RehearsalSongPicker {rehearsal} setlist={linked} {catalog} onsave={chooseSongs} onclose={() => { showPicker = false; }} />{/if}
+{#if showForm && rehearsal}<RehearsalForm title={repeating ? $rt.repeat : $rt.edit} initial={formInitial} {setlists} {musicians} {catalog} onsubmit={saveForm} onclose={() => { showForm = false; }} />{/if}
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
@@ -159,6 +192,7 @@
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; } h1 { font-size: 1.5rem; margin: 0 0 8px; } h2 { font-size: 1rem; margin: 0; }
   .time { font-size: 1.3rem; color: var(--accent); }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
+  .song-heading .primary { font-size: .88rem; font-weight: 600; padding: 8px 18px; border-radius: 6px; }
   .primary, .chosen { background: var(--accent); color: #fff; border-color: var(--accent); }
   .location { font-size: 1rem; } .setlist { display: inline-block; color: var(--accent); font-size: .85rem; margin: 4px 0 10px; text-decoration: none; }
   .note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; } .muted { color: var(--text-muted); font-size: .8rem; }
@@ -166,6 +200,8 @@
   .song-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 10px; } .song { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
+  .drag-handle { touch-action: none; cursor: grab; padding: 10px 6px; border: 0; background: transparent; color: var(--text-muted); }
+  .dragging { opacity: .5; } .drop-target { outline: 2px solid var(--accent); }
   .song-title { flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; } .song-title strong { font-size: .95rem; } .song-title small { display: block; font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
   .pct { padding: 5px 8px; border-radius: 12px; font-size: .8rem; font-weight: 650; flex-shrink: 0; }
   .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 14px 9px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 14px 12px; overflow-wrap: anywhere; }
@@ -176,5 +212,5 @@
   .detail-actions, footer { display: flex; gap: 8px; flex-wrap: wrap; } .detail-actions { margin-top: 10px; } footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
   .danger { color: #dc2626; } .empty { color: var(--text-muted); padding: 22px 0; } .cancelled { padding: 12px; border-radius: 8px; background: var(--bg); color: var(--text-muted); }
   .error { color: #dc2626; padding: 12px 0; font-size: .85rem; }
-  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } textarea { font-size: 16px; } .musician { flex-wrap: wrap; } .song-heading .primary { font-size: .75rem; } }
+  @media(max-width:600px) { h1 { font-size: 1.2rem; } .time { font-size: 1.1rem; } .song-row { gap: 8px; padding: 12px 10px; } textarea { font-size: 16px; } .musician { flex-wrap: wrap; } }
 </style>

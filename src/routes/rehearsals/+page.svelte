@@ -7,13 +7,14 @@
   import { authLoading, canAccessRehearsals } from '$lib/auth';
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { getRehearsals, getSetlists, getMusicians, createRehearsal } from '$lib/api';
-  import type { Rehearsal, RehearsalDraft, Setlist, BandMusician } from '$lib/types';
+  import { getSongs, getRehearsals, getSetlists, getMusicians, createRehearsal } from '$lib/api';
+  import type { Rehearsal, RehearsalDraft, Setlist, BandMusician, Song } from '$lib/types';
   import { calendarDays, localDate, isUpcoming } from '$lib/rehearsals';
   import { formatDate } from '$lib/utils';
   import RehearsalCard from '$components/rehearsals/RehearsalCard.svelte';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
 
+  let catalog = $state<Song[]>([]);
   let rehearsals = $state<Rehearsal[]>([]);
   let setlists = $state<Setlist[]>([]);
   let musicians = $state<BandMusician[]>([]);
@@ -39,7 +40,7 @@
   async function load() {
     loading = true; error = '';
     try {
-      [rehearsals, setlists, musicians] = await Promise.all([getRehearsals(), getSetlists(), getMusicians()]);
+      [rehearsals, setlists, musicians, catalog] = await Promise.all([getRehearsals(), getSetlists(), getMusicians(), getSongs()]);
       if (page.url.searchParams.get('new') === '1') {
         initial = { date: selectedDate, setlistId: page.url.searchParams.get('setlist') ?? undefined };
         showNew = true;
@@ -96,7 +97,7 @@
     </div>
   {/if}
 </div>
-{#if showNew && !loading}<RehearsalForm {initial} {setlists} {musicians} onsubmit={save} onclose={closeForm} />{/if}
+{#if showNew && !loading}<RehearsalForm {initial} {setlists} {musicians} {catalog} onsubmit={save} onclose={closeForm} />{/if}
 {/if}
 <style>
   .loading { padding: 40px 20px; }

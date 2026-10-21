@@ -2,6 +2,8 @@ import { derived } from 'svelte/store';
 import { lang } from './i18n';
 const strings = {
   en: {
+    plan: 'Songs & musicians', selectionHint: 'Choose in either order. Counts show selected songs needing each musician; song hints show who is missing. Everything stays selectable.',
+    needed: 'Needed for songs', unused: 'No selected songs', available: 'All musicians attending', unassigned: 'No assigned parts', drag: 'Drag to reorder; use arrow keys to move',
     title: 'Rehearsals', new: 'Plan rehearsal', upcoming: 'Coming up', noUpcoming: 'No upcoming rehearsals. Pick a date to plan one.',
     today: 'Today', previous: 'Previous month', next: 'Next month', noSessions: 'No rehearsals on this date.',
     date: 'Date', start: 'Start', end: 'End (optional)', location: 'Location', note: 'Rehearsal notes', setlist: 'Linked setlist', noSetlist: 'No linked setlist',
@@ -24,6 +26,8 @@ const strings = {
     progressError: 'Could not update progress. Please retry.', pending: 'Saving…',
   },
   ru: {
+    plan: 'Песни и музыканты', selectionHint: 'Выбирайте в любом порядке. Число у имени — сколько выбранных песен требуют музыканта; у песни указано, кого не хватает. Всё можно выбрать.',
+    needed: 'Нужен для песен', unused: 'Нет выбранных песен', available: 'Все музыканты придут', unassigned: 'Нет назначенных партий', drag: 'Перетащите для сортировки; используйте клавиши со стрелками',
     title: 'Репетиции', new: 'Запланировать репетицию', upcoming: 'Ближайшие', noUpcoming: 'Пока нет ближайших репетиций. Выберите дату, чтобы запланировать.',
     today: 'Сегодня', previous: 'Предыдущий месяц', next: 'Следующий месяц', noSessions: 'На эту дату репетиций нет.',
     date: 'Дата', start: 'Начало', end: 'Окончание (необязательно)', location: 'Место', note: 'Заметки к репетиции', setlist: 'Связанный сетлист', noSetlist: 'Без сетлиста',

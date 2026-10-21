@@ -56,3 +56,23 @@ test('setlists exclude past dates, include today regardless of start time, and p
   assert.deepEqual(upcomingSetlists(setlists, '2026-10-13').map(s => s.id), ['future-later', 'future-next', 'today', 'undated']);
   assert.equal(setlists[0].id, 'undated');
 });
+
+test('coverage counts assigned guests and excludes empty roster parts without changing selection', async () => {
+  const { rehearsalCoverage } = await import('../src/lib/rehearsals.ts');
+  assert.deepEqual(rehearsalCoverage(song, ['Bass', 'Free']), {
+    needed: ['Bass', 'Guest'], missing: ['Guest'], present: 1, complete: false,
+  });
+  assert.equal(rehearsalCoverage(song, ['Bass', 'Guest']).complete, true);
+  assert.equal(rehearsalCoverage({ musicians: { Free: { instruments: [] } } }, ['Free']).complete, false);
+});
+
+test('adding songs preserves custom order, notes and arrangements while sorting only additions', async () => {
+  const { mergeRehearsalSongs } = await import('../src/lib/rehearsals.ts');
+  const make = (id, artist) => ({ songId: id, song: { artist, title: id } });
+  const z = { ...make('z', 'Zebra'), note: 'Keep this', sourceSetlistId: 'event' };
+  const a = make('a', 'Alpha');
+  const additions = [make('ru', 'Я'), make('b', 'Beta'), make('c', 'Charlie')];
+  assert.deepEqual(mergeRehearsalSongs([z, a], [...additions, a, { ...z, note: 'replacement' }]), [z, a, additions[1], additions[2], additions[0]]);
+  assert.deepEqual(mergeRehearsalSongs([z, a], [z]), [z]);
+  assert.deepEqual(mergeRehearsalSongs([], [z, a]), [a, z]);
+});

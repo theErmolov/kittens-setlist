@@ -53,3 +53,22 @@ export function upcomingSetlists(setlists: Setlist[], today = localDate()): Setl
     return eventTime(b).localeCompare(eventTime(a)) || a.name.localeCompare(b.name);
   });
 }
+
+/** Only actual assigned parts count; empty roster entries do not require attendance. */
+export function rehearsalCoverage(song: Song, attendees: string[]) {
+  const needed = Object.keys(song.musicians).filter(name => song.musicians[name].instruments.length > 0);
+  const missing = needed.filter(name => !attendees.includes(name));
+  return { needed, missing, present: needed.length - missing.length, complete: needed.length > 0 && missing.length === 0 };
+}
+
+export function compareRehearsalSongs(a: RehearsalSong, b: RehearsalSong): number {
+  return a.song.artist.localeCompare(b.song.artist, 'en', { sensitivity: 'base' })
+    || a.song.title.localeCompare(b.song.title, 'en', { sensitivity: 'base' });
+}
+
+/** Keep the existing custom order and append newly selected songs alphabetically. */
+export function mergeRehearsalSongs(previous: RehearsalSong[], selected: RehearsalSong[]): RehearsalSong[] {
+  const ids = new Set(selected.map(s => s.songId));
+  const existing = new Set(previous.map(s => s.songId));
+  return [...previous.filter(s => ids.has(s.songId)), ...selected.filter(s => !existing.has(s.songId)).sort(compareRehearsalSongs)];
+}
