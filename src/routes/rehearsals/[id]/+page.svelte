@@ -10,7 +10,7 @@
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { getRehearsal, getSetlists, getSongs, getMusicians, updateRehearsal, createRehearsal, deleteRehearsal, updateRehearsalProgress } from '$lib/api';
-  import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants, rehearsalCoverage } from '$lib/rehearsals';
+  import { rehearsalReadiness, rehearsalSongKey, localDate, rehearsalCoverage } from '$lib/rehearsals';
   import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, BandMusician, LearningStage } from '$lib/types';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
@@ -28,7 +28,6 @@
   let orderQueue = emptyOrderQueue();
   const id = $derived(page.params.id!);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
-  const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
   const activeAttendees = $derived(rehearsal?.attendees ?? []);
   const displayedSongs = $derived(readinessFirst
     ? [...(rehearsal?.songs ?? [])].sort((a, b) => (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity))
@@ -181,10 +180,6 @@
     if (repeating) { const created = await createRehearsal(draft, rehearsal?.id); showForm = false; await goto(`${base}/rehearsals/${created.id}`); }
     else { await persist(draft); showForm = false; }
   }
-  function toggleAttendee(name: string) {
-    if (!rehearsal) return;
-    action({ attendees: activeAttendees.includes(name) ? activeAttendees.filter(n => n !== name) : [...activeAttendees, name] });
-  }
   async function progress(item: RehearsalSong, name: string, stage: LearningStage) {
     if (!rehearsal || busy) return;
     busy = true; error = '';
@@ -222,10 +217,7 @@
     {#if linked}<a class="setlist" href="{base}/setlists/{linked.id}">{$rt.setlist}: {linked.name}</a>
     {:else if rehearsal.setlistId}<p class="muted">{$rt.unavailableSetlist}</p>{/if}
     {#if rehearsal.note}<p class="note">{rehearsal.note}</p>{/if}
-    <section class="attendees"><h2>{$rt.attendees}</h2><p class="muted hint">{$rt.attendeesHint}</p><div class="chips">
-      {#each attendeeOptions as name}<button class:chosen={activeAttendees.includes(name)} aria-pressed={activeAttendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{activeAttendees.includes(name) ? ' ✓' : ''}</button>{/each}
-    </div></section>
-    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><FilterChip label={$rt.leastReadyFirst} active={readinessFirst} onclick={toggleReadinessOrder} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null} /><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div></div>
+    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><FilterChip label={$rt.leastReadyFirst} active={readinessFirst} onclick={toggleReadinessOrder} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null} /></div></div>
     {#if rehearsal.songs.length > 1}<p class="reorder-hint">{$rt.reorderHint}</p>{/if}
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
@@ -277,13 +269,10 @@
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; } h1 { font-size: 1.5rem; margin: 0 0 8px; } h2 { font-size: 1rem; margin: 0; }
   .time { font-size: 1.3rem; color: var(--accent); }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
-  .song-heading .primary { font-size: .88rem; font-weight: 600; padding: 8px 18px; border-radius: 6px; }
-  .primary, .chosen { background: var(--accent); color: #fff; border-color: var(--accent); }
   .location { font-size: 1rem; } .setlist { display: inline-block; color: var(--accent); font-size: .85rem; margin: 4px 0 10px; text-decoration: none; }
   .note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; } .muted { color: var(--text-muted); font-size: .8rem; }
-  .attendees { margin: 24px 0 30px; } .hint { margin: 8px 0 12px; } .chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .song-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
+  .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 24px 0 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 10px; } .song { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
   .drag-handle { touch-action: none; cursor: grab; width: 36px; min-height: 44px; padding: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 1.35rem; flex-shrink: 0; }
