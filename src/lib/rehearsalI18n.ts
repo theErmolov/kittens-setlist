@@ -2,7 +2,7 @@ import { derived } from 'svelte/store';
 import { lang } from './i18n';
 const strings = {
   en: {
-    plan: 'Songs & musicians', selectionHint: 'Choose in either order. Counts show selected songs needing each musician; song hints show who is missing. Songs stay selectable.',
+    plan: 'Songs & musicians', songSelectionTitle: 'Songs',
     leastReadyFirst: 'Least ready first',
     attendanceAutoHint: 'Choosing songs selects their musicians. Your manual choices take priority.', reorderHint: 'Drag the dotted grip to change song order.',
     needed: 'Needed for songs', unused: 'No selected songs', available: 'All musicians attending', unassigned: 'No assigned parts', drag: 'Drag to reorder; use arrow keys to move',
@@ -28,7 +28,7 @@ const strings = {
     progressError: 'Could not update progress. Please retry.', pending: 'Saving…',
   },
   ru: {
-    plan: 'Песни и музыканты', selectionHint: 'Выбирайте в любом порядке. Число у имени — сколько выбранных песен требуют музыканта; у песни указано, кого не хватает. Все песни можно выбрать.',
+    plan: 'Песни и музыканты', songSelectionTitle: 'Песни',
     leastReadyFirst: 'Сначала неготовые',
     attendanceAutoHint: 'При выборе песен выбираются их музыканты. Ваш ручной выбор важнее автоматического.', reorderHint: 'Перетащите за точки, чтобы изменить порядок песен.',
     needed: 'Нужен для песен', unused: 'Нет выбранных песен', available: 'Все музыканты придут', unassigned: 'Нет назначенных партий', drag: 'Перетащите для сортировки; используйте клавиши со стрелками',

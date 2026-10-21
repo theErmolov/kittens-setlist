@@ -42,9 +42,8 @@
     <p class="hint">{$rt.attendanceAutoHint}</p>
     </fieldset>
   </aside>
-  <fieldset class="songs-panel" aria-label={$rt.songs} {disabled}>
-    <h3>{$rt.songs}</h3>
-    <p class="hint">{$rt.selectionHint}</p>
+  <fieldset class="songs-panel" aria-label={$rt.songSelectionTitle} {disabled}>
+    <h3>{$rt.songSelectionTitle}</h3>
     <div class="tabs">
       {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
       <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
