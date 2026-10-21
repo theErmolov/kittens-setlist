@@ -4,7 +4,7 @@ const strings = {
   en: {
     plan: 'Songs & musicians', selectionHint: 'Choose in either order. Counts show selected songs needing each musician; song hints show who is missing. Songs stay selectable.',
     leastReadyFirst: 'Least ready first',
-    attendanceAutoHint: 'Musicians with no selected songs are deselected automatically.', reorderHint: 'Drag the dotted grip to change song order.',
+    attendanceAutoHint: 'Choosing songs selects their musicians. Your manual choices take priority.', reorderHint: 'Drag the dotted grip to change song order.',
     needed: 'Needed for songs', unused: 'No selected songs', available: 'All musicians attending', unassigned: 'No assigned parts', drag: 'Drag to reorder; use arrow keys to move',
     title: 'Rehearsals', new: 'Plan rehearsal', upcoming: 'Coming up', noUpcoming: 'No upcoming rehearsals. Pick a date to plan one.',
     today: 'Today', previous: 'Previous month', next: 'Next month', noSessions: 'No rehearsals on this date.',
@@ -29,8 +29,8 @@ const strings = {
   },
   ru: {
     plan: 'Песни и музыканты', selectionHint: 'Выбирайте в любом порядке. Число у имени — сколько выбранных песен требуют музыканта; у песни указано, кого не хватает. Все песни можно выбрать.',
-    leastReadyFirst: 'Сначала менее готовые',
-    attendanceAutoHint: 'Музыканты без выбранных песен автоматически снимаются с репетиции.', reorderHint: 'Перетащите за точки, чтобы изменить порядок песен.',
+    leastReadyFirst: 'Сначала неготовые',
+    attendanceAutoHint: 'При выборе песен выбираются их музыканты. Ваш ручной выбор важнее автоматического.', reorderHint: 'Перетащите за точки, чтобы изменить порядок песен.',
     needed: 'Нужен для песен', unused: 'Нет выбранных песен', available: 'Все музыканты придут', unassigned: 'Нет назначенных партий', drag: 'Перетащите для сортировки; используйте клавиши со стрелками',
     title: 'Репетиции', new: 'Запланировать репетицию', upcoming: 'Ближайшие', noUpcoming: 'Пока нет ближайших репетиций. Выберите дату, чтобы запланировать.',
     today: 'Сегодня', previous: 'Предыдущий месяц', next: 'Следующий месяц', noSessions: 'На эту дату репетиций нет.',

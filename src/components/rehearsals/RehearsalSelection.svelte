@@ -3,10 +3,10 @@
   import { orderMusicianNames } from '$lib/utils';
   import type { BandMusician, RehearsalSong, Song, Setlist } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { rehearsalReadiness, rehearsalSongKey, rehearsalCoverage, compareRehearsalSongs, rehearsalAttendees } from '$lib/rehearsals';
-  let { setlist, catalog, musicians, attendees = $bindable(), selected = $bindable(), onattendancechange, details, disabled = false }: {
-    setlist?: Setlist; catalog: Song[]; musicians: BandMusician[]; attendees: string[]; selected: RehearsalSong[];
-    onattendancechange: () => void; details: Snippet; disabled?: boolean;
+  import { rehearsalReadiness, rehearsalSongKey, rehearsalCoverage, compareRehearsalSongs } from '$lib/rehearsals';
+  let { setlist, catalog, musicians, attendees, attendanceOverrides = $bindable(), selected = $bindable(), details, disabled = false }: {
+    setlist?: Setlist; catalog: Song[]; musicians: BandMusician[]; attendees: string[]; attendanceOverrides: Record<string, boolean>; selected: RehearsalSong[];
+    details: Snippet; disabled?: boolean;
   } = $props();
   let source = $state(untrack(() => setlist ? 'setlist' : 'catalog'));
   let search = $state(''), guest = $state('');
@@ -16,29 +16,23 @@
     : catalog.filter(s => !s.archived).map(song => ({ songId: song.id, song })));
   const visible = $derived(candidates.filter(item => `${item.song.artist} ${item.song.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort(compareRehearsalSongs));
   const names = $derived(orderMusicianNames([...new Set([
-    ...musicians.filter(m => !m.guest).map(m => m.name), ...attendees, ...guests,
+    ...musicians.filter(m => !m.guest).map(m => m.name), ...attendees, ...Object.keys(attendanceOverrides), ...guests,
     ...[...candidates, ...selected].flatMap(item => rehearsalCoverage(item.song, []).needed),
   ])], musicians));
-  $effect(() => {
-    const songs = selected;
-    untrack(() => {
-      if (disabled) return;
-      const next = rehearsalAttendees(songs, attendees);
-      if (next.length !== attendees.length) attendees = next;
-    });
-  });
   function needed(name: string) { return selected.filter(item => rehearsalCoverage(item.song, []).needed.includes(name)).length; }
   function isSelected(item: RehearsalSong) { return selected.some(s => s.songId === item.songId); }
   function toggle(item: RehearsalSong) { selected = isSelected(item) ? selected.filter(s => s.songId !== item.songId) : [...selected, item]; }
   function selectMany(items: RehearsalSong[]) { for (const item of items) if (!isSelected(item)) selected = [...selected, item]; }
-  function toggleAttendee(name: string) { onattendancechange(); attendees = attendees.includes(name) ? attendees.filter(n => n !== name) : [...attendees, name]; }
-  function addGuest() { const name = guest.trim(); if (!name) return; onattendancechange(); guests = [...new Set([...guests, name])]; attendees = [...new Set([...attendees, name])]; guest = ''; }
+  function toggleAttendee(name: string) { attendanceOverrides = { ...attendanceOverrides, [name]: !attendees.includes(name) }; }
+  function chooseMusicians(included: boolean) { attendanceOverrides = { ...attendanceOverrides, ...Object.fromEntries(names.map(name => [name, included])) }; }
+  function addGuest() { const name = guest.trim(); if (!name) return; guests = [...new Set([...guests, name])]; attendanceOverrides = { ...attendanceOverrides, [name]: true }; guest = ''; }
+
 </script>
 <section class="selection-layout" aria-label={$rt.plan}>
   <aside>
     {@render details()}
     <fieldset class="musicians-panel" aria-label={$rt.attendees} {disabled}>
-      <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => { onattendancechange(); attendees = [...names]; }}>{$rt.all}</button><button type="button" onclick={() => { onattendancechange(); attendees = []; }}>{$rt.none}</button></div>
+      <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => chooseMusicians(true)}>{$rt.all}</button><button type="button" onclick={() => chooseMusicians(false)}>{$rt.none}</button></div>
       <div class="chips">
         {#each names as name}
           {@const count = needed(name)}

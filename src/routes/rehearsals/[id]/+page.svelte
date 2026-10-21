@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FilterChip from '$components/shared/FilterChip.svelte';
   import { onDestroy } from 'svelte';
   import LearningProgress from '$components/shared/LearningProgress.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
@@ -9,7 +10,7 @@
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { getRehearsal, getSetlists, getSongs, getMusicians, updateRehearsal, createRehearsal, deleteRehearsal, updateRehearsalProgress } from '$lib/api';
-  import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants, rehearsalAttendees } from '$lib/rehearsals';
+  import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants, rehearsalCoverage } from '$lib/rehearsals';
   import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, BandMusician, LearningStage } from '$lib/types';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
@@ -19,12 +20,16 @@
   let setlists = $state<Setlist[]>([]), catalog = $state<Song[]>([]), musicians = $state<BandMusician[]>([]);
   let loading = $state(true), error = $state(''), busy = $state(false);
   let showForm = $state(false), repeating = $state(false);
+  let readinessFirst = $state(false);
   let expanded = $state<string | null>(null), lyrics = $state<Song | null>(null);
   let notes = $state<Record<string, string>>({});
   const id = $derived(page.params.id!);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
-  const activeAttendees = $derived(rehearsalAttendees(rehearsal?.songs ?? [], rehearsal?.attendees ?? []));
+  const activeAttendees = $derived(rehearsal?.attendees ?? []);
+  const displayedSongs = $derived(readinessFirst
+    ? [...(rehearsal?.songs ?? [])].sort((a, b) => (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity))
+    : rehearsal?.songs ?? []);
   const formInitial = $derived(rehearsal ? { ...rehearsal, attendees: activeAttendees, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
   $effect(() => {
     if ($authLoading) return;
@@ -44,15 +49,13 @@
   let dragIndex = $state<number | null>(null), dropIndex = $state<number | null>(null);
   function reorder(from: number, to: number) {
     if (!rehearsal || busy || rehearsal.cancelled || from === to || to < 0 || to >= rehearsal.songs.length) return;
-    const songs = [...rehearsal.songs];
+    const songs = [...displayedSongs];
     songs.splice(to, 0, songs.splice(from, 1)[0]);
-    action({ songs });
+    persist({ songs }).then(() => { readinessFirst = false; }).catch(() => {});
   }
-  function orderByReadiness() {
+  function toggleReadinessOrder() {
     if (!rehearsal || busy || rehearsal.cancelled || dragIndex !== null) return;
-    const songs = [...rehearsal.songs].sort((a, b) =>
-      (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity));
-    if (songs.some((song, index) => song !== rehearsal!.songs[index])) action({ songs });
+    readinessFirst = !readinessFirst;
   }
   function startDrag(event: PointerEvent, index: number) {
     if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
@@ -129,7 +132,11 @@
     try {
       const before = rehearsal;
       const next = { ...before, ...patch };
-      if (!next.cancelled) next.attendees = rehearsalAttendees(next.songs, next.attendees);
+      if (!next.cancelled && patch.songs && patch.attendees === undefined) {
+        const beforeNeeded = new Set(before.songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
+        const nextNeeded = new Set(next.songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
+        next.attendees = next.attendees.filter(name => !beforeNeeded.has(name) || nextNeeded.has(name));
+      }
       rehearsal = await updateRehearsal(next);
       notes = Object.fromEntries(rehearsal.songs.map(song => {
         const key = rehearsalSongKey(song);
@@ -187,11 +194,11 @@
     <section class="attendees"><h2>{$rt.attendees}</h2><p class="muted hint">{$rt.attendeesHint}</p><div class="chips">
       {#each attendeeOptions as name}<button class:chosen={activeAttendees.includes(name)} aria-pressed={activeAttendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{activeAttendees.includes(name) ? ' ✓' : ''}</button>{/each}
     </div></section>
-    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><button onclick={orderByReadiness} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null}>{$rt.leastReadyFirst}</button><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div></div>
+    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><FilterChip label={$rt.leastReadyFirst} active={readinessFirst} onclick={toggleReadinessOrder} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null} /><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div></div>
     {#if rehearsal.songs.length > 1}<p class="reorder-hint">{$rt.reorderHint}</p>{/if}
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
-    {#each rehearsal.songs as item, index (rehearsalSongKey(item))}
+    {#each displayedSongs as item, index (rehearsalSongKey(item))}
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, activeAttendees)}
       {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !activeAttendees.includes(name))}
@@ -244,13 +251,13 @@
   .location { font-size: 1rem; } .setlist { display: inline-block; color: var(--accent); font-size: .85rem; margin: 4px 0 10px; text-decoration: none; }
   .note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; } .muted { color: var(--text-muted); font-size: .8rem; }
   .attendees { margin: 24px 0 30px; } .hint { margin: 8px 0 12px; } .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .song-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .song-actions > button { font-size: .88rem; }
+  .song-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 10px; } .song { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
-  .drag-handle { touch-action: none; cursor: grab; width: 36px; min-height: 44px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); font-size: 1.35rem; flex-shrink: 0; }
-  .drag-handle:hover, .drag-handle:focus-visible { color: var(--accent); border-color: var(--accent); }
+  .drag-handle { touch-action: none; cursor: grab; width: 36px; min-height: 44px; padding: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 1.35rem; flex-shrink: 0; }
+  .drag-handle:hover { color: var(--accent); }
+  .drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .drag-handle:active { cursor: grabbing; }
   .reorder-hint { font-size: .78rem; color: var(--text-muted); margin: -5px 0 14px; }
   .dragging { opacity: .35; } .drop-target { outline: 2px dotted var(--accent); outline-offset: -2px; }

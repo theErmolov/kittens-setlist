@@ -78,3 +78,10 @@ export function rehearsalAttendees(songs: RehearsalSong[], attendees: string[]):
   const needed = new Set(songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
   return attendees.filter(name => needed.has(name));
 }
+
+/** Explicit choices override automatic attendance for the current editing session. */
+export function plannedRehearsalAttendees(songs: RehearsalSong[], overrides: Record<string, boolean>): string[] {
+  const names = new Set(songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
+  for (const [name, included] of Object.entries(overrides)) if (included) names.add(name);
+  return [...names].filter(name => overrides[name] !== false);
+}

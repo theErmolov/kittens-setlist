@@ -86,3 +86,16 @@ test('attendance drops musicians after their last assigned song is removed, pres
   assert.deepEqual(rehearsalAttendees([both], ['Guest']), ['Guest']);
   assert.deepEqual(rehearsalAttendees([], ['Bass', 'Guest']), []);
 });
+
+test('song-driven attendance starts empty and always respects explicit inclusions and exclusions', async () => {
+  const { plannedRehearsalAttendees } = await import('../src/lib/rehearsals.ts');
+  const selected = [{ songId: 'both', song }];
+  assert.deepEqual(plannedRehearsalAttendees([], {}), []);
+  assert.deepEqual(plannedRehearsalAttendees(selected, {}), ['Bass', 'Guest']);
+  assert.deepEqual(plannedRehearsalAttendees([], { Bass: true }), ['Bass']);
+  const manual = { Bass: true, Guest: false };
+  assert.deepEqual(plannedRehearsalAttendees(selected, manual), ['Bass']);
+  assert.deepEqual(plannedRehearsalAttendees([], manual), ['Bass']);
+  assert.deepEqual(plannedRehearsalAttendees([...selected, ...selected], manual), ['Bass']);
+  assert.deepEqual(plannedRehearsalAttendees(selected, { Bass: false, Guest: false }), []);
+});

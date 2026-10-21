@@ -1,13 +1,13 @@
 <script lang="ts">
   import RehearsalSelection from './RehearsalSelection.svelte';
-  import { mergeRehearsalSongs, rehearsalAttendees } from '$lib/rehearsals';
+  import { mergeRehearsalSongs, plannedRehearsalAttendees, rehearsalCoverage } from '$lib/rehearsals';
   import { untrack } from 'svelte';
   import { lang } from '$lib/i18n';
   import { formatDate } from '$lib/utils';
   import { modalDialog } from '$lib/modalDialog';
   import type { RehearsalDraft, Setlist, BandMusician, Song, RehearsalSong } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { localDate, setlistParticipants, closestUpcomingSetlist, upcomingSetlists } from '$lib/rehearsals';
+  import { localDate, closestUpcomingSetlist, upcomingSetlists } from '$lib/rehearsals';
   let { initial = {}, title, setlists, musicians, catalog, onsubmit, onclose }: {
     initial?: Partial<RehearsalDraft>; title?: string; setlists: Setlist[]; musicians: BandMusician[]; catalog: Song[];
     onsubmit: (draft: RehearsalDraft) => Promise<void>; onclose: () => void;
@@ -21,15 +21,18 @@
   let location = $state(seed.location ?? '');
   let note = $state(seed.note ?? '');
   let autoSelect = $state(seed.setlistId === undefined && seed.attendees === undefined && seed.songs === undefined);
-  let attendanceTouched = $state(false);
   let setlistId = $state(seed.setlistId ?? untrack(() => autoSelect ? closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '' : ''));
   const sortedSetlists = $derived(upcomingSetlists(setlists));
-  const defaults = (id: string) => {
-    const setlist = setlists.find(s => s.id === id);
-    return setlist ? setlistParticipants(setlist) : musicians.filter(m => !m.guest).map(m => m.name);
-  };
-  let attendees = $state<string[]>(seed.attendees ? [...seed.attendees] : untrack(() => defaults(setlistId)));
   let songs = $state<RehearsalSong[]>(seed.songs ? [...seed.songs] : []);
+  let attendanceOverrides = $state<Record<string, boolean>>(untrack(() => {
+    if (!seed.attendees) return {};
+    const needed = new Set((seed.songs ?? []).flatMap(item => rehearsalCoverage(item.song, []).needed));
+    return Object.fromEntries([
+      ...[...needed].filter(name => !seed.attendees!.includes(name)).map(name => [name, false]),
+      ...seed.attendees.filter(name => !needed.has(name)).map(name => [name, true]),
+    ]);
+  }));
+  const attendees = $derived(seed.cancelled ? seed.attendees ?? [] : plannedRehearsalAttendees(songs, attendanceOverrides));
   let busy = $state(false);
   let error = $state('');
   $effect(() => {
@@ -38,7 +41,6 @@
     untrack(() => {
       if (setlistId === next) return;
       setlistId = next;
-      if (!attendanceTouched) attendees = defaults(next);
     });
   });
   async function save(event: SubmitEvent) {
@@ -48,7 +50,7 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { error = $rt.invalidDate; return; }
     busy = true;
     try {
-      await onsubmit({ date, startTime, endTime: undefined, timeZone, location: location.trim() || undefined, note: note.trim() || undefined, setlistId: setlistId || undefined, attendees: seed.cancelled ? attendees : rehearsalAttendees(songs, attendees), songs: mergeRehearsalSongs(seed.songs ?? [], songs), cancelled: seed.cancelled ?? false });
+      await onsubmit({ date, startTime, endTime: undefined, timeZone, location: location.trim() || undefined, note: note.trim() || undefined, setlistId: setlistId || undefined, attendees, songs: mergeRehearsalSongs(seed.songs ?? [], songs), cancelled: seed.cancelled ?? false });
     } catch (e) { error = String(e).includes('409') ? $rt.conflict : $rt.saveError; }
     finally { busy = false; }
   }
@@ -76,7 +78,7 @@
             </div>
             <label>{$rt.location}<input bind:value={location} maxlength="500" /></label>
             <label>{$rt.setlist}
-              <select bind:value={setlistId} onchange={() => { autoSelect = false; if (!attendanceTouched) attendees = defaults(setlistId); }}>
+              <select bind:value={setlistId} onchange={() => { autoSelect = false; }}>
                 <option value="">{$rt.noSetlist}</option>
                 {#if setlistId && !sortedSetlists.some(s => s.id === setlistId)}
                   {@const current = setlists.find(s => s.id === setlistId)}
@@ -88,7 +90,7 @@
             <label>{$rt.note}<textarea bind:value={note} rows="3" maxlength="4000"></textarea></label>
           </div>
         {/snippet}
-        <RehearsalSelection {details} disabled={seed.cancelled} setlist={setlists.find(s => s.id === setlistId)} {catalog} {musicians} bind:attendees bind:selected={songs} onattendancechange={() => { attendanceTouched = true; }} />
+        <RehearsalSelection {details} disabled={seed.cancelled} setlist={setlists.find(s => s.id === setlistId)} {catalog} {musicians} {attendees} bind:attendanceOverrides bind:selected={songs} />
       </fieldset>
       <div class="form-footer">
         {#if error}<p class="error" role="alert">{error}</p>{/if}
