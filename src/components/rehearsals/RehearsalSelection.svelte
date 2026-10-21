@@ -22,7 +22,6 @@
   function needed(name: string) { return selected.filter(item => rehearsalCoverage(item.song, []).needed.includes(name)).length; }
   function isSelected(item: RehearsalSong) { return selected.some(s => s.songId === item.songId); }
   function toggle(item: RehearsalSong) { selected = isSelected(item) ? selected.filter(s => s.songId !== item.songId) : [...selected, item]; }
-  function selectMany(items: RehearsalSong[]) { for (const item of items) if (!isSelected(item)) selected = [...selected, item]; }
   function toggleAttendee(name: string) { attendanceOverrides = { ...attendanceOverrides, [name]: !attendees.includes(name) }; }
   function chooseMusicians(included: boolean) { attendanceOverrides = { ...attendanceOverrides, ...Object.fromEntries(names.map(name => [name, included])) }; }
   function addGuest() { const name = guest.trim(); if (!name) return; guests = [...new Set([...guests, name])]; attendanceOverrides = { ...attendanceOverrides, [name]: true }; guest = ''; }
@@ -52,16 +51,15 @@
       <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
     </div>
     <input class="search" bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
-    <div class="shortcuts"><button type="button" onclick={() => selectMany(visible)}>{$rt.allSongs}</button><button type="button" onclick={() => selectMany(visible.filter(s => { const pct = rehearsalReadiness(s.song, attendees); return pct !== null && pct < 100; }))}>{$rt.notReady}</button><button type="button" onclick={() => { selected = []; }}>{$rt.none}</button></div>
     <p class="hint" aria-live="polite">{selected.length} {$rt.selected}</p>
     <div class="songs">
       {#each visible as item (rehearsalSongKey(item))}
-        {@const pct = rehearsalReadiness(item.song, attendees)}
+        {@const pct = rehearsalReadiness(item.song)}
         {@const coverage = rehearsalCoverage(item.song, attendees)}
         <label class="song" class:incomplete={!coverage.complete} class:chosen={isSelected(item)}>
           <input type="checkbox" checked={isSelected(item)} onchange={() => toggle(item)} />
           <span class="song-copy"><strong>{item.song.title}</strong><small>{item.song.artist}</small><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
-          <span class="pct" title={$rt.sessionReadiness}>{pct === null ? '—' : `${pct}%`}</span>
+          <span class="pct" title={$rt.fullReadiness}>{pct === null ? '—' : `${pct}%`}</span>
         </label>
       {:else}<p>{$rt.noMatches}</p>{/each}
     </div>
@@ -81,9 +79,9 @@
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--bg); color: var(--text); cursor: pointer; }
   button:disabled, input:disabled { opacity: .5; cursor: default; }
   .active { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .attendees-header, .chips, .guest, .tabs, .shortcuts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .attendees-header, .chips, .guest, .tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .attendees-header strong { margin-right: auto; font-size: .9rem; }
-  .attendees-header button, .shortcuts button { font-size: .78rem; }
+  .attendees-header button { font-size: .78rem; }
   .chips button { font-size: .85rem; }
   .chips span { margin-left: 4px; font-size: .75rem; }
   .needed { box-shadow: 0 0 0 2px var(--accent); }

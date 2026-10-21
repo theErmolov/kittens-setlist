@@ -23,6 +23,9 @@
   let readinessFirst = $state(false);
   let expanded = $state<string | null>(null), lyrics = $state<Song | null>(null);
   let notes = $state<Record<string, string>>({});
+  type OrderQueue = { confirmed: Rehearsal | null; pending: Promise<void>; epoch: number };
+  const emptyOrderQueue = (): OrderQueue => ({ confirmed: null, pending: Promise.resolve(), epoch: 0 });
+  let orderQueue = emptyOrderQueue();
   const id = $derived(page.params.id!);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
@@ -36,12 +39,12 @@
     if (!$canAccessRehearsals) { goto(`${base}/backlog`); return; }
     const target = id;
     let active = true;
-    loading = true; error = ''; rehearsal = null;
+    loading = true; error = ''; rehearsal = null; orderQueue = emptyOrderQueue();
     Promise.all([getRehearsal(target), getSetlists(), getSongs(), getMusicians()]).then(([r,s,c,m]) => {
       if (!active) return;
-      rehearsal = r; setlists = s; catalog = c; musicians = m; resetNotes(); loading = false;
+      orderQueue.confirmed = r; rehearsal = r; setlists = s; catalog = c; musicians = m; resetNotes(); loading = false;
     }).catch(() => { if (active) { error = $rt.error; loading = false; } });
-    return () => { active = false; };
+    return () => { active = false; orderQueue = emptyOrderQueue(); };
   });
   let dragMoved = $state(false);
   let cancelDrag: (() => void) | undefined;
@@ -51,7 +54,29 @@
     if (!rehearsal || busy || rehearsal.cancelled || from === to || to < 0 || to >= rehearsal.songs.length) return;
     const songs = [...displayedSongs];
     songs.splice(to, 0, songs.splice(from, 1)[0]);
-    persist({ songs }).then(() => { readinessFirst = false; }).catch(() => {});
+    const next = { ...rehearsal, songs };
+    const queue = orderQueue;
+    const epoch = queue.epoch;
+    // Move immediately. Serialize background writes so rapid drops use the latest version.
+    rehearsal = next;
+    readinessFirst = false;
+    error = '';
+    queue.pending = queue.pending.then(async () => {
+      if (epoch !== queue.epoch || !queue.confirmed) return;
+      try {
+        const saved = await updateRehearsal({ ...next, version: queue.confirmed.version });
+        queue.confirmed = saved;
+        if (orderQueue !== queue) return;
+        // Acknowledging a save must not replace the visible cards or a newer local order.
+        if (rehearsal) rehearsal.version = saved.version;
+      } catch (e) {
+        queue.epoch++;
+        if (orderQueue !== queue) return;
+        cancelDrag?.();
+        rehearsal = queue.confirmed;
+        error = String(e).includes('409') ? $rt.conflict : $rt.saveError;
+      }
+    });
   }
   function toggleReadinessOrder() {
     if (!rehearsal || busy || rehearsal.cancelled || dragIndex !== null) return;
@@ -123,13 +148,16 @@
   async function reload() {
     if (!rehearsal) { location.reload(); return; }
     busy = true; error = '';
-    try { rehearsal = await getRehearsal(id); resetNotes(); } catch { error = $rt.error; }
+    try { await orderQueue.pending; rehearsal = await getRehearsal(id); orderQueue.confirmed = rehearsal; resetNotes(); } catch { error = $rt.error; }
     finally { busy = false; }
   }
   async function persist(patch: Partial<Rehearsal>) {
     if (!rehearsal || busy) return;
     busy = true; error = '';
     try {
+      await orderQueue.pending;
+      if (!rehearsal) return;
+      error = '';
       const before = rehearsal;
       const next = { ...before, ...patch };
       if (!next.cancelled && patch.songs && patch.attendees === undefined) {
@@ -138,6 +166,7 @@
         next.attendees = next.attendees.filter(name => !beforeNeeded.has(name) || nextNeeded.has(name));
       }
       rehearsal = await updateRehearsal(next);
+      orderQueue.confirmed = rehearsal;
       notes = Object.fromEntries(rehearsal.songs.map(song => {
         const key = rehearsalSongKey(song);
         const saved = before.songs.find(s => rehearsalSongKey(s) === key)?.note ?? '';
@@ -160,7 +189,9 @@
     if (!rehearsal || busy) return;
     busy = true; error = '';
     try {
+      await orderQueue.pending;
       rehearsal = await updateRehearsalProgress(id, item, name, stage);
+      orderQueue.confirmed = rehearsal;
       // Picker readiness should also reflect this latest canonical progress.
       catalog = catalog.map(song => song.id === item.songId ? { ...song, progress: { ...(song.progress ?? {}), [name]: stage } } : song);
     } catch { error = $rt.progressError; }
@@ -170,7 +201,7 @@
   async function remove() {
     if (!rehearsal || !confirm($rt.deleteConfirm)) return;
     busy = true; error = '';
-    try { await deleteRehearsal(rehearsal); await goto(`${base}/rehearsals`); }
+    try { await orderQueue.pending; if (!rehearsal) return; await deleteRehearsal(rehearsal); await goto(`${base}/rehearsals`); }
     catch(e) { error = String(e).includes('409') ? $rt.conflict : $rt.saveError; }
     finally { busy = false; }
   }
