@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { orderMusicianNames } from '$lib/utils';
   import type { BandMusician, RehearsalSong, Song, Setlist } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { rehearsalReadiness, rehearsalSongKey, rehearsalCoverage, compareRehearsalSongs } from '$lib/rehearsals';
-  let { setlist, catalog, musicians, attendees = $bindable(), selected = $bindable(), onattendancechange }: {
+  import { rehearsalReadiness, rehearsalSongKey, rehearsalCoverage, compareRehearsalSongs, rehearsalAttendees } from '$lib/rehearsals';
+  let { setlist, catalog, musicians, attendees = $bindable(), selected = $bindable(), onattendancechange, details, disabled = false }: {
     setlist?: Setlist; catalog: Song[]; musicians: BandMusician[]; attendees: string[]; selected: RehearsalSong[];
-    onattendancechange: () => void;
+    onattendancechange: () => void; details: Snippet; disabled?: boolean;
   } = $props();
   let source = $state(untrack(() => setlist ? 'setlist' : 'catalog'));
   let search = $state(''), guest = $state('');
@@ -19,6 +19,14 @@
     ...musicians.filter(m => !m.guest).map(m => m.name), ...attendees, ...guests,
     ...[...candidates, ...selected].flatMap(item => rehearsalCoverage(item.song, []).needed),
   ])], musicians));
+  $effect(() => {
+    const songs = selected;
+    untrack(() => {
+      if (disabled) return;
+      const next = rehearsalAttendees(songs, attendees);
+      if (next.length !== attendees.length) attendees = next;
+    });
+  });
   function needed(name: string) { return selected.filter(item => rehearsalCoverage(item.song, []).needed.includes(name)).length; }
   function isSelected(item: RehearsalSong) { return selected.some(s => s.songId === item.songId); }
   function toggle(item: RehearsalSong) { selected = isSelected(item) ? selected.filter(s => s.songId !== item.songId) : [...selected, item]; }
@@ -26,39 +34,53 @@
   function toggleAttendee(name: string) { onattendancechange(); attendees = attendees.includes(name) ? attendees.filter(n => n !== name) : [...attendees, name]; }
   function addGuest() { const name = guest.trim(); if (!name) return; onattendancechange(); guests = [...new Set([...guests, name])]; attendees = [...new Set([...attendees, name])]; guest = ''; }
 </script>
-<section aria-label={$rt.plan}>
-  <h3>{$rt.plan}</h3>
-  <p class="hint">{$rt.selectionHint}</p>
-  <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => { onattendancechange(); attendees = [...names]; }}>{$rt.all}</button><button type="button" onclick={() => { onattendancechange(); attendees = []; }}>{$rt.none}</button></div>
-  <div class="chips">
-    {#each names as name}
-      {@const count = needed(name)}
-      <button type="button" class:active={attendees.includes(name)} class:needed={count > 0} class:unused={selected.length > 0 && count === 0} aria-pressed={attendees.includes(name)} title={count ? `${$rt.needed}: ${count}` : $rt.unused} onclick={() => toggleAttendee(name)}>{name} <span>{count}</span></button>
-    {/each}
-  </div>
-  <div class="guest"><input bind:value={guest} placeholder={$rt.guest} aria-label={$rt.guest} maxlength="100" onkeydown={e => { if (e.key === 'Enter') { e.preventDefault(); addGuest(); } }} /><button type="button" onclick={addGuest}>{$rt.add}</button></div>
-  <div class="tabs">
-    {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
-    <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
-    <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
-  </div>
-  <input class="search" bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
-  <div class="shortcuts"><button type="button" onclick={() => selectMany(visible)}>{$rt.allSongs}</button><button type="button" onclick={() => selectMany(visible.filter(s => { const pct = rehearsalReadiness(s.song, attendees); return pct !== null && pct < 100; }))}>{$rt.notReady}</button><button type="button" onclick={() => { selected = []; }}>{$rt.none}</button></div>
-  <p class="hint" aria-live="polite">{selected.length} {$rt.selected}</p>
-  <div class="songs">
-    {#each visible as item (rehearsalSongKey(item))}
-      {@const pct = rehearsalReadiness(item.song, attendees)}
-      {@const coverage = rehearsalCoverage(item.song, attendees)}
-      <label class="song" class:incomplete={!coverage.complete} class:chosen={isSelected(item)}>
-        <input type="checkbox" checked={isSelected(item)} onchange={() => toggle(item)} />
-        <span class="song-copy"><strong>{item.song.title}</strong><small>{item.song.artist}</small><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
-        <span class="pct" title={$rt.sessionReadiness}>{pct === null ? '—' : `${pct}%`}</span>
-      </label>
-    {:else}<p>{$rt.noMatches}</p>{/each}
-  </div>
+<section class="selection-layout" aria-label={$rt.plan}>
+  <aside>
+    {@render details()}
+    <fieldset class="musicians-panel" aria-label={$rt.attendees} {disabled}>
+      <div class="attendees-header"><strong>{$rt.attendees}</strong><button type="button" onclick={() => { onattendancechange(); attendees = [...names]; }}>{$rt.all}</button><button type="button" onclick={() => { onattendancechange(); attendees = []; }}>{$rt.none}</button></div>
+      <div class="chips">
+        {#each names as name}
+          {@const count = needed(name)}
+          <button type="button" class:active={attendees.includes(name)} class:needed={count > 0} class:unused={selected.length > 0 && count === 0} aria-pressed={attendees.includes(name)} title={count ? `${$rt.needed}: ${count}` : $rt.unused} onclick={() => toggleAttendee(name)}>{name} <span>{count}</span></button>
+        {/each}
+      </div>
+      <div class="guest"><input bind:value={guest} placeholder={$rt.guest} aria-label={$rt.guest} maxlength="100" onkeydown={e => { if (e.key === 'Enter') { e.preventDefault(); addGuest(); } }} /><button type="button" onclick={addGuest}>{$rt.add}</button></div>
+    <p class="hint">{$rt.attendanceAutoHint}</p>
+    </fieldset>
+  </aside>
+  <fieldset class="songs-panel" aria-label={$rt.songs} {disabled}>
+    <h3>{$rt.songs}</h3>
+    <p class="hint">{$rt.selectionHint}</p>
+    <div class="tabs">
+      {#if setlist}<button type="button" class:active={source === 'setlist'} onclick={() => { source = 'setlist'; }} aria-pressed={source === 'setlist'}>{$rt.fromSetlist}</button>{/if}
+      <button type="button" class:active={source === 'catalog' || (source === 'setlist' && !setlist)} onclick={() => { source = 'catalog'; }} aria-pressed={source === 'catalog' || (source === 'setlist' && !setlist)}>{$rt.catalog}</button>
+      <button type="button" class:active={source === 'selected'} aria-pressed={source === 'selected'} onclick={() => { source = 'selected'; }}>{selected.length} {$rt.selected}</button>
+    </div>
+    <input class="search" bind:value={search} placeholder={$rt.search} aria-label={$rt.search} />
+    <div class="shortcuts"><button type="button" onclick={() => selectMany(visible)}>{$rt.allSongs}</button><button type="button" onclick={() => selectMany(visible.filter(s => { const pct = rehearsalReadiness(s.song, attendees); return pct !== null && pct < 100; }))}>{$rt.notReady}</button><button type="button" onclick={() => { selected = []; }}>{$rt.none}</button></div>
+    <p class="hint" aria-live="polite">{selected.length} {$rt.selected}</p>
+    <div class="songs">
+      {#each visible as item (rehearsalSongKey(item))}
+        {@const pct = rehearsalReadiness(item.song, attendees)}
+        {@const coverage = rehearsalCoverage(item.song, attendees)}
+        <label class="song" class:incomplete={!coverage.complete} class:chosen={isSelected(item)}>
+          <input type="checkbox" checked={isSelected(item)} onchange={() => toggle(item)} />
+          <span class="song-copy"><strong>{item.song.title}</strong><small>{item.song.artist}</small><small class:complete={coverage.complete}>{coverage.complete ? $rt.available : coverage.needed.length ? `${$rt.missing}: ${coverage.missing.join(', ')}` : $rt.unassigned}</small></span>
+          <span class="pct" title={$rt.sessionReadiness}>{pct === null ? '—' : `${pct}%`}</span>
+        </label>
+      {:else}<p>{$rt.noMatches}</p>{/each}
+    </div>
+  </fieldset>
 </section>
 <style>
-  section { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .selection-layout { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(240px, .75fr) minmax(0, 1.6fr); gap: 24px; }
+  aside { min-height: 0; overflow-y: auto; padding: 2px 4px 8px 2px; display: flex; flex-direction: column; gap: 22px; }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .songs-panel { min-height: 0; overflow: hidden; }
+  .songs-panel > :not(.songs) { flex-shrink: 0; }
+  .chips { padding: 2px; }
+
   h3 { font-size: 1rem; margin: 0; }
   .hint { margin: 0; color: var(--text-muted); font-size: .8rem; line-height: 1.5; }
   button, input { font: inherit; }
@@ -74,12 +96,18 @@
   .unused { opacity: .65; }
   .guest { flex-wrap: nowrap; }
   input:not([type=checkbox]) { box-sizing: border-box; min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); }
-  .songs { overflow-y: auto; max-height: 42dvh; min-height: 100px; }
+  .songs { flex: 1; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
   .song { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .song input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
   .song-copy { min-width: 0; overflow-wrap: anywhere; }
   .song strong { font-size: .9rem; } small { display: block; color: var(--text-muted); margin-top: 3px; font-size: .75rem; }
   .incomplete strong { color: var(--text-muted); } .chosen { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
   .complete { color: var(--accent); } .pct { margin-left: auto; flex-shrink: 0; font-size: .85rem; color: var(--text-muted); }
+  @media(max-width: 700px), (max-height: 550px) {
+    .selection-layout { height: auto; display: flex; flex-direction: column; }
+    aside { overflow: visible; flex-shrink: 0; }
+    .songs-panel { overflow: visible; flex-shrink: 0; }
+    .songs { flex: none; max-height: 50dvh; min-height: 150px; }
+  }
   @media(max-width: 600px) { input:not([type=checkbox]) { font-size: 16px; } }
 </style>

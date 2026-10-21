@@ -72,3 +72,9 @@ export function mergeRehearsalSongs(previous: RehearsalSong[], selected: Rehears
   const existing = new Set(previous.map(s => s.songId));
   return [...previous.filter(s => ids.has(s.songId)), ...selected.filter(s => !existing.has(s.songId)).sort(compareRehearsalSongs)];
 }
+
+/** Keep explicit attendance choices only for musicians with a part in this plan. */
+export function rehearsalAttendees(songs: RehearsalSong[], attendees: string[]): string[] {
+  const needed = new Set(songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
+  return attendees.filter(name => needed.has(name));
+}

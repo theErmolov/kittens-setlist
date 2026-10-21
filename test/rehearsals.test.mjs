@@ -76,3 +76,13 @@ test('adding songs preserves custom order, notes and arrangements while sorting 
   assert.deepEqual(mergeRehearsalSongs([z, a], [z]), [z]);
   assert.deepEqual(mergeRehearsalSongs([], [z, a]), [a, z]);
 });
+
+test('attendance drops musicians after their last assigned song is removed, preserving manual exclusions and guests', async () => {
+  const { rehearsalAttendees } = await import('../src/lib/rehearsals.ts');
+  const both = { songId: 'both', song };
+  const bassOnly = { songId: 'bass', song: { musicians: { Bass: { instruments: ['bass'] }, Free: { instruments: [] } } } };
+  assert.deepEqual(rehearsalAttendees([both], ['Bass', 'Guest', 'Free']), ['Bass', 'Guest']);
+  assert.deepEqual(rehearsalAttendees([bassOnly], ['Bass', 'Guest']), ['Bass']);
+  assert.deepEqual(rehearsalAttendees([both], ['Guest']), ['Guest']);
+  assert.deepEqual(rehearsalAttendees([], ['Bass', 'Guest']), []);
+});

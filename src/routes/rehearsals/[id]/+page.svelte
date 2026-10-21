@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import LearningProgress from '$components/shared/LearningProgress.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
@@ -8,7 +9,7 @@
   import { lang } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { getRehearsal, getSetlists, getSongs, getMusicians, updateRehearsal, createRehearsal, deleteRehearsal, updateRehearsalProgress } from '$lib/api';
-  import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants } from '$lib/rehearsals';
+  import { rehearsalReadiness, rehearsalSongKey, localDate, setlistParticipants, rehearsalAttendees } from '$lib/rehearsals';
   import { formatDate, INSTRUMENT_ICONS, pctBubbleStyle, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, Setlist, Song, BandMusician, LearningStage } from '$lib/types';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
@@ -23,7 +24,8 @@
   const id = $derived(page.params.id!);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const attendeeOptions = $derived(orderMusicianNames([...new Set([...(linked ? setlistParticipants(linked) : musicians.filter(m => !m.guest).map(m => m.name)), ...(rehearsal?.attendees ?? [])])], musicians));
-  const formInitial = $derived(rehearsal ? { ...rehearsal, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
+  const activeAttendees = $derived(rehearsalAttendees(rehearsal?.songs ?? [], rehearsal?.attendees ?? []));
+  const formInitial = $derived(rehearsal ? { ...rehearsal, attendees: activeAttendees, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
   $effect(() => {
     if ($authLoading) return;
     if (!$canAccessRehearsals) { goto(`${base}/backlog`); return; }
@@ -36,6 +38,10 @@
     }).catch(() => { if (active) { error = $rt.error; loading = false; } });
     return () => { active = false; };
   });
+  let dropSide = $state<'before' | 'after'>('before');
+  let dragX = $state(0), dragY = $state(0), dragMoved = $state(false);
+  let cancelDrag: (() => void) | undefined;
+  onDestroy(() => cancelDrag?.());
   let dragIndex = $state<number | null>(null), dropIndex = $state<number | null>(null);
   function reorder(from: number, to: number) {
     if (!rehearsal || busy || rehearsal.cancelled || from === to || to < 0 || to >= rehearsal.songs.length) return;
@@ -45,30 +51,42 @@
   }
   function startDrag(event: PointerEvent, index: number) {
     if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
+    cancelDrag?.();
     const handle = event.currentTarget as HTMLButtonElement;
     handle.setPointerCapture(event.pointerId);
     let x = event.clientX, y = event.clientY, moved = false, frame = 0;
     const startY = y;
-    dragIndex = index; dropIndex = index;
+    dragIndex = index; dropIndex = index; dragMoved = false;
     function target() {
       const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-rehearsal-index]');
-      if (row) dropIndex = Number(row.dataset.rehearsalIndex);
+      if (row) {
+        dropIndex = Number(row.dataset.rehearsalIndex);
+        const rect = row.getBoundingClientRect();
+        dropSide = y < rect.top + rect.height / 2 ? 'before' : 'after';
+      }
+      dragX = Math.max(8, Math.min(x + 14, window.innerWidth - 248));
+      dragY = Math.max(8, Math.min(y + 14, window.innerHeight - 86));
     }
     function scroll() {
       if (moved) { const speed = y < 100 ? -12 : y > window.innerHeight - 80 ? 12 : 0; if (speed) { window.scrollBy(0, speed); target(); } }
       frame = requestAnimationFrame(scroll);
     }
-    function move(e: PointerEvent) { x = e.clientX; y = e.clientY; if (Math.abs(y - startY) > 5) moved = true; if (moved) target(); }
+    function move(e: PointerEvent) { x = e.clientX; y = e.clientY; if (Math.abs(y - startY) > 5) { moved = true; dragMoved = true; } if (moved) target(); }
     function finish(e: PointerEvent) {
-      const to = dropIndex;
+      const boundary = dropIndex === null ? index : dropIndex + (dropSide === 'after' ? 1 : 0);
+      const to = boundary > index ? boundary - 1 : boundary;
       cleanup();
-      if (e.type === 'pointerup' && moved && to !== null) reorder(index, to);
+      if (e.type === 'pointerup' && moved) reorder(index, to);
     }
     function cleanup() {
-      cancelAnimationFrame(frame); dragIndex = null; dropIndex = null;
+      cancelAnimationFrame(frame); dragIndex = null; dropIndex = null; dragMoved = false; cancelDrag = undefined;
+      document.removeEventListener('keydown', keydown);
       handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', finish); handle.removeEventListener('pointercancel', finish); handle.removeEventListener('lostpointercapture', finish);
       if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
     }
+    function keydown(e: KeyboardEvent) { if (e.key === 'Escape') cleanup(); }
+    cancelDrag = cleanup;
+    document.addEventListener('keydown', keydown);
     handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', finish); handle.addEventListener('pointercancel', finish); handle.addEventListener('lostpointercapture', finish);
     frame = requestAnimationFrame(scroll);
   }
@@ -84,7 +102,9 @@
     busy = true; error = '';
     try {
       const before = rehearsal;
-      rehearsal = await updateRehearsal({ ...before, ...patch });
+      const next = { ...before, ...patch };
+      if (!next.cancelled) next.attendees = rehearsalAttendees(next.songs, next.attendees);
+      rehearsal = await updateRehearsal(next);
       notes = Object.fromEntries(rehearsal.songs.map(song => {
         const key = rehearsalSongKey(song);
         const saved = before.songs.find(s => rehearsalSongKey(s) === key)?.note ?? '';
@@ -101,7 +121,7 @@
   }
   function toggleAttendee(name: string) {
     if (!rehearsal) return;
-    action({ attendees: rehearsal.attendees.includes(name) ? rehearsal.attendees.filter(n => n !== name) : [...rehearsal.attendees, name] });
+    action({ attendees: activeAttendees.includes(name) ? activeAttendees.filter(n => n !== name) : [...activeAttendees, name] });
   }
   async function progress(item: RehearsalSong, name: string, stage: LearningStage) {
     if (!rehearsal || busy) return;
@@ -139,18 +159,19 @@
     {:else if rehearsal.setlistId}<p class="muted">{$rt.unavailableSetlist}</p>{/if}
     {#if rehearsal.note}<p class="note">{rehearsal.note}</p>{/if}
     <section class="attendees"><h2>{$rt.attendees}</h2><p class="muted hint">{$rt.attendeesHint}</p><div class="chips">
-      {#each attendeeOptions as name}<button class:chosen={rehearsal.attendees.includes(name)} aria-pressed={rehearsal.attendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{rehearsal.attendees.includes(name) ? ' ✓' : ''}</button>{/each}
+      {#each attendeeOptions as name}<button class:chosen={activeAttendees.includes(name)} aria-pressed={activeAttendees.includes(name)} onclick={() => toggleAttendee(name)} disabled={busy || rehearsal.cancelled}>{name}{activeAttendees.includes(name) ? ' ✓' : ''}</button>{/each}
     </div></section>
     <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><button class="primary" onclick={() => { repeating = false; showForm = true; }} disabled={busy || rehearsal.cancelled}>{$rt.plan}</button></div>
+    {#if rehearsal.songs.length > 1}<p class="reorder-hint">{$rt.reorderHint}</p>{/if}
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
     {#each rehearsal.songs as item, index (rehearsalSongKey(item))}
       {@const songKey = rehearsalSongKey(item)}
-      {@const pct = rehearsalReadiness(item.song, rehearsal.attendees)}
-      {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !rehearsal!.attendees.includes(name))}
-      <article class="song" data-rehearsal-index={index} class:dragging={dragIndex === index} class:drop-target={dropIndex === index}>
+      {@const pct = rehearsalReadiness(item.song, activeAttendees)}
+      {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !activeAttendees.includes(name))}
+      <article class="song" data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index} class:drop-before={dropSide === 'before'} class:drop-after={dropSide === 'after'}>
         <div class="song-row">
-          <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>☰</button>
+          <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</button>
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><strong>{item.song.title}</strong><small>{item.song.artist}</small></button>
           <span class="pct" style={pct !== null ? pctBubbleStyle(pct) : ''} title={$rt.sessionReadiness}>{pct !== null ? `${pct}%` : '—'}</span>
         </div>
@@ -163,8 +184,8 @@
             {#if item.sourceMissing}<p class="muted">{$rt.sourceMissing}</p>{/if}
             {#each orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length) as name}
               {@const role = item.song.musicians[name]}
-              <div class="musician" class:absent={!rehearsal.attendees.includes(name)}><span>{name} <small>{role.instruments.map(i => INSTRUMENT_ICONS[i]).join(' ')}</small></span>
-                <LearningProgress {name} value={item.song.progress?.[name] ?? 'queue'} onchange={stage => progress(item, name, stage)} disabled={busy || rehearsal.cancelled || !rehearsal.attendees.includes(name) || (item.sourceMissing && !catalog.some(s => s.id === item.songId))} />
+              <div class="musician" class:absent={!activeAttendees.includes(name)}><span>{name} <small>{role.instruments.map(i => INSTRUMENT_ICONS[i]).join(' ')}</small></span>
+                <LearningProgress {name} value={item.song.progress?.[name] ?? 'queue'} onchange={stage => progress(item, name, stage)} disabled={busy || rehearsal.cancelled || !activeAttendees.includes(name) || (item.sourceMissing && !catalog.some(s => s.id === item.songId))} />
               </div>
             {/each}
             {#if item.song.comment}<p class="note muted">{item.song.comment}</p>{/if}
@@ -183,6 +204,10 @@
   {/if}
 </div>
 {#if showForm && rehearsal}<RehearsalForm title={repeating ? $rt.repeat : $rt.edit} initial={formInitial} {setlists} {musicians} {catalog} onsubmit={saveForm} onclose={() => { showForm = false; }} />{/if}
+{#if dragMoved && dragIndex !== null && rehearsal}
+  {@const item = rehearsal.songs[dragIndex]}
+  <div class="drag-preview" style:left={`${dragX}px`} style:top={`${dragY}px`} aria-hidden="true"><span>⠿</span><div><strong>{item.song.title}</strong><small>{item.song.artist}</small></div></div>
+{/if}
 {#if lyrics}<LyricsOverlay song={lyrics} onclose={() => { lyrics = null; }} onsavetranspose={async song => { lyrics = song; return song; }} />{/if}
 {/if}
 <style>
@@ -198,10 +223,20 @@
   .note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; } .muted { color: var(--text-muted); font-size: .8rem; }
   .attendees { margin: 24px 0 30px; } .hint { margin: 8px 0 12px; } .chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .song-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
-  .song-list { display: flex; flex-direction: column; gap: 10px; } .song { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
+  .song-list { display: flex; flex-direction: column; gap: 10px; } .song { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: clip; }
   .song-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
-  .drag-handle { touch-action: none; cursor: grab; padding: 10px 6px; border: 0; background: transparent; color: var(--text-muted); }
-  .dragging { opacity: .5; } .drop-target { outline: 2px solid var(--accent); }
+  .drag-handle { touch-action: none; cursor: grab; width: 36px; min-height: 44px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); font-size: 1.35rem; flex-shrink: 0; }
+  .drag-handle:hover, .drag-handle:focus-visible { color: var(--accent); border-color: var(--accent); }
+  .drag-handle:active { cursor: grabbing; }
+  .reorder-hint { font-size: .78rem; color: var(--text-muted); margin: -5px 0 14px; }
+  .dragging { opacity: .35; } .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .drop-target::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); pointer-events: none; }
+  .drop-before::after { top: 0; } .drop-after::after { bottom: 0; }
+  .drag-preview { position: fixed; z-index: 200; pointer-events: none; display: flex; align-items: center; gap: 12px; width: 240px; box-sizing: border-box; padding: 12px; border: 2px solid var(--accent); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #0003; }
+  .drag-preview > span { color: var(--accent); font-size: 1.35rem; }
+  .drag-preview div { min-width: 0; } .drag-preview strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+  .drag-preview small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); margin-top: 4px; font-size: .78rem; }
+
   .song-title { flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; } .song-title strong { font-size: .95rem; } .song-title small { display: block; font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
   .pct { padding: 5px 8px; border-radius: 12px; font-size: .8rem; font-weight: 650; flex-shrink: 0; }
   .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 14px 9px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 14px 12px; overflow-wrap: anywhere; }
