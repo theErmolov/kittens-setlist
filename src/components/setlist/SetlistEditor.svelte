@@ -1,5 +1,4 @@
 <script lang="ts">
-  import SetlistRehearsals from '$components/rehearsals/SetlistRehearsals.svelte';
   import Note from '$components/shared/Note.svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
   import type { Setlist, Song, Instrument, SetlistEntry, SetlistSubset, BandMusician, LearningStage } from '$lib/types';
@@ -892,7 +891,6 @@
 </script>
 
 <div class="editor" class:read-only={!$canWrite}>
-  <div class="setlist-rehearsals"><SetlistRehearsals setlistId={setlist.id} /></div>
   <div class="editor-header">
     <div class="meta">
       {#if editingMeta && $canWrite}
@@ -928,6 +926,7 @@
       {/if}
     </div>
     <div class="header-actions">
+      <button class="btn-secondary filter-toggle" class:active={filterOpen || isFiltered} aria-expanded={filterOpen} aria-controls="desktop-setlist-filters" onclick={() => { filterOpen = !filterOpen; }}>🎛️ {$t.editor.filter}</button>
       {#if $canWrite}
         <div class="break-wrap">
           <button class="btn-secondary" onclick={() => { showBreakPicker = !showBreakPicker; }}>⏸ {$t.editor.break}</button>
@@ -947,7 +946,7 @@
     </div>
   </div>
 
-  <div class="filter-bar">
+  <div id="desktop-setlist-filters" class="filter-bar" class:open={filterOpen}>
     <input class="filter-search" type="search" placeholder={$t.editor.search} bind:value={filterText} />
     {#each allMusicians as name}
       <button
@@ -1379,7 +1378,8 @@
     border: 1px solid var(--border); font-size: 0.65rem;
     color: var(--text-muted); cursor: default; flex-shrink: 0; line-height: 1;
   }
-  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .header-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .filter-toggle.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn-secondary { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; color: var(--text); font-size: 0.88rem; }
   .btn-primary { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
   .btn-stage { padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.88rem; }
@@ -1387,9 +1387,10 @@
   .empty p { margin-bottom: 12px; }
 
   .filter-bar {
-    display: flex; flex-wrap: wrap; gap: 5px;
+    display: none; flex-wrap: wrap; gap: 5px;
     padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
+  .filter-bar.open { display: flex; }
   .filter-chip {
     padding: 3px 12px; border: 1px solid var(--border); border-radius: 20px;
     background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 500;
@@ -1615,13 +1616,12 @@
   .entry-time-mob { display: none; }
 
   @media (max-width: 700px) {
-    .setlist-rehearsals { display: none; }
     .editor { height: calc(100dvh - 56px - 64px); }
     .th-musician { display: none; }
     .td-musician { display: none; }
     .th-time, .td-time { display: none; }
     .desktop-only { display: none !important; }
-    .filter-bar { display: none; }
+    .filter-bar, .filter-bar.open { display: none; }
     .header-actions { display: none; }
     .entry-time-mob { display: block; font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; margin-top: 2px; text-align: right; }
     .mobile-musicians {
