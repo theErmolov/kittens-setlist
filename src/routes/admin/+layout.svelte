@@ -15,7 +15,7 @@
 </script>
 
 {#if $currentUser?.isAdmin}
-  <div class="admin-shell">
+  <div class="page-shell">
     <header>
       <nav class="admin-nav" aria-label={$t.admin.title}>
         <a href="{base}/admin" class:active={path === '/admin' || path === '/admin/'} aria-current={path === '/admin' || path === '/admin/' ? 'page' : undefined}>{$t.admin.users}</a>
@@ -31,7 +31,6 @@
 {/if}
 
 <style>
-  .admin-shell { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
   .admin-content { padding-top: 24px; }
   .admin-nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   a { padding: 8px 12px; border-radius: 6px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; font-weight: 600; }

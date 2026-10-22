@@ -42,7 +42,7 @@
   }
 </script>
 
-<div class="page">
+<div class="page-shell">
   {#if $canWrite}
     <div class="page-header">
       <button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>
@@ -89,7 +89,6 @@
 </div>
 
 <style>
-  .page { padding: 20px 16px; max-width: 640px; margin: 0 auto; }
   .page-header { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 20px; }
   .new-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
   .new-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }

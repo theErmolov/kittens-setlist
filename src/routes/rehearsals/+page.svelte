@@ -60,7 +60,7 @@
 </script>
 
 {#if $canAccessRehearsals}
-<div class="page">
+<div class="page-shell">
   <header><ReminderPreferences /><button class="primary" onclick={plan} disabled={loading || !!error}>{$rt.new}</button></header>
   {#if loading}<p class="loading"><LoadingCat /></p>
   {:else if error}<p class="error" role="alert">{error}</p><button onclick={load}>{$rt.retry}</button>
@@ -101,7 +101,6 @@
 {/if}
 <style>
   .loading { padding: 40px 20px; }
-  .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
   header, .day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header { flex-wrap: nowrap; margin-bottom: 24px; } header .primary { flex-shrink: 0; margin-left: auto; } h2 { font-size: 1rem; margin: 0 0 12px; }
   button { border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--surface); color: var(--text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
@@ -126,5 +125,5 @@
   .session-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .empty { color: var(--text-muted); padding: 16px 0; font-size: .9rem; } .upcoming-empty { margin-bottom: 20px; } .error { color: #dc2626; }
   @media(max-width: 700px) { .calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
-  @media(max-width: 600px) { .page { padding: 18px 10px 40px; } .calendar { padding: 10px 6px; } .dates { gap: 3px; } .day { min-height: 65px; padding: 5px 3px; } .marker { font-size: .58rem; padding: 1px 2px; } .calendar-header { gap: 5px; } .calendar-header h2 { font-size: 1rem; } .card-slot { flex-basis: 245px; } }
+  @media(max-width: 600px) { .calendar { padding: 10px 6px; } .dates { gap: 3px; } .day { min-height: 65px; padding: 5px 3px; } .marker { font-size: .58rem; padding: 1px 2px; } .calendar-header { gap: 5px; } .calendar-header h2 { font-size: 1rem; } .card-slot { flex-basis: 245px; } }
 </style>

@@ -917,7 +917,7 @@
             <span class="count">{$t.editor.songs(songCount)} ({formatDuration(totalMinutes, $lang)})</span>
             {#if songCount > 0}<span class="ready-count">{$t.progress.readyCount(readyCount, songCount)}</span>{/if}
           </div>
-          <Note value={localComment} label={$t.common.setlistComment} mobileCollapsible onsave={$canWrite ? async (value) => {
+          <Note value={localComment} label={$t.common.setlistComment} singleLineCollapsible onsave={$canWrite ? async (value) => {
             const updated = await updateSetlistComment(setlist.id, value);
             applyUpdate(updated);
           } : undefined} />
@@ -926,6 +926,7 @@
       {/if}
     </div>
     <div class="header-actions">
+      {#if $canWrite && !editingMeta}<button class="btn-secondary" onclick={startEditMeta}>✏️ {$t.editor.edit}</button>{/if}
       <button class="btn-secondary filter-toggle" class:active={filterOpen || isFiltered} aria-expanded={filterOpen} aria-controls="desktop-setlist-filters" onclick={() => { filterOpen = !filterOpen; }}>🎛️ {$t.editor.filter}</button>
       {#if $canWrite}
         <div class="break-wrap">
@@ -1354,7 +1355,8 @@
   .editor { display: flex; flex-direction: column; height: calc(100dvh - 56px); }
   .read-only .song-row, .read-only .song-row:active, .read-only .break-row, .read-only .subset-header, .read-only .break-label { cursor: default; }
   .editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-  .meta { display: flex; align-items: flex-start; gap: 8px; }
+  .meta { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  .meta-view { min-width: 0; width: 100%; }
   .meta-view h1 { margin: 0 0 4px; font-size: 1.4rem; }
   .meta-details { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
   .date, .count, .start-time { font-size: 0.82rem; color: var(--text-muted); }
@@ -1614,6 +1616,12 @@
   :global([data-theme="dark"]) .guest-tag { color: rgba(255,255,255,0.85) !important; }
 
   .entry-time-mob { display: none; }
+
+  @media (min-width: 701px) {
+    .editor-header { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, auto); }
+    .header-actions { justify-content: flex-end; align-self: start; min-width: 0; }
+    .edit-meta-btn { display: none; }
+  }
 
   @media (max-width: 700px) {
     .editor { height: calc(100dvh - 56px - 64px); }

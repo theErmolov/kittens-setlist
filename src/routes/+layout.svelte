@@ -195,6 +195,11 @@
     transition: background 0.2s, color 0.2s;
   }
 
+  :global(.page-shell) { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+  @media (max-width: 600px) {
+    :global(.page-shell) { padding: 18px 10px 40px; }
+  }
+
   .nav {
     display: flex;
     align-items: center;
