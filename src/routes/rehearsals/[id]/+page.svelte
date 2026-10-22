@@ -232,6 +232,7 @@
           <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</button>
           <span class="song-order">{index + 1}</span>
           <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><RehearsalSongName artist={item.song.artist} title={item.song.title} /></button>
+          {#if item.song.lyrics}<button class="lyrics-btn" aria-label={`${$rt.lyrics}: ${item.song.title}`} title={$rt.lyrics} onclick={() => { lyrics = item.song; }}>📝</button>{:else}<span class="lyrics-spacer" aria-hidden="true"></span>{/if}
           <RehearsalReadiness value={pct} label={$rt.sessionReadiness} />
         </div>
         {#if pct === null}<p class="song-hint">{$rt.noPlayers}</p>{/if}
@@ -251,7 +252,6 @@
             <label class="note-label">{$rt.songNote}<textarea bind:value={notes[songKey]} maxlength="4000" rows="2" disabled={busy || rehearsal.cancelled}></textarea></label>
             <div class="detail-actions">
               <button onclick={() => action({ songs: rehearsal!.songs.map(s => rehearsalSongKey(s) === songKey ? { ...s, note: notes[songKey] } : s) })} disabled={busy || rehearsal.cancelled || (notes[songKey] ?? '') === (item.note ?? '')}>{$rt.save}</button>
-              {#if item.song.lyrics}<button onclick={() => { lyrics = item.song; }}>{$rt.lyrics}</button>{/if}
               <button class="danger" onclick={() => action({ songs: rehearsal!.songs.filter(s => rehearsalSongKey(s) !== songKey) })} disabled={busy || rehearsal.cancelled}>{$rt.remove}</button>
             </div>
           </div>
@@ -277,7 +277,7 @@
   .song-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 24px 0 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 3px; } .song { position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: clip; }
-  .song-row { display: grid; grid-template-columns: 32px 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 8px; }
+  .song-row { display: grid; grid-template-columns: 32px 20px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 8px; }
   .song:hover { background: var(--row-hover); }
   .song-order { text-align: center; font-size: .82rem; color: var(--text-muted); }
   .drag-handle { touch-action: none; cursor: grab; width: 32px; min-height: 44px; padding: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }
@@ -289,6 +289,8 @@
   :global(.song.drag-preview) { position: fixed; z-index: 200; pointer-events: none; box-sizing: border-box; margin: 0; opacity: 1; box-shadow: 0 8px 24px #0003; }
 
   .song-title { font: inherit; flex: 1; min-width: 0; padding: 0; text-align: left; border: 0; background: transparent; }
+  .lyrics-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 5px; background: var(--accent); color: #fff; font-size: 1rem; }
+  .lyrics-spacer { width: 34px; height: 34px; }
   .song-hint { font-size: .75rem; color: var(--text-muted); margin: 0 8px 6px 76px; } .song-note { font-size: .85rem; white-space: pre-wrap; margin: 0 8px 8px 76px; overflow-wrap: anywhere; }
   .details { padding: 14px; border-top: 1px solid var(--border); } .details > p:first-child { margin-top: 0; }
   .musician { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; font-size: .85rem; } .musician small { margin-left: 5px; } .absent { opacity: .5; }
