@@ -135,15 +135,6 @@
   >
     <span class="link-icon">📷</span><span class="link-label">{$t.nav.media}</span>
   </a>
-  <a
-    href="https://antispam.kittens.band/"
-    class="nav-link"
-    target="_blank"
-    rel="noopener noreferrer"
-    title={$t.nav.antispam}
-  >
-    <span class="link-icon">🛡️</span><span class="link-label">{$t.nav.antispam}</span>
-  </a>
   <button class="lang-toggle" onclick={toggleLang}>{$lang.toUpperCase()}</button>
   <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if navLoggedIn}
