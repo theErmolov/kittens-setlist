@@ -121,7 +121,20 @@
     </a>
   {/if}
   {#if navIsAdmin}
-    <a href="{base}/admin" class="nav-link" class:active={path.startsWith('/admin')}>
+    <a
+      href="{base}/admin/budget"
+      class="nav-link admin-link"
+      class:active={path.startsWith('/admin/budget')}
+      title={$t.nav.budget}
+    >
+      <span class="link-icon">💰</span><span class="link-label">{$t.nav.budget}</span>
+    </a>
+    <a
+      href="{base}/admin"
+      class="nav-link admin-link"
+      class:active={path.startsWith('/admin') && !path.startsWith('/admin/budget')}
+      title={$t.nav.admin}
+    >
       <span class="link-icon">🔑</span><span class="link-label">{$t.nav.admin}</span>
       {#if hasPending}<span class="pending-dot"></span>{/if}
     </a>
@@ -135,6 +148,16 @@
   >
     <span class="link-icon">📷</span><span class="link-label">{$t.nav.media}</span>
   </a>
+  <a
+    href="https://antispam.kittens.band/"
+    class="nav-link"
+    target="_blank"
+    rel="noopener noreferrer"
+    title={$t.nav.antispam}
+  >
+    <span class="link-icon">🛡️</span><span class="link-label">{$t.nav.antispam}</span>
+  </a>
+  <span class="nav-spacer"></span>
   <button class="lang-toggle" onclick={toggleLang}>{$lang.toUpperCase()}</button>
   <button class="theme-toggle" onclick={toggleTheme} title={$t.common.themeToggle}>{#key dark}<span>{dark ? '☀️' : '🌙'}</span>{/key}</button>
   {#if navLoggedIn}
@@ -255,6 +278,7 @@
   }
   .nav-link:hover { color: var(--text); background: var(--chip-bg); }
   .nav-link.active { color: #fff; background: #6c63ff; }
+  .nav-spacer { flex: 1 1 auto; }
 
   .link-icon { font-size: 1rem; line-height: 1; position: relative; }
 
@@ -339,6 +363,10 @@
   }
   .logout-btn:hover { border-color: #e05252; color: #e05252; }
 
+  @media (max-width: 1180px) {
+    .admin-link .link-label { display: none; }
+  }
+
   @media (max-width: 900px) {
     .nav { gap: 0; padding: 0 10px; }
     .brand-text { display: none; }
@@ -346,6 +374,7 @@
     .link-label { display: none; }
     .nav-link { flex: 1 1 0; justify-content: center; min-width: 0; padding: 0; font-size: 1.2rem; }
     .link-icon { font-size: 1.25rem; }
+    .nav-spacer { display: none; }
     .lang-toggle { margin-left: auto; padding: 4px 7px; }
   }
 </style>
