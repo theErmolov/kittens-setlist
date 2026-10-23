@@ -20,6 +20,7 @@
       <nav class="admin-nav" aria-label={$t.admin.title}>
         <a href="{base}/admin" class:active={path === '/admin' || path === '/admin/'} aria-current={path === '/admin' || path === '/admin/' ? 'page' : undefined}>{$t.admin.users}</a>
         <a href="{base}/admin/audit" class:active={path.startsWith('/admin/audit')} aria-current={path.startsWith('/admin/audit') ? 'page' : undefined}>{$t.admin.auditLog}</a>
+        <a href="{base}/admin/budget" class:active={path.startsWith('/admin/budget')} aria-current={path.startsWith('/admin/budget') ? 'page' : undefined}>{$t.nav.budget}</a>
       </nav>
     </header>
     <div class="admin-content">
