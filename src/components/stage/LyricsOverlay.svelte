@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isChordLine, firstChord, CHORD_FIND_SRC } from '$lib/lyricsChords';
+  import { isChordLine, firstChord, CHORD_FIND_SRC, withoutChords } from '$lib/lyricsChords';
   import { packLyricsColumns, type LyricsPair } from '$lib/lyricsLayout';
   import { browser } from '$app/environment';
   import type { Song } from '$lib/types';
@@ -31,6 +31,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
 
+  let hideChords = $state(browser && localStorage.getItem('lyrics_hide_chords') === 'true');
   let transpose = $state(song.transpose ?? 0);
   let userFontSize = $state<number | null>(null);
   let dropdownOpen = $state(false);
@@ -102,6 +103,8 @@
   let transposedLines = $derived(
     rawLines.map(l => isChordLine(l) ? transposeChordLine(l, transpose) : l)
   );
+
+  let displayLines = $derived(hideChords ? withoutChords(rawLines) : transposedLines);
 
   let originalKey = $derived.by((): string => {
     for (const line of rawLines) {
@@ -232,7 +235,7 @@
     const availH = lyricsBodyEl.clientHeight - BODY_PAD_V;
     if (clientW <= 0 || availH <= 0) return;
 
-    const lines = transposedLines;
+    const lines = displayLines;
     const uf = userFontSize;
 
     function computeAt(avail: number) {
@@ -315,7 +318,7 @@
 
   // Re-run when lyrics content or manual font size changes
   $effect(() => {
-    transposedLines; // track
+    displayLines; // track
     userFontSize;    // track
     recompute();
   });
@@ -333,6 +336,13 @@
     const stored = localStorage.getItem(`lyrics_zoom_${song.id}`);
     userFontSize = stored !== null ? Number(stored) : null;
   });
+
+  function toggleChords() {
+    hideChords = !hideChords;
+    dropdownOpen = false;
+    currentPage = 0;
+    if (browser) localStorage.setItem('lyrics_hide_chords', String(hideChords));
+  }
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
 
@@ -388,11 +398,18 @@
       <span class="page-counter">{currentPage + 1} / {totalPages}</span>
     {/if}
     <div class="header-controls">
+      {#if originalKey}
+        <button
+          class="chords-toggle"
+          aria-pressed={hideChords}
+          onclick={toggleChords}
+        >{hideChords ? $t.stage.showChords : $t.stage.hideChords}</button>
+      {/if}
       <div class="zoom-buttons">
         <button class="zoom-btn" onclick={zoomOut} title={$t.stage.zoomOut}>A−</button>
         <button class="zoom-btn" onclick={zoomIn} title={$t.stage.zoomIn}>A+</button>
       </div>
-      {#if originalKey}
+      {#if originalKey && !hideChords}
         <div class="transpose-wrap">
           <div class="transpose-controls">
             <button class="step-btn" onclick={transposeDown} title={$t.stage.semitoneDown}>▼</button>
@@ -521,6 +538,25 @@
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+  }
+
+  .chords-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .chords-toggle:hover,
+  .chords-toggle[aria-pressed="true"] { background: var(--chip-bg); }
+
+  @media (max-width: 600px) {
+    .overlay-header { flex-wrap: wrap; gap: 8px; }
+    .header-controls { flex-wrap: wrap; justify-content: flex-end; width: 100%; }
   }
 
   .zoom-buttons {

@@ -17,3 +17,12 @@ export function firstChord(line: string): string {
   if (!isChordLine(line)) return '';
   return line.replace(SECTION_PREFIX_RE, '').match(new RegExp(CHORD_FIND_SRC))?.[0] ?? '';
 }
+
+/** Remove chord rows while preserving section headings and lyric spacing. */
+export function withoutChords(lines: string[]): string[] {
+  return lines.flatMap(line => {
+    if (!isChordLine(line)) return [line];
+    const heading = line.match(SECTION_PREFIX_RE)?.[0].trim();
+    return heading ? [heading] : [];
+  });
+}
