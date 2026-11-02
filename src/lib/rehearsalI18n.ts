@@ -3,6 +3,7 @@ import { lang } from './i18n';
 const strings = {
   en: {
     plan: 'Songs & musicians', songSelectionTitle: 'Songs',
+    markDone: 'Mark done through this song', markUndone: 'Mark not done', songDetails: 'Song details',
     leastReadyFirst: 'Least ready first',
     attendanceAutoHint: 'Choosing songs selects their musicians. Your manual choices take priority.', reorderHint: 'Drag the dotted grip to change song order.',
     needed: 'Needed for songs', unused: 'No selected songs', available: 'All musicians attending', unassigned: 'No assigned parts', drag: 'Drag to reorder; use arrow keys to move',
@@ -29,6 +30,7 @@ const strings = {
   },
   ru: {
     plan: 'Песни и музыканты', songSelectionTitle: 'Песни',
+    markDone: 'Отметить выполненными до этой песни', markUndone: 'Снять отметку выполнения', songDetails: 'Детали песни',
     leastReadyFirst: 'Сначала неготовые',
     attendanceAutoHint: 'При выборе песен выбираются их музыканты. Ваш ручной выбор важнее автоматического.', reorderHint: 'Перетащите за точки, чтобы изменить порядок песен.',
     needed: 'Нужен для песен', unused: 'Нет выбранных песен', available: 'Все музыканты придут', unassigned: 'Нет назначенных партий', drag: 'Перетащите для сортировки; используйте клавиши со стрелками',

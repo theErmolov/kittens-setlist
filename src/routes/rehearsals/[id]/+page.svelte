@@ -152,20 +152,23 @@
     try { await orderQueue.pending; rehearsal = await getRehearsal(id); orderQueue.confirmed = rehearsal; resetNotes(); } catch { error = $rt.error; }
     finally { busy = false; }
   }
-  async function persist(patch: Partial<Rehearsal>) {
+  async function persist(patch: Partial<Rehearsal>, optimistic = false) {
     if (!rehearsal || busy) return;
     busy = true; error = '';
+    let rollback: Rehearsal | null = null;
     try {
       await orderQueue.pending;
       if (!rehearsal) return;
       error = '';
       const before = rehearsal;
+      if (optimistic) rollback = before;
       const next = { ...before, ...patch };
       if (!next.cancelled && patch.songs && patch.attendees === undefined) {
         const beforeNeeded = new Set(before.songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
         const nextNeeded = new Set(next.songs.flatMap(item => rehearsalCoverage(item.song, []).needed));
         next.attendees = next.attendees.filter(name => !beforeNeeded.has(name) || nextNeeded.has(name));
       }
+      if (optimistic) rehearsal = next;
       rehearsal = await updateRehearsal(next);
       orderQueue.confirmed = rehearsal;
       notes = Object.fromEntries(rehearsal.songs.map(song => {
@@ -174,8 +177,16 @@
         return [key, notes[key] !== undefined && notes[key] !== saved ? notes[key] : song.note ?? ''];
       }));
     }
-    catch(e) { error = String(e).includes('409') ? $rt.conflict : $rt.saveError; throw e; }
+    catch(e) { if (rollback) rehearsal = rollback; error = String(e).includes('409') ? $rt.conflict : $rt.saveError; throw e; }
     finally { busy = false; }
+  }
+  async function togglePlayed(item: RehearsalSong) {
+    if (!rehearsal || busy || rehearsal.cancelled) return;
+    // Use the visible order, including the optional readiness sort, as stage view does.
+    const through = new Set(displayedSongs.slice(0, displayedSongs.indexOf(item) + 1).map(rehearsalSongKey));
+    await persist({ songs: rehearsal.songs.map(song => item.played
+      ? rehearsalSongKey(song) === rehearsalSongKey(item) ? { ...song, played: false } : song
+      : through.has(rehearsalSongKey(song)) ? { ...song, played: true } : song) }, true).catch(() => {});
   }
   function action(patch: Partial<Rehearsal>) { return persist(patch).catch(() => {}); }
   async function saveForm(draft: RehearsalDraft) {
@@ -219,7 +230,7 @@
     {#if linked}<a class="setlist" href="{base}/setlists/{linked.id}">{$rt.setlist}: {linked.name}</a>
     {:else if rehearsal.setlistId}<p class="muted">{$rt.unavailableSetlist}</p>{/if}
     {#if rehearsal.note}<p class="note">{rehearsal.note}</p>{/if}
-    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.length}</span></h2><div class="song-actions"><FilterChip label={$rt.leastReadyFirst} active={readinessFirst} onclick={toggleReadinessOrder} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null} /></div></div>
+    <div class="song-heading"><h2>{$rt.songs} <span>{rehearsal.songs.filter(song => song.played).length}/{rehearsal.songs.length}</span></h2><div class="song-actions"><FilterChip label={$rt.leastReadyFirst} active={readinessFirst} onclick={toggleReadinessOrder} disabled={busy || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null} /></div></div>
     {#if rehearsal.songs.length > 1}<p class="reorder-hint">{$rt.reorderHint}</p>{/if}
     {#if !rehearsal.songs.length}<p class="empty">{$rt.emptySongs}</p>{/if}
     <div class="song-list">
@@ -227,12 +238,13 @@
       {@const songKey = rehearsalSongKey(item)}
       {@const pct = rehearsalReadiness(item.song, activeAttendees)}
       {@const missing = orderMusicianNames(Object.keys(item.song.musicians), musicians).filter(name => item.song.musicians[name].instruments.length && !activeAttendees.includes(name))}
-      <article class="song" data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index}>
+      <article class="song" class:played={item.played} data-rehearsal-index={index} class:dragging={dragMoved && dragIndex === index} class:drop-target={dragMoved && dropIndex === index && dragIndex !== index}>
         <div class="song-row">
           <button class="drag-handle" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</button>
           <span class="song-order">{index + 1}</span>
-          <button class="song-title" aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}><RehearsalSongName artist={item.song.artist} title={item.song.title} /></button>
+          <button class="song-title" aria-pressed={!!item.played} aria-label={`${item.played ? $rt.markUndone : $rt.markDone}: ${item.song.title}`} disabled={busy || rehearsal.cancelled} onclick={() => togglePlayed(item)}><RehearsalSongName artist={item.song.artist} title={item.song.title} /></button>
           {#if item.song.lyrics}<button class="lyrics-btn" aria-label={`${$rt.lyrics}: ${item.song.title}`} title={$rt.lyrics} onclick={() => { lyrics = item.song; }}>📝</button>{:else}<span class="lyrics-spacer" aria-hidden="true"></span>{/if}
+          <button class="details-toggle" aria-label={`${$rt.songDetails}: ${item.song.title}`} aria-expanded={expanded === songKey} onclick={() => { expanded = expanded === songKey ? null : songKey; }}>{expanded === songKey ? '▴' : '▾'}</button>
           <RehearsalReadiness value={pct} label={$rt.sessionReadiness} />
         </div>
         {#if pct === null}<p class="song-hint">{$rt.noPlayers}</p>{/if}
@@ -277,7 +289,10 @@
   .song-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .song-heading { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 24px 0 14px; } h2 span { color: var(--text-muted); margin-left: 6px; }
   .song-list { display: flex; flex-direction: column; gap: 3px; } .song { position: relative; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: clip; }
-  .song-row { display: grid; grid-template-columns: 32px 20px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 8px; }
+  .song-row { display: grid; grid-template-columns: 32px 20px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 7px 8px; }
+  .song.played { opacity: .45; }
+  .song.played .song-title { text-decoration: line-through; }
+  .details-toggle { padding: 4px; min-width: 28px; min-height: 44px; border: 0; background: transparent; }
   .song:hover { background: var(--row-hover); }
   .song-order { text-align: center; font-size: .82rem; color: var(--text-muted); }
   .drag-handle { touch-action: none; cursor: grab; width: 32px; min-height: 44px; padding: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }

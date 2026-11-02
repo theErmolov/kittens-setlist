@@ -74,7 +74,8 @@ async function parseDraft(body: Record<string, unknown>, before?: Rehearsal): Pr
     if (input.refreshFor !== undefined && (!Array.isArray(input.refreshFor) || input.refreshFor.length > 100)) throw new InputError('Invalid refresh musicians');
     const refreshFor = [...new Set(((input.refreshFor ?? previous?.refreshFor ?? []) as unknown[]).map(name => text(name, 'refresh musician', 100)))];
     if (refreshFor.some(name => !name || !(source ?? previous?.song)!.musicians[name]?.instruments.length)) throw new InputError('Refresh musician does not take part in this song');
-    songs.push({ ...ref, song: stripPersonalComments(previous?.song ?? source!), note: text(input.note, 'song note') || undefined, ...(refreshFor.length ? { refreshFor } : {}) });
+    if (input.played !== undefined && typeof input.played !== 'boolean') throw new InputError('Invalid played status');
+    songs.push({ played: (input.played as boolean | undefined) ?? previous?.played ?? false, ...ref, song: stripPersonalComments(previous?.song ?? source!), note: text(input.note, 'song note') || undefined, ...(refreshFor.length ? { refreshFor } : {}) });
   }
   if (body.cancelled !== undefined && typeof body.cancelled !== 'boolean') throw new InputError('Invalid cancelled status');
   return { date, startTime, endTime: endTime || undefined, timeZone, location: text(body.location, 'location', 500) || undefined, note: text(body.note, 'note') || undefined, setlistId, attendees, songs, cancelled: body.cancelled === true };
@@ -105,7 +106,7 @@ export async function rehearsalsHandler(event: APIGatewayProxyEventV2, path: str
       const original = copyFromId ? await getCurrent<Rehearsal>(TABLE, copyFromId) : undefined;
       if (copyFromId && !original) throw new InputError('Original rehearsal not found', 404);
       const draft = await parseDraft(body, original);
-      const item: Rehearsal = { ...draft, id: randomUUID(), version: 1, createdAt: new Date().toISOString(), createdBy: user.id };
+      const item: Rehearsal = { ...draft, songs: draft.songs.map(song => ({ ...song, played: false })), id: randomUUID(), version: 1, createdAt: new Date().toISOString(), createdBy: user.id };
       await db.send(new PutCommand({ TableName: TABLE, Item: item, ConditionExpression: 'attribute_not_exists(id)' }));
       await logAudit({ action: 'rehearsal.create', actor: user, entityType: 'rehearsal', entityId: item.id, entityName: `${item.date} ${item.startTime}`, summary: 'создана репетиция' });
       return ok(await hydrate(item), 201);

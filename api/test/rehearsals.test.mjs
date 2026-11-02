@@ -230,3 +230,23 @@ test('refresh markers are independent of progress, validate assignments and surv
 test('nonexistent local start times at the DST spring transition are rejected', async () => {
   assert.equal((await request('POST', '/rehearsals', { ...draft, date: '2026-03-29', startTime: '02:30', endTime: undefined })).status, 400);
 });
+
+test('rehearsal completion persists independently, survives edits and resets on repeat', async () => {
+  let current = await create();
+  current.songs[0].played = true;
+  current = (await request('PUT', `/rehearsals/${current.id}`, current, 'writer')).body;
+  assert.equal(current.songs[0].played, true);
+  assert.equal(current.songs[1].played, false);
+  assert.equal(items('kittens-setlists')[0].entries[0].played, false);
+  assert.equal(items('kittens-songs')[0].played, undefined);
+  const legacy = structuredClone(current); delete legacy.songs[0].played;
+  current = (await request('PUT', `/rehearsals/${current.id}`, { ...legacy, location: 'Elsewhere' })).body;
+  assert.equal((await request('GET', `/rehearsals/${current.id}`)).body.songs[0].played, true);
+  const repeated = await request('POST', '/rehearsals', { ...current, copyFromId: current.id });
+  assert.ok(repeated.body.songs.every(song => song.played === false));
+  current.songs[0].played = 'yes';
+  assert.equal((await request('PUT', `/rehearsals/${current.id}`, current)).status, 400);
+  current.songs[0].played = false;
+  current = (await request('PUT', `/rehearsals/${current.id}`, current)).body;
+  assert.equal(current.songs[0].played, false);
+});

@@ -1,4 +1,4 @@
-export interface NotificationEntity { type: 'bold' | 'blockquote'; offset: number; length: number }
+export interface NotificationEntity { type: 'bold' | 'blockquote' | 'text_link'; offset: number; length: number; url?: string }
 export interface NotificationText { text: string; entities: NotificationEntity[] }
 interface NotificationSong { artist: string; title: string; note?: string }
 
@@ -19,4 +19,16 @@ export function songListText(songs: NotificationSong[]): NotificationText {
 export function appendNotificationText(target: NotificationText, part: NotificationText): void {
   target.entities.push(...part.entities.map(entity => ({ ...entity, offset: entity.offset + target.text.length })));
   target.text += part.text;
+}
+
+/** Mention only selected attendees; unlinked guests remain readable plain text. */
+export function attendeeText(attendees: string[], users: import('./types.js').User[]): NotificationText {
+  const result: NotificationText = { text: 'Кто придёт: ', entities: [] };
+  for (const [index, name] of [...new Set(attendees)].entries()) {
+    if (index) result.text += ', ';
+    const account = users.find(user => user.status === 'approved' && user.musicianName === name && /^\d+$/.test(user.telegramId ?? ''));
+    if (account) result.entities.push({ type: 'text_link', offset: result.text.length, length: name.length, url: `tg://user?id=${account.telegramId}` });
+    result.text += name;
+  }
+  return result;
 }

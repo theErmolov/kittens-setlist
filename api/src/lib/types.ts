@@ -147,6 +147,7 @@ export interface PresenceEntry {
 
 // Rehearsals have an independent song selection; learning progress stays live.
 export interface RehearsalSong {
+  played?: boolean; // completion within this rehearsal only
   songId: string;
   sourceSetlistId?: string;
   song: Song; // arrangement snapshot; API overlays current learning progress

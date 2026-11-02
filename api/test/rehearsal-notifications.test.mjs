@@ -430,3 +430,17 @@ test('HTTP API permits readers only their own reminder preference, preserving sh
   assert.equal((await request('GET', '/rehearsals')).statusCode, 403);
   assert.equal((await request('PATCH', '/notification-preferences/100', { enabled: false })).statusCode, 403);
 });
+
+test('announcement mentions selected linked musicians and keeps unlinked guests as plain names', async () => {
+  put('kittens-people', { ...admin, id: 'absent', telegramId: '300', musicianName: 'Absent' });
+  put('kittens-people', { ...admin, id: 'pending', telegramId: '400', musicianName: 'Guest 🎸', status: 'pending' });
+  put('kittens-rehearsals', rehearsal('r', undefined, undefined, { attendees: ['Guest 🎸', 'Bass', 'Keys'] }));
+  await runRehearsalNotifications(now);
+  const { text, entities } = messages('-1003138570084')[0].payload;
+  assert.match(text, /Кто придёт: Guest 🎸, Bass, Keys/);
+  const mentions = entities.filter(entity => entity.type === 'text_link');
+  assert.deepEqual(mentions.map(entity => [text.slice(entity.offset, entity.offset + entity.length), entity.url]), [
+    ['Bass', 'tg://user?id=100'], ['Keys', 'tg://user?id=200'],
+  ]);
+  assert.ok(entities.filter(entity => entity.type === 'bold').some(entity => text.slice(entity.offset, entity.offset + entity.length) === 'Song'));
+});

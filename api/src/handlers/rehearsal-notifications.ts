@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { songListText, appendNotificationText, type NotificationText } from '../lib/notification-text.js';
+import { attendeeText, songListText, appendNotificationText, type NotificationText } from '../lib/notification-text.js';
 import { dbScan } from '../lib/dynamo.js';
 import { listUsers, getUserByTelegramId } from '../lib/people.js';
 import { hydrate } from './rehearsals.js';
@@ -40,6 +40,10 @@ async function deliverGroup(r: Rehearsal, kind: 'announcement' | 'reminder', now
   if (!receipt) return false;
   const message: NotificationText = { text: `${kind === 'announcement' ? 'Запланирована репетиция' : 'Напоминание о репетиции'}\n`, entities: [] };
   appendNotificationText(message, rehearsalLabelText(r));
+  if (kind === 'announcement' && r.attendees.length) {
+    message.text += '\n\n';
+    appendNotificationText(message, attendeeText(r.attendees, await listUsers()));
+  }
   message.text += `${r.note ? `\n\n${r.note}` : ''}\n\n${r.songs.length ? 'Песни:\n' : 'План песен пока составляется.'}`;
   appendNotificationText(message, songListText(r.songs.map(item => item.song)));
   if (kind === 'announcement') await setStateFields(id, { rehearsalId: r.id, chatId, fingerprint: fingerprint(r), startAt: rehearsalStart(r), label: rehearsalLabel(r), expiresAt: Math.floor(rehearsalStart(r) / 1000) + 90 * 86400 });
