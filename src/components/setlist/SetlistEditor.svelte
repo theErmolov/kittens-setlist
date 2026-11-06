@@ -47,6 +47,9 @@
   } = $props();
 
   let allMusicians = $derived(musicians.map(m => m.name));
+  let columnMusicians = $derived(allMusicians.filter(name =>
+    localEntries.some(entry => (entry.song?.musicians[name]?.instruments?.length ?? 0) > 0)
+  ));
   let permanentNamesSet = $derived(new Set(allMusicians));
 
   let guestNames = $derived.by(() => {
@@ -540,7 +543,7 @@
   });
 
   // total columns: drag + num + (time?) + song + musicians + actions
-  let totalCols = $derived(allMusicians.length + 4 + (localMeta.startTime ? 1 : 0));
+  let totalCols = $derived(columnMusicians.length + 4 + (localMeta.startTime ? 1 : 0));
 
   async function handleAdd(songs: Song[]) {
     const updated = await addSongsToSetlist(setlist.id, songs);
@@ -1067,7 +1070,7 @@
             <th class="th-num">#</th>
             {#if localMeta.startTime}<th class="th-time">⏱</th>{/if}
             <th class="th-song">{$t.editor.songColumn}</th>
-            {#each allMusicians as name, i}
+            {#each columnMusicians as name, i}
               <th class="th-musician progress-delim" class:musician-alt={i % 2 === 0}>{name}</th>
             {/each}
             <th class="th-actions"></th>
@@ -1214,7 +1217,7 @@
                       {/if}
                       <Note value={entry.personalComment} label="🔒" />
                     </td>
-                    {#each allMusicians as name, mi}
+                    {#each columnMusicians as name, mi}
                       {@const role = song.musicians[name]}
                       {@const stage = entryStage(entry, name)}
                       {@const progBg = (role?.instruments?.length ?? 0) > 0 ? (PROG_BG[stage] ?? null) : null}
