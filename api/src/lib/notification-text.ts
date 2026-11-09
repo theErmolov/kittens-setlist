@@ -1,4 +1,4 @@
-export interface NotificationEntity { type: 'bold' | 'blockquote' | 'text_link'; offset: number; length: number; url?: string }
+export interface NotificationEntity { type: 'bold' | 'blockquote' | 'text_link' | 'date_time'; offset: number; length: number; url?: string; unix_time?: number; date_time_format?: string }
 export interface NotificationText { text: string; entities: NotificationEntity[] }
 interface NotificationSong { artist: string; title: string; note?: string }
 

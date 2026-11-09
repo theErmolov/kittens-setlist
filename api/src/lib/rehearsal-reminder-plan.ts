@@ -55,8 +55,10 @@ export function personalNotificationsAllowed(user?: User | null): user is User &
 }
 export function rehearsalLabelText(r: Rehearsal): NotificationText {
   const date = new Intl.DateTimeFormat('ru-RU', { timeZone: r.timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(rehearsalStart(r));
-  const dateTime = `${date}, ${r.startTime}${r.endTime ? `–${r.endTime}` : ''}`;
-  return { text: `${dateTime}${r.location ? ` · ${r.location}` : ''}`, entities: [{ type: 'bold', offset: 0, length: dateTime.length }] };
+  const startLabel = `${date}, ${r.startTime}`;
+  // Telegram dates represent one instant, with no duration/end-time support.
+  // Keep the existing local text and avoid nesting this entity inside bold.
+  return { text: `${startLabel}${r.endTime ? `–${r.endTime}` : ''}${r.location ? ` · ${r.location}` : ''}`, entities: [{ type: 'date_time', offset: 0, length: startLabel.length, unix_time: Math.floor(rehearsalStart(r) / 1000), date_time_format: '' }] };
 }
 export function rehearsalLabel(r: Rehearsal): string {
   return rehearsalLabelText(r).text;

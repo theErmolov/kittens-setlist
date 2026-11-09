@@ -311,7 +311,7 @@ test('group and personal songs sort by artist and bold only literal titles, incl
     const quotes = payload.entities.filter(e => e.type === 'blockquote');
     assert.equal(quotes.length, 1);
     assert.ok(payload.text.slice(quotes[0].offset, quotes[0].offset + quotes[0].length).startsWith('• alpha & friends'));
-    assert.ok(payload.entities.some(e => e.type === 'bold' && payload.text.slice(e.offset, e.offset + e.length) === plan.rehearsalLabel(rehearsal())));
+    assert.ok(payload.entities.some(e => e.type === 'date_time' && payload.text.slice(e.offset, e.offset + e.length) === plan.rehearsalLabel(rehearsal())));
   }
   assert.match(messages('100')[0].payload.text, /<b>Keep this literal<\/b>/);
   assert.equal(messages('100')[0].payload.reply_markup.inline_keyboard[1][0].text, 'Отключить напоминания');
@@ -330,7 +330,7 @@ test('clipping keeps bold entities only for retained song lines, never for the a
   assert.match(payload.text, /Полный список/);
 });
 
-test('date/time bold excludes location; every preparation section gets its own quote panel', async () => {
+test('clickable date/time excludes location; every preparation section gets its own quote panel', async () => {
   const r = rehearsal('r', undefined, undefined, { location: 'Studio' });
   r.songs = ['queue', 'mastering', 'ready'].map((stage, i) => ({ songId: `s${i}`, song: { ...song, id: `s${i}`, title: `Song ${i}`, progress: { Bass: stage } }, ...(stage === 'ready' ? { refreshFor: ['Bass'] } : {}) }));
   for (const item of r.songs) put('kittens-songs', item.song);
@@ -338,9 +338,15 @@ test('date/time bold excludes location; every preparation section gets its own q
   await runRehearsalNotifications(now);
   for (const chat of ['100', '-1003138570084']) {
     const { text, entities } = messages(chat)[0].payload;
-    const bold = entities.filter(e => e.type === 'bold').map(e => text.slice(e.offset, e.offset + e.length));
-    assert.ok(bold.some(value => value.includes('19:00') && value.includes('15 октября')));
-    assert.ok(bold.every(value => !value.includes('Studio')));
+    const dates = entities.filter(e => e.type === 'date_time');
+    assert.equal(dates.length, 1);
+    const date = dates[0];
+    assert.equal(date.unix_time, rehearsalStart(r) / 1000);
+    assert.equal(date.date_time_format, '');
+    const label = text.slice(date.offset, date.offset + date.length);
+    assert.ok(label.includes('19:00') && label.includes('15 октября'));
+    assert.ok(!label.includes('Studio'));
+    assert.ok(!entities.some(e => e !== date && e.offset < date.offset + date.length && e.offset + e.length > date.offset));
     const quotes = entities.filter(e => e.type === 'blockquote');
     assert.equal(quotes.length, chat === '100' ? 3 : 1);
     for (const quote of quotes) assert.ok(text.slice(quote.offset, quote.offset + quote.length).startsWith('• Artist'));
@@ -443,4 +449,16 @@ test('announcement mentions selected linked musicians and keeps unlinked guests 
     ['Bass', 'tg://user?id=100'], ['Keys', 'tg://user?id=200'],
   ]);
   assert.ok(entities.filter(entity => entity.type === 'bold').some(entity => text.slice(entity.offset, entity.offset + entity.length) === 'Song'));
+});
+
+test('date links use the rehearsal timezone across DST and exclude optional end times', () => {
+  for (const [date, utc] of [['2026-01-15', '2026-01-15T18:00:00Z'], ['2026-07-15', '2026-07-15T17:00:00Z']]) {
+    const r = rehearsal('r', date, '19:00', { timeZone: 'Europe/Berlin', endTime: '22:00', location: 'Studio' });
+    const label = plan.rehearsalLabelText(r);
+    const entity = label.entities[0];
+    assert.equal(entity.type, 'date_time');
+    assert.equal(entity.unix_time, Date.parse(utc) / 1000);
+    assert.ok(label.text.slice(0, entity.length).endsWith('19:00'));
+    assert.ok(label.text.slice(entity.length).startsWith('–22:00 · Studio'));
+  }
 });
