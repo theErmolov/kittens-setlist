@@ -4,6 +4,19 @@
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
   import LearningProgress from '$components/shared/LearningProgress.svelte';
   import { t } from '$lib/i18n';
+  import { useStore } from '$lib/store/bridge';
+  import { songEditStore } from '$lib/store/backlog';
+  import * as Dialog from '$components/ui/dialog';
+  import * as AlertDialog from '$components/ui/alert-dialog';
+  import * as Tabs from '$components/ui/tabs';
+  import { Button } from '$components/ui/button';
+  import { Input } from '$components/ui/input';
+  import { Textarea } from '$components/ui/textarea';
+  import { Label } from '$components/ui/label';
+  import * as Table from '$components/ui/table';
+  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { getCoreRowModel, type ColumnDef } from '@tanstack/table-core';
+  import { ToggleGroup, ToggleGroupItem } from '$components/ui/toggle-group';
 
   const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
   const instrumentIcons: Record<Instrument, string> = {
@@ -32,100 +45,54 @@
     onremove?: () => void;
   } = $props();
 
-  const permanentNames = new Set(musicians.map(m => m.name));
+  songEditStore.getState().init(song, musicians, mode);
+  const draftStore = useStore(songEditStore, s => s.draft);
+  const guestRowsStore = useStore(songEditStore, s => s.guestRows);
+  const activeTab = useStore(songEditStore, s => s.activeTab);
+  const saving = useStore(songEditStore, s => s.saving);
+  const saveFailed = useStore(songEditStore, s => s.saveFailed);
+  const confirmKind = useStore(songEditStore, s => s.confirm);
+  const actions = songEditStore.getState();
+  const setField = actions.setField;
+  const labelClass = 'text-[0.82rem] font-semibold tracking-[0.04em] text-muted-foreground uppercase';
+  const instClass = 'px-0 text-[1.35rem] data-[state=on]:bg-primary min-w-0 flex-1';
+  const catActive: Record<Category, string> = {
+    top: 'data-[state=on]:border-transparent data-[state=on]:bg-warning data-[state=on]:text-warning-ink',
+    mid: 'data-[state=on]:border-transparent data-[state=on]:bg-info data-[state=on]:text-info-ink',
+    low: 'data-[state=on]:border-transparent data-[state=on]:bg-success data-[state=on]:text-success-ink',
+  };
+  const numberOrNull = (v: string) => v === '' ? null : Number(v);
 
-  // ── Permanent musicians ────────────────────────────────────────────────────
+  let guestsMissingInstrument = $derived(
+    new Set($guestRowsStore.filter(r => r.name.trim() && r.instruments.length === 0).map(r => r.id))
+  );
 
-  function buildInitialMusicians(): Record<string, MusicianRole> {
-    const result: Record<string, MusicianRole> = {};
-    if (song?.musicians) {
-      for (const [name, role] of Object.entries(song.musicians)) {
-        if (permanentNames.has(name)) result[name] = { instruments: [...(role.instruments ?? [])] };
-      }
-    } else if (mode !== 'setlist-only') {
-      for (const m of musicians) {
-        result[m.name] = { instruments: m.defaultInstruments?.length ? [...m.defaultInstruments] : [] };
-      }
-    }
-    return result;
-  }
-
-  let draft = $state<Song>({
-    id: song?.id ?? '',
-    artist: song?.artist ?? '',
-    title: song?.title ?? '',
-    category: song?.category ?? 'mid',
-    comment: song?.comment ?? '',
-    personalComment: song?.personalComment ?? '',
-    musicians: buildInitialMusicians(),
-    sortOrder: song?.sortOrder,
-    lengthMinutes: song?.lengthMinutes ?? 5,
-    progress: { ...(song?.progress ?? {}) },
-    lyrics: song?.lyrics ?? '',
-    transpose: song?.transpose,
-    archived: song?.archived ?? false,
+  // ── Roster Data Table (members + guests) ───────────────────────────────────
+  type RosterRow = { key: string; kind: 'member'; name: string } | { key: string; kind: 'guest'; id: number };
+  const guestOf = (id: number) => $guestRowsStore.find(g => g.id === id);
+  let rosterRows = $derived<RosterRow[]>([
+    ...musicians.map((bm): RosterRow => ({ key: `m:${bm.name}`, kind: 'member', name: bm.name })),
+    ...$guestRowsStore.map((g): RosterRow => ({ key: `g:${g.id}`, kind: 'guest', id: g.id })),
+  ]);
+  const rosterColumns: ColumnDef<RosterRow>[] = [
+    { id: 'name', header: () => $t.song.musicians, cell: ({ row }) => renderSnippet(nameCell as never, row.original),
+      meta: { cell: 'max-[640px]:order-1 max-[640px]:min-w-0 max-[640px]:flex-1' } },
+    { id: 'instruments', header: () => '', cell: ({ row }) => renderSnippet(instCell as never, row.original),
+      meta: { cell: 'w-full max-[640px]:order-3 max-[640px]:basis-full' } },
+    { id: 'progress', header: () => $t.song.progress, cell: ({ row }) => renderSnippet(progCell as never, row.original),
+      meta: { cell: 'max-[640px]:order-2' } },
+  ];
+  const table = createSvelteTable<RosterRow>({
+    get data() { return rosterRows; },
+    columns: rosterColumns,
+    getRowId: r => r.key,
+    getCoreRowModel: getCoreRowModel(),
   });
-
-  let activeTab = $state<'details' | 'lyrics'>('details');
-
-  function toggleInstrument(name: string, inst: Instrument) {
-    const role = draft.musicians[name] ?? { instruments: [] };
-    const has = role.instruments.includes(inst);
-    const instruments = has ? role.instruments.filter(i => i !== inst) : [...role.instruments, inst];
-    draft.musicians = { ...draft.musicians, [name]: { instruments } };
-  }
-
-  function setProgress(name: string, stage: LearningStage) {
-    draft.progress = { ...(draft.progress ?? {}), [name]: stage };
-  }
-
-  // ── Guest musicians (ad-hoc, per-song) ────────────────────────────────────
-
-  type GuestRow = { id: number; name: string; instruments: Instrument[]; progress: LearningStage };
-  let _id = 0;
-  function mkGuest(name = '', instruments: Instrument[] = [], progress: LearningStage = 'queue'): GuestRow {
-    return { id: _id++, name, instruments, progress };
-  }
-
-  function buildInitialGuests(): GuestRow[] {
-    if (!song?.musicians) return [mkGuest()];
-    const existing = Object.entries(song.musicians)
-      .filter(([name]) => !permanentNames.has(name))
-      .map(([name, role]) => mkGuest(name, [...(role.instruments ?? [])], song?.progress?.[name] ?? 'queue'));
-    return [...existing, mkGuest()];
-  }
-
-  let guestRows = $state<GuestRow[]>(buildInitialGuests());
-
-  function onGuestInput(row: GuestRow, value: string) {
-    const isLast = row.id === guestRows[guestRows.length - 1].id;
-    guestRows = guestRows.map(r => r.id === row.id ? { ...r, name: value } : r);
-    if (isLast && value.trim()) guestRows = [...guestRows, mkGuest()];
-  }
-
-  function toggleGuestInstrument(row: GuestRow, inst: Instrument) {
-    const has = row.instruments.includes(inst);
-    const instruments = has ? row.instruments.filter(i => i !== inst) : [...row.instruments, inst];
-    guestRows = guestRows.map(r => r.id === row.id ? { ...r, instruments } : r);
-  }
-
-  function removeGuest(id: number) {
-    guestRows = guestRows.filter(r => r.id !== id);
-    if (!guestRows.length || guestRows[guestRows.length - 1].name.trim()) {
-      guestRows = [...guestRows, mkGuest()];
-    }
-  }
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
-  let guestsMissingInstrument = $derived(
-    new Set(guestRows.filter(r => r.name.trim() && r.instruments.length === 0).map(r => r.id))
-  );
-
-  let saving = $state(false);
-  let saveFailed = $state(false);
-
   async function handleSave(): Promise<boolean> {
+    const { draft, guestRows, saving } = songEditStore.getState();
     if (saving) return false;
     if (personalOnly) return persist({ ...draft });
     if (!draft.artist.trim() || !draft.title.trim()) return false;
@@ -142,27 +109,16 @@
   }
 
   async function persist(updated: Song): Promise<boolean> {
-    saving = true;
-    saveFailed = false;
+    actions.setSaving(true);
+    actions.setSaveFailed(false);
     try { await onsave(updated); return true; }
-    catch { saveFailed = true; return false; }
-    finally { saving = false; }
+    catch { actions.setSaveFailed(true); return false; }
+    finally { actions.setSaving(false); }
   }
 
   async function toggleArchive() {
-    draft.archived = !draft.archived;
+    setField('archived', !songEditStore.getState().draft.archived);
     if (await handleSave()) closeModal();
-  }
-
-  let dragStartedInModal = false;
-
-  function handleBackdropMousedown(e: MouseEvent) {
-    dragStartedInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop');
-  }
-
-  function handleBackdrop(e: MouseEvent) {
-    if (dragStartedInModal) { dragStartedInModal = false; return; }
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal();
   }
 
   // ── Mobile: full-screen + browser back-button support ─────────────────────
@@ -176,7 +132,6 @@
 
   onMount(() => {
     if (!browser || window.innerWidth > 700) return;
-    document.body.style.overflow = 'hidden';
     history.pushState({ kittenModal: true }, '');
     historyPushed = true;
     window.addEventListener('popstate', handlePopstate);
@@ -184,7 +139,6 @@
 
   onDestroy(() => {
     if (!browser) return;
-    document.body.style.overflow = '';
     window.removeEventListener('popstate', handlePopstate);
   });
 
@@ -206,389 +160,213 @@
   );
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onmousedown={handleBackdropMousedown} onclick={handleBackdrop}>
-  <div class="modal">
-    <div class="modal-header">
-      <button class="back-btn" onclick={closeModal}>← {$t.song.cancel}</button>
-      <h2>{modalTitle}</h2>
-      <button class="close-btn" onclick={closeModal}>✕</button>
-    </div>
+{#snippet nameCell(r: RosterRow)}
+  {#if r.kind === 'member'}
+    <span class="block w-[88px] truncate font-semibold max-[760px]:w-auto">{r.name}</span>
+  {:else}
+    {@const g = guestOf(r.id)}
+    <Input
+      class="w-[88px] rounded-none border-0 bg-transparent p-0 text-[0.9rem] shadow-none focus-visible:ring-0 max-[760px]:w-full max-[760px]:text-base dark:bg-transparent {g?.name.trim() ? 'font-semibold' : 'font-normal'}"
+      value={g?.name ?? ''}
+      placeholder={g?.name.trim() ? $t.song.guestNamePlaceholder : $t.song.guestPlaceholder}
+      aria-label={$t.song.guestNamePlaceholder}
+      oninput={(e) => actions.setGuestName(r.id, e.currentTarget.value)}
+    />
+  {/if}
+{/snippet}
 
-    <div class="modal-body">
+{#snippet instCell(r: RosterRow)}
+  {#if r.kind === 'member'}
+    {@render instruments($draftStore.musicians[r.name]?.instruments ?? [], v => actions.setInstruments(r.name, v))}
+  {:else}
+    {@const g = guestOf(r.id)}
+    {#if g?.name.trim()}{@render instruments(g.instruments, v => actions.setGuestInstruments(r.id, v))}{/if}
+  {/if}
+{/snippet}
+
+{#snippet progCell(r: RosterRow)}
+  {#if r.kind === 'member'}
+    {#if ($draftStore.musicians[r.name]?.instruments?.length ?? 0) > 0}
+      <LearningProgress name={r.name} value={($draftStore.progress?.[r.name] ?? 'queue') as LearningStage} onchange={stage => actions.setProgress(r.name, stage)} />
+    {/if}
+  {:else}
+    {@const g = guestOf(r.id)}
+    {#if g?.name.trim()}
+      <div class="flex items-center gap-2">
+        {#if g.instruments.length > 0}<LearningProgress name={g.name} value={g.progress} onchange={stage => actions.setGuestProgress(r.id, stage)} />{/if}
+        <Button variant="ghost" size="icon-xs" class="ml-auto shrink-0 text-muted-foreground opacity-60 hover:text-destructive hover:opacity-100" aria-label={$t.song.remove} onclick={() => actions.removeGuest(r.id)}>✕</Button>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet instruments(selected: Instrument[], onchange: (v: Instrument[]) => void)}
+  <ToggleGroup
+    type="multiple"
+    variant="outline"
+    spacing={0.75}
+    class="w-full"
+    value={selected}
+    onValueChange={v => onchange(v as Instrument[])}
+  >
+    {#each allInstruments as inst}
+      <ToggleGroupItem value={inst} class={instClass} title={$t.instrument[inst]} aria-label={$t.instrument[inst]}>{instrumentIcons[inst]}</ToggleGroupItem>
+    {/each}
+  </ToggleGroup>
+{/snippet}
+
+<!-- Always mounted by its parent while visible, so `open` is constant and any dismissal (X, Esc, outside) goes through closeModal. -->
+<Dialog.Root open onOpenChange={(open) => { if (!open) closeModal(); }}>
+  <Dialog.Content
+    class="flex h-[min(820px,calc(100dvh-2rem))] flex-col gap-4 rounded-2xl sm:max-w-[760px] max-[760px]:top-0 max-[760px]:left-0 max-[760px]:h-dvh max-[760px]:w-screen max-[760px]:max-w-none max-[760px]:translate-x-0 max-[760px]:translate-y-0 max-[760px]:rounded-none max-[760px]:ring-0"
+  >
+    <Dialog.Header class="shrink-0 pr-8">
+      <Dialog.Title class="text-[1.2rem] leading-tight font-bold">{modalTitle}</Dialog.Title>
+      <Dialog.Description class="sr-only">{$draftStore.artist} {$draftStore.title}</Dialog.Description>
+    </Dialog.Header>
+
+    <div class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pr-3 [scrollbar-gutter:stable]">
       {#if personalOnly}
-        <p>{draft.artist} — {draft.title}</p>
+        <p>{$draftStore.artist} — {$draftStore.title}</p>
       {:else}
-      <fieldset disabled={saving}>
-      <div class="fields-row">
-        <div class="field">
-          <label for="song-editor-artist">{$t.song.artist}</label>
-          <input id="song-editor-artist" bind:value={draft.artist} placeholder={$t.song.artist} />
-        </div>
-        <div class="field">
-          <label for="song-editor-title">{$t.song.title}</label>
-          <input id="song-editor-title" bind:value={draft.title} placeholder={$t.song.title} />
-        </div>
-      </div>
-
-      <div class="tab-strip">
-        <button class="tab-btn" class:active={activeTab === 'details'} onclick={() => activeTab = 'details'}>{$t.song.detailsTab}</button>
-        <button class="tab-btn" class:active={activeTab === 'lyrics'} onclick={() => activeTab = 'lyrics'}>{$t.song.lyricsTab}</button>
-      </div>
-
-      {#if activeTab === 'details'}
-      {#if mode !== 'entry'}
-      <div class="cat-chips">
-        {#each (['top', 'mid', 'low'] as Category[]) as cat}
-          <button
-            class="cat-chip cat-chip-{cat}"
-            class:active={draft.category === cat}
-            onclick={() => { draft.category = cat; }}
-          >{$t.filter[cat]}</button>
-        {/each}
-      </div>
-      {/if}
-
-      <div class="musician-roster">
-
-          <div class="roster-header">
-            <span class="header-name">{$t.song.musicians}</span>
-            <span class="row-gap"></span>
-            <span class="header-instruments"></span>
-            <span class="header-progress">{$t.song.progress}</span>
+      <fieldset disabled={$saving} class="m-0 flex min-w-0 flex-col gap-3.5 border-0 p-0 {$activeTab === 'lyrics' ? 'flex-1' : ''}">
+        <div class="flex flex-col gap-3 min-[761px]:flex-row">
+          <div class="flex flex-1 flex-col gap-1.5">
+            <Label for="song-editor-artist" class={labelClass}>{$t.song.artist}</Label>
+            <Input id="song-editor-artist" value={$draftStore.artist} oninput={e => setField('artist', e.currentTarget.value)} placeholder={$t.song.artist} />
           </div>
+          <div class="flex flex-1 flex-col gap-1.5">
+            <Label for="song-editor-title" class={labelClass}>{$t.song.title}</Label>
+            <Input id="song-editor-title" value={$draftStore.title} oninput={e => setField('title', e.currentTarget.value)} placeholder={$t.song.title} />
+          </div>
+        </div>
 
-          <!-- Permanent band members -->
-          {#each musicians as bm}
-            {@const role = draft.musicians[bm.name]}
-            {@const curStage = (draft.progress?.[bm.name] ?? 'queue') as LearningStage}
-            {@const hasInst = (role?.instruments?.length ?? 0) > 0}
-            <div class="roster-row">
-              <span class="roster-name">{bm.name}</span>
-              <span class="row-gap"></span>
-              <div class="inst-grid">
-                {#each allInstruments as inst}
-                  <button
-                    class="inst-btn"
-                    class:active={role?.instruments?.includes(inst)}
-                    onclick={() => toggleInstrument(bm.name, inst)}
-                    title={$t.instrument[inst]}
-                  >{instrumentIcons[inst]}</button>
+        <Tabs.Root value={$activeTab} onValueChange={v => actions.setActiveTab(v as 'details' | 'lyrics')} class="min-h-0 {$activeTab === 'lyrics' ? 'flex-1' : ''}">
+          <Tabs.List variant="line" class="w-full justify-start border-b">
+            <Tabs.Trigger value="details" class="flex-none px-4">{$t.song.detailsTab}</Tabs.Trigger>
+            <Tabs.Trigger value="lyrics" class="flex-none px-4">{$t.song.lyricsTab}</Tabs.Trigger>
+          </Tabs.List>
+
+          <Tabs.Content value="details" class="flex flex-col gap-3.5 pt-2">
+            {#if mode !== 'entry'}
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                spacing={1.5}
+                class="max-w-full flex-wrap"
+                value={$draftStore.category}
+                onValueChange={v => { if (v) setField('category', v as Category); }}
+                aria-label={$t.backlog.cols.cat}
+              >
+                {#each (['top', 'mid', 'low'] as Category[]) as cat}
+                  <ToggleGroupItem
+                    value={cat}
+                    class="px-4 text-[0.85rem] text-muted-foreground {catActive[cat]}"
+                  >{$t.filter[cat]}</ToggleGroupItem>
                 {/each}
-              </div>
-              {#if hasInst}
-                <div class="prog-wrap">
-                  <LearningProgress name={bm.name} value={curStage} onchange={stage => setProgress(bm.name, stage)} />
-                </div>
-              {/if}
+              </ToggleGroup>
+            {/if}
+
+            <div class="flex flex-col gap-1.5">
+              <!-- Roster Data Table: permanent members first, then ad-hoc guests; the trailing empty guest row is a ghost "add" row. -->
+              <Table.Root class="max-[640px]:block">
+                <Table.Header class="max-[640px]:hidden">
+                  {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+                    <Table.Row class="hover:bg-transparent">
+                      {#each headerGroup.headers as header (header.id)}
+                        <Table.Head><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></Table.Head>
+                      {/each}
+                    </Table.Row>
+                  {/each}
+                </Table.Header>
+                <Table.Body class="max-[640px]:block">
+                  {#each table.getRowModel().rows as row (row.id)}
+                    {@const r = row.original}
+                    {@const isAdd = r.kind === 'guest' && !guestOf(r.id)?.name.trim()}
+                    {@const missingInst = r.kind === 'guest' && guestsMissingInstrument.has(r.id)}
+                    <Table.Row class="max-[640px]:flex max-[640px]:flex-wrap max-[640px]:items-center max-[640px]:gap-y-1 max-[640px]:py-2 {isAdd ? 'opacity-75 focus-within:opacity-100 [&>td]:border-dashed' : ''} {missingInst ? 'bg-destructive/10' : ''}">
+                      {#each row.getVisibleCells() as cell (cell.id)}
+                        <Table.Cell class="max-[640px]:not-last:border-r-0 max-[640px]:px-2 max-[640px]:py-0 {(cell.column.columnDef.meta as { cell?: string } | undefined)?.cell ?? ''}">
+                          <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+                        </Table.Cell>
+                      {/each}
+                    </Table.Row>
+                  {/each}
+                </Table.Body>
+              </Table.Root>
             </div>
-          {/each}
 
-          <!-- Ad-hoc guests — same layout, no divider -->
-          {#each guestRows as row (row.id)}
-            {@const isAdd = !row.name.trim()}
-            {@const missingInst = guestsMissingInstrument.has(row.id)}
-            <div class="roster-row" class:ghost-row={isAdd} class:row-error={missingInst}>
-              <input
-                class="roster-name guest-name"
-                value={row.name}
-                placeholder={isAdd ? $t.song.guestPlaceholder : $t.song.guestNamePlaceholder}
-                oninput={(e) => onGuestInput(row, (e.target as HTMLInputElement).value)}
-              />
-              <span class="row-gap"></span>
-              <div class="inst-grid">
-                {#each allInstruments as inst}
-                  <button
-                    class="inst-btn"
-                    class:active={row.instruments.includes(inst)}
-                    class:invisible={isAdd}
-                    onclick={() => !isAdd && toggleGuestInstrument(row, inst)}
-                    title={$t.instrument[inst]}
-                    tabindex={isAdd ? -1 : 0}
-                  >{instrumentIcons[inst]}</button>
-                {/each}
+            <div class="flex flex-col gap-3 min-[761px]:flex-row">
+              <div class="flex flex-[3] flex-col gap-1.5">
+                <Label for="song-editor-comment" class={labelClass}>{$t.song.comment}</Label>
+                <Input id="song-editor-comment" value={$draftStore.comment} oninput={e => setField('comment', e.currentTarget.value)} placeholder={$t.song.commentPlaceholder} />
               </div>
-              {#if !isAdd && row.instruments.length > 0}
-                <div class="prog-wrap">
-                  <LearningProgress name={row.name} value={row.progress} onchange={stage => { guestRows = guestRows.map(r => r.id === row.id ? { ...r, progress: stage } : r); }} />
-                </div>
-              {/if}
-              {#if !isAdd}
-                <button class="remove-guest-btn" onclick={() => removeGuest(row.id)}>✕</button>
-              {/if}
+              <div class="flex flex-1 flex-col gap-1.5">
+                <Label for="song-editor-length" class={labelClass}>{$t.song.length}</Label>
+                <Input id="song-editor-length" type="number" min="1" max="99" value={$draftStore.lengthMinutes} oninput={e => setField('lengthMinutes', numberOrNull(e.currentTarget.value) as number)} />
+              </div>
             </div>
-          {/each}
+          </Tabs.Content>
 
-        </div>
-
-      <div class="fields-row">
-        <div class="field" style="flex: 3">
-          <label for="song-editor-comment">{$t.song.comment}</label>
-          <input id="song-editor-comment" bind:value={draft.comment} placeholder={$t.song.commentPlaceholder} />
-        </div>
-        <div class="field field-length">
-          <label for="song-editor-length">{$t.song.length}</label>
-          <input id="song-editor-length" type="number" min="1" max="99" bind:value={draft.lengthMinutes} />
-        </div>
-      </div>
-      {:else}
-      <textarea class="lyrics-editor" bind:value={draft.lyrics} placeholder={$t.song.lyricsPlaceholder}></textarea>
-      {/if}
+          <Tabs.Content value="lyrics" class="flex min-h-[260px] flex-col pt-2">
+            <Textarea
+              class="field-sizing-fixed min-h-[220px] flex-1 resize-y overflow-x-auto font-mono text-base leading-[1.55] whitespace-pre md:text-[0.88rem]"
+              value={$draftStore.lyrics}
+              oninput={e => setField('lyrics', e.currentTarget.value)}
+              placeholder={$t.song.lyricsPlaceholder}
+              aria-label={$t.song.lyricsTab}
+            />
+          </Tabs.Content>
+        </Tabs.Root>
       </fieldset>
       {/if}
-      <div class="field personal-comment-field">
-        <label for="personal-song-comment">{$t.common.personalComment}</label>
-        <textarea id="personal-song-comment" bind:value={draft.personalComment} maxlength="4000" rows="3" disabled={saving}></textarea>
+      <div class="flex flex-col gap-1.5">
+        <Label for="personal-song-comment" class={labelClass}>{$t.common.personalComment}</Label>
+        <Textarea id="personal-song-comment" value={$draftStore.personalComment} oninput={e => setField('personalComment', e.currentTarget.value)} maxlength={4000} rows={3} disabled={$saving} class="field-sizing-fixed resize-y" />
       </div>
-      {#if saveFailed}<p class="save-error" role="alert">{$t.common.commentSaveFailed}</p>{/if}
+      {#if $saveFailed}<p class="text-destructive" role="alert">{$t.common.commentSaveFailed}</p>{/if}
     </div>
 
-    <div class="modal-footer">
-      <div class="footer-left">
+    <Dialog.Footer class="shrink-0 flex-row items-center justify-between">
+      <div class="flex gap-2">
         {#if ondelete}
-          <button class="btn-icon danger" onclick={() => { if (confirm($t.deleteConfirm)) { ondelete!(); closeModal(); } }} title={$t.song.remove}>🗑</button>
+          <Button variant="outline" size="icon-lg" class="text-[1.1rem] text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('delete')} title={$t.song.remove} aria-label={$t.song.remove}>🗑</Button>
         {/if}
         {#if onaddtosetlist}
-          <button class="btn-icon" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title}>📋</button>
+          <Button variant="outline" size="icon-lg" class="text-[1.1rem]" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title} aria-label={$t.addToSetlist.title}>📋</Button>
         {/if}
         {#if !personalOnly && mode === 'backlog' && song?.id}
-          <button class="btn-icon" onclick={toggleArchive} title={draft.archived ? $t.song.unarchive : $t.song.archive}>{draft.archived ? '📤' : '📦'}</button>
+          <Button variant="outline" size="icon-lg" class="text-[1.1rem]" onclick={toggleArchive} title={$draftStore.archived ? $t.song.unarchive : $t.song.archive} aria-label={$draftStore.archived ? $t.song.unarchive : $t.song.archive}>{$draftStore.archived ? '📤' : '📦'}</Button>
         {/if}
         {#if onremove}
-          <button class="btn-remove-setlist danger" onclick={() => { if (confirm($t.song.removeFromSetlistConfirm)) { onremove!(); closeModal(); } }} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</button>
+          <Button variant="outline" size="lg" class="text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('remove')} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</Button>
         {/if}
       </div>
-      <div class="footer-right">
-        <button class="btn-secondary" onclick={closeModal}>{$t.song.cancel}</button>
-        <button class="btn-primary" disabled={saving} onclick={async () => { if (await handleSave()) closeModal(); }}>{$t.song.save}</button>
+      <div class="flex gap-2">
+        <Button variant="outline" size="lg" onclick={closeModal}>{$t.song.cancel}</Button>
+        <Button size="lg" disabled={$saving} onclick={async () => { if (await handleSave()) closeModal(); }}>{$t.song.save}</Button>
       </div>
-    </div>
-  </div>
-</div>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
 
-<style>
-  fieldset { display: flex; flex-direction: column; gap: 14px; border: 0; margin: 0; padding: 0; min-width: 0; }
-  .personal-comment-field { margin-top: 12px; }
-  .personal-comment-field textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
-  .save-error { color: #ef4444; }
-  @media (max-width: 700px) { .personal-comment-field textarea { font-size: 16px; } }
-
-  .modal-backdrop {
-    position: fixed; inset: 0; background: #0008;
-    display: flex; align-items: center; justify-content: center; z-index: 150; padding: 16px;
-  }
-  .modal {
-    box-sizing: border-box; color: var(--text); background: var(--surface);
-    border: 1px solid var(--border); border-radius: 16px;
-    width: min(760px, 100%); height: min(820px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px);
-    padding: 22px; overflow: hidden; display: flex; flex-direction: column;
-  }
-  .modal button { font-family: inherit; }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 20px; flex-shrink: 0; }
-  .modal-header h2 { flex: 1; margin: 0; font-size: 1.2rem; font-weight: 700; }
-  .close-btn { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); padding: 4px 8px; }
-  .modal-body { padding: 0; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-  .modal-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
-  .footer-left { display: flex; gap: 6px; }
-  .footer-right { display: flex; gap: 8px; }
-  .btn-icon {
-    background: none; border: 1px solid var(--border); border-radius: 6px;
-    cursor: pointer; font-size: 1.2rem; padding: 6px 10px;
-    color: var(--text-muted); transition: border-color 0.12s, color 0.12s;
-  }
-  .btn-icon:hover { border-color: var(--accent); color: var(--text); }
-  .btn-icon.danger:hover { border-color: #ef4444; color: #ef4444; }
-  .btn-remove-setlist {
-    background: none; border: 1px solid var(--border); border-radius: 6px;
-    cursor: pointer; font-size: 0.82rem; padding: 6px 10px;
-    color: var(--text-muted); transition: border-color 0.12s, color 0.12s;
-  }
-  .btn-remove-setlist:hover { border-color: #ef4444; color: #ef4444; }
-
-  .fields-row { display: flex; gap: 12px; }
-  .fields-row .field { flex: 1; }
-  .field { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
-  .field > label { color: var(--text-muted); }
-  .fields-row .field > input:not([type="radio"]):not([type="checkbox"]) { font-size: 1rem; }
-  input:not([type="radio"]):not([type="checkbox"]) {
-    padding: 9px; border: 1px solid var(--border); border-radius: 7px;
-    background: var(--bg); color: var(--text); font: inherit; width: 100%; box-sizing: border-box;
-  }
-  .cat-chips { display: flex; gap: 6px; }
-  .cat-chip {
-    padding: 5px 16px; border-radius: 20px; border: 1px solid var(--border);
-    background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
-    color: var(--text-muted); transition: all 0.15s;
-  }
-  .cat-chip-top.active { background: #b91c1c; border-color: #ef4444; color: #fff; }
-  .cat-chip-mid.active { background: #7c3aed; border-color: #a78bfa; color: #fff; }
-  .cat-chip-low.active { background: #15803d; border-color: #22c55e; color: #fff; }
-  .cat-chip:not(.active):hover { border-color: var(--accent); color: var(--accent); }
-
-  /* ── Musician roster ──────────────────────────────────────────────────── */
-
-  .musician-roster { display: flex; flex-direction: column; gap: 4px; }
-
-  .roster-header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 0 9px 4px;
-    font-size: 0.82rem; font-weight: 600; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .header-name { flex-shrink: 0; width: 72px; overflow: visible; white-space: nowrap; }
-  .header-instruments { flex-shrink: 0; width: 367px; }
-  .header-progress { flex-shrink: 0; margin-left: 20px; }
-
-  .roster-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-  }
-
-  /* Fixed-width name column so inst grid aligns across all rows */
-  .roster-name {
-    font-weight: 600; font-size: 0.9rem;
-    width: 72px; flex-shrink: 0;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-
-  /* Guest name as an unstyled inline input, same size */
-  .guest-name {
-    padding: 0 !important; border: none !important; background: transparent !important;
-    width: 72px !important; box-sizing: border-box !important;
-    color: var(--text);
-  }
-  .ghost-row .guest-name { font-weight: 400; color: var(--text-muted); }
-
-  /* Fixed 10-column grid — one cell per instrument, perfectly aligned */
-  .inst-grid {
-    display: grid;
-    grid-template-columns: repeat(10, 34px);
-    gap: 3px;
-    flex-shrink: 0;
-  }
-
-  .inst-btn {
-    width: 34px; height: 34px; font-size: 1.35rem;
-    border: 1px solid var(--border); border-radius: 6px;
-    background: transparent; cursor: pointer; transition: all 0.12s;
-  }
-  .inst-btn:hover { border-color: var(--accent); }
-  .inst-btn.active { background: var(--accent); border-color: var(--accent); }
-  .inst-btn.invisible { visibility: hidden; pointer-events: none; }
-
-  /* ── Progress bar ────────────────────────────────────────────────────── */
-
-  .prog-wrap {
-    margin-left: 20px; flex-shrink: 0;
-    display: flex; align-items: center; gap: 6px;
-  }
-
-  .ghost-row {
-    border-style: dashed;
-    opacity: 0.75;
-  }
-  .row-error { border-color: #ef4444; }
-  .ghost-row:focus-within {
-    opacity: 1;
-    border-style: solid;
-  }
-
-  .row-gap { flex-shrink: 0; width: 20px; }
-  .remove-guest-btn {
-    margin-left: auto; flex-shrink: 0; width: 20px;
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 0.78rem; padding: 0;
-    opacity: 0.5; transition: opacity 0.12s; text-align: center;
-  }
-  .remove-guest-btn:hover { opacity: 1; color: #ef4444; }
-
-  .tab-strip {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: -6px;
-    padding-bottom: 0;
-  }
-  .tab-btn {
-    padding: 6px 16px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    cursor: pointer;
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    transition: color 0.12s, border-color 0.12s;
-  }
-  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab-btn:hover:not(.active) { color: var(--text); }
-
-  .lyrics-editor {
-    width: 100%;
-    flex: 1;
-    min-height: 120px;
-    box-sizing: border-box;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.88rem;
-    line-height: 1.55;
-    resize: vertical;
-    white-space: pre;
-    overflow-wrap: normal;
-    overflow-x: auto;
-  }
-  .lyrics-editor:focus { outline: none; border-color: var(--accent); }
-
-  .field-length { flex: 1; }
-
-  .btn-primary { padding: 8px 12px; background: var(--accent); color: #fff; border: 1px solid var(--accent); border-radius: 7px; cursor: pointer; font: inherit; font-weight: 600; }
-  .btn-secondary { padding: 8px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font: inherit; }
-
-  .back-btn { display: none; }
-
-  @media (max-width: 760px), (max-height: 550px) {
-    /* Full-screen modal */
-    .modal-backdrop { padding: 0; align-items: stretch; }
-    .modal { width: 100vw; width: 100dvw; max-width: none; max-height: none; height: 100vh; height: 100dvh; border: 0; border-radius: 0; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-    .modal-header { position: sticky; top: 0; z-index: 1; background: var(--surface); }
-    .modal-header h2 { flex: 1; text-align: left; }
-    .back-btn {
-      display: flex; align-items: center; gap: 4px;
-      background: none; border: none; cursor: pointer;
-      color: var(--accent); font-size: 0.9rem; font-weight: 600; padding: 4px 0;
-    }
-    .close-btn { display: none; }
-    .fields-row { flex-direction: column; }
-    input:not([type="radio"]):not([type="checkbox"]), textarea { font-size: 16px; }
-    .lyrics-editor { font-size: 16px; }
-
-    /* 2-line musician layout:
-       Line 1: name  ···  progress bar
-       Line 2: instrument buttons (full width) */
-    .roster-header { display: none; }
-    .roster-row { flex-wrap: wrap; gap: 6px 0; }
-    .row-gap { display: none; }
-    .roster-name { order: 1; min-width: 0; flex: 1 1 auto; width: auto; }
-    .guest-name { order: 1; flex: 1 1 auto; min-width: 0; width: auto !important; }
-    .prog-wrap { order: 2; margin-left: auto; }
-    .remove-guest-btn { order: 3; margin-left: 8px; width: auto; }
-    .inst-grid {
-      order: 4; width: 100%;
-      grid-template-columns: repeat(10, 1fr);
-    }
-    .inst-btn { width: 100%; height: 40px; }
-    /* Ghost row: hide invisible inst-grid to avoid blank space */
-    .ghost-row .inst-grid { display: none; }
-  }
-</style>
+<AlertDialog.Root open={$confirmKind !== null} onOpenChange={(open) => { if (!open) actions.setConfirm(null); }}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}</AlertDialog.Title>
+      <AlertDialog.Description>{$confirmKind === 'delete' ? $t.deleteConfirm : $t.song.removeFromSetlistConfirm}</AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel>{$t.song.cancel}</AlertDialog.Cancel>
+      <AlertDialog.Action
+        variant="destructive"
+        onclick={() => {
+          const kind = $confirmKind;
+          actions.setConfirm(null);
+          if (kind === 'delete') { ondelete?.(); closeModal(); }
+          else if (kind === 'remove') { onremove?.(); closeModal(); }
+        }}
+      >{$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>

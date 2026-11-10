@@ -1,5 +1,7 @@
 <script lang="ts">
+  import ButtonRow from '$components/shared/ButtonRow.svelte';
   import { t } from '$lib/i18n';
+  import * as ToggleGroup from '$components/ui/toggle-group';
 
   export type SortKey = 'artist' | 'title' | 'default';
 
@@ -12,28 +14,15 @@
   } = $props();
 </script>
 
-<div class="sortbar">
-  <span class="label">{$t.sort.label}</span>
-  {#each (['default', 'artist', 'title'] as SortKey[]) as key}
-    <button class="sort-btn" class:active={sort === key} onclick={() => onchange(key)}>
-      {$t.sort[key]}
-    </button>
-  {/each}
-</div>
-
-<style>
-  .sortbar { display: flex; align-items: center; gap: 6px; }
-  .label { font-size: 0.78rem; color: var(--text-muted); margin-right: 2px; }
-  .sort-btn {
-    padding: 3px 12px;
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    transition: all 0.15s;
-  }
-  .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-</style>
+<ButtonRow>
+  <span class="mr-0.5 text-[0.78rem] text-muted-foreground">{$t.sort.label}</span>
+  <ToggleGroup.Root type="single" variant="outline" size="sm" spacing={2} value={sort} aria-label={$t.sort.label}
+    onValueChange={(v: string) => { if (v) onchange(v as SortKey); }}>
+    {#each (['default', 'artist', 'title'] as SortKey[]) as key}
+      <ToggleGroup.Item
+        value={key}
+        class="sort-btn px-3 text-[0.78rem] font-normal text-muted-foreground hover:border-primary hover:bg-transparent hover:text-primary-ink data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90 data-[state=on]:hover:text-primary-foreground"
+      >{$t.sort[key]}</ToggleGroup.Item>
+    {/each}
+  </ToggleGroup.Root>
+</ButtonRow>

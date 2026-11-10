@@ -5,6 +5,8 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import type { Rehearsal, RehearsalDraft, Song, Setlist, SetlistEntry, SetlistSubset, BandMusician, User, UserRole, UserStatus, Instrument, LearningStage, AuditLogEntry, BudgetEntry, PresenceEntry } from '$lib/types';
 import { getToken } from '$lib/auth';
+import { ApiError } from '$lib/apiError';
+export { ApiError, isAuthError } from '$lib/apiError';
 
 const BASE = PUBLIC_API_URL;
 
@@ -18,7 +20,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} → ${res.status}`);
+  if (!res.ok) throw new ApiError(`${init?.method ?? 'GET'} ${path} → ${res.status}`, res.status);
   return res.json() as Promise<T>;
 }
 
@@ -222,7 +224,23 @@ export async function heartbeatPresence(room: string, clientId: string): Promise
   return req(`/presence/${encodeURIComponent(room)}`, { method: 'POST', body: JSON.stringify({ clientId }) });
 }
 
-/** Best-effort leave: removes our presence. keepalive so it survives tab close. */
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export async function telegramLogin(data: Record<string, string>): Promise<{ token: string; user: User }> {
+  return req('/auth/telegram', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/** Invalidates the token server-side (the response body is ignored). */
+export async function logoutRequest(): Promise<void> {
+  const token = getToken();
+  if (!token) return;
+  await fetch(`${BASE}/auth/logout`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+}
+
+/**
+ * Best-effort leave: removes our presence. The one deliberate call outside TanStack Query: it runs
+ * from `pagehide`/teardown where a mutation could not finish, so it is a `keepalive` fetch that survives tab close.
+ */
 export function leavePresence(room: string, clientId: string): void {
   const token = getToken();
   fetch(`${BASE}/presence/${encodeURIComponent(room)}?clientId=${encodeURIComponent(clientId)}`, {

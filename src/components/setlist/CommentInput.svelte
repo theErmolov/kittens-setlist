@@ -1,5 +1,10 @@
 <script lang="ts">
+  import { Input } from '$components/ui/input';
   import { t } from '$lib/i18n';
+  import { splitLinks } from '$lib/linkify';
+  import LinkifiedText from '$components/shared/LinkifiedText.svelte';
+  import { useStore } from '$lib/store/bridge';
+  import { createCommentDraftStore } from '$lib/store/stage';
 
   let {
     value: initial = '',
@@ -9,36 +14,37 @@
     onsave: (v: string) => void;
   } = $props();
 
-  let value = $state(initial);
-  let focused = $state(false);
-  $effect(() => { if (!focused) value = initial; });
+  const draft = createCommentDraftStore(initial);
+  const value = useStore(draft, s => s.value);
+  const focused = useStore(draft, s => s.focused);
+  // Unfocused comments that contain a URL show it as a clickable «domain.tld» link; clicking elsewhere on the line edits.
+  const hasLink = $derived(splitLinks($value).some(part => part.type === 'link'));
+  const showLinks = $derived(hasLink && !$focused);
+  let inputEl = $state<HTMLInputElement | null>(null); // DOM handle only (not UI state)
+  const { setValue, setFocused } = draft.getState();
+  $effect(() => { const v = initial; if (!draft.getState().focused) setValue(v); });
 </script>
 
-<input
-  class="comment-input"
-  bind:value
+<!-- Inline note field: shadcn Input restyled as a borderless dashed-underline line so the song table looks unchanged. -->
+{#if showLinks}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div
+    class="block h-7 w-full cursor-text truncate border-b border-dashed text-base leading-7 italic sm:text-[0.94rem]"
+    draggable="false"
+    onmousedown={(e) => e.stopPropagation()}
+    onclick={(e) => { e.stopPropagation(); setFocused(true); queueMicrotask(() => inputEl?.focus()); }}
+  ><LinkifiedText text={$value} /></div>
+{/if}
+<Input
+  bind:ref={inputEl}
+  class="{showLinks ? 'hidden' : 'block'} h-7 w-full rounded-none border-0 border-b border-dashed bg-transparent px-0 text-base italic shadow-none transition-colors placeholder:opacity-50 focus-visible:border-primary focus-visible:ring-0 dark:bg-transparent sm:text-[0.94rem]"
+  value={$value}
+  oninput={(e) => setValue(e.currentTarget.value)}
   placeholder={$t.common.commentPlaceholder}
   draggable="false"
   onmousedown={(e) => e.stopPropagation()}
   onclick={(e) => e.stopPropagation()}
   ondragstart={(e) => { e.stopPropagation(); e.preventDefault(); }}
-  onfocus={() => { focused = true; }}
-  onblur={() => { focused = false; if (value !== (initial ?? '')) onsave(value); }}
+  onfocus={() => setFocused(true)}
+  onblur={() => { setFocused(false); const v = draft.getState().value; if (v !== (initial ?? '')) onsave(v); }}
 />
-
-<style>
-  .comment-input {
-    display: block; width: 100%; margin-top: 3px;
-    background: transparent; border: none; border-bottom: 1px dashed var(--border);
-    font-size: 0.94rem; color: var(--text); font-style: italic;
-    padding: 1px 0; outline: none; cursor: text;
-    transition: border-color 0.15s;
-  }
-  .comment-input:focus { border-bottom-color: var(--accent); }
-  .comment-input:not(:placeholder-shown) { border-bottom-color: var(--border); }
-  .comment-input::placeholder { opacity: 0.5; }
-
-  @media (max-width: 700px) {
-    .comment-input { font-size: 16px; }
-  }
-</style>

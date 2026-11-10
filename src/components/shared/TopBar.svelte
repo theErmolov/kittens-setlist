@@ -1,26 +1,9 @@
 <script lang="ts">
+  import ButtonRow from '$components/shared/ButtonRow.svelte';
   let { title, children }: { title: string; children?: import('svelte').Snippet } = $props();
 </script>
 
-<header class="topbar">
-  <span class="title">{title}</span>
-  <div class="actions">
-    {@render children?.()}
-  </div>
+<header class="sticky top-0 z-10 flex items-center justify-between border-b bg-card px-4 py-3">
+  <span class="text-[1.1rem] font-bold text-foreground">{title}</span>
+  <ButtonRow>{@render children?.()}</ButtonRow>
 </header>
-
-<style>
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  .title { font-size: 1.1rem; font-weight: 700; color: var(--text); }
-  .actions { display: flex; gap: 8px; align-items: center; }
-</style>

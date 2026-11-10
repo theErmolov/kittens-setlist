@@ -1,4 +1,6 @@
-import { writable, derived } from 'svelte/store';
+import { derived } from 'svelte/store';
+import { useStore } from '$lib/store/bridge';
+import { settingsStore } from '$lib/store/settings';
 import { browser } from '$app/environment';
 
 export type Lang = 'ru' | 'en';
@@ -22,6 +24,8 @@ const strings = {
       invalidAmount: 'Enter an amount greater than zero.',
       presenceOthers: 'Someone else is here',
       presenceAlone: 'Only you here',
+      dragMode: 'Reorder',
+      accessDenied: "You don't have access to this section, so its data isn't shown.",
       themeToggle: 'Toggle theme',
       logout: 'Log out',
       close: 'Close',
@@ -29,6 +33,7 @@ const strings = {
       lyrics: 'Song lyrics',
       commentPlaceholder: 'comment…',
       personalComment: 'Only me',
+      actions: 'Actions',
       setlistComment: 'Comment',
       addComment: 'Add comment',
       expandComment: 'Show more',
@@ -70,12 +75,21 @@ const strings = {
     backlog: {
       search: 'Search artist or title…',
       addSong: '+ Add Song',
-      cols: { artist: 'Artist', title: 'Title', cat: 'Cat', musicians: 'Musicians' },
+      cols: { artist: 'Artist', title: 'Title', cat: 'Cat', musicians: 'Musicians', guests: 'Guests' },
       progress: 'Progress',
       filterBtn: 'Filter',
       addMode: 'To setlist',
       empty: 'No songs found',
       archivedFilter: 'Archive',
+      filterSearch: 'Search filters…',
+      filterCategories: 'Categories',
+      filterMusicians: 'Musicians',
+      filterInstruments: 'Instruments',
+      filterReset: 'Reset filters',
+      filterView: 'View',
+      showArchive: 'Show archive',
+      filterRemove: 'Remove filter',
+      filterNone: 'No matching filters',
       shown: (n: number, total: number) =>
         n === total ? `${n} song${n !== 1 ? 's' : ''}` : `${n} / ${total} songs`,
     },
@@ -129,6 +143,9 @@ const strings = {
       title: 'Setlists',
       newBtn: '+ New Setlist',
       namePlaceholder: 'Setlist name (e.g. 2025-03-20 Bar Gig)',
+      colName: 'Setlist',
+      colVibe: 'Vibe',
+      colSongs: 'Songs',
       create: 'Create',
       cancel: 'Cancel',
       empty: 'No setlists yet.',
@@ -173,6 +190,8 @@ const strings = {
       filter: 'Filter',
       add: '+ Add',
       songColumn: 'Song',
+      guestsColumn: 'Guests',
+      timeColumn: 'Time',
       editEntry: 'Edit in setlist',
       breakLabel: (n: number) => `Break — ${n} min`,
     },
@@ -189,6 +208,7 @@ const strings = {
       shown: (n: number) => `· ${n} shown`,
       noSongs: 'No songs match current filters',
       onTime: 'On time',
+      minShort: 'min',
       behind: (n: number) => `${n} min behind`,
       ahead: (n: number) => `${n} min ahead`,
       finish: 'Finish',
@@ -200,6 +220,8 @@ const strings = {
       showChords: 'Show chords',
       zoomOut: 'Smaller',
       zoomIn: 'Larger',
+      prevPage: 'Previous page',
+      nextPage: 'Next page',
       semitoneDown: 'Semitone down',
       transpose: 'Transpose',
       semitoneUp: 'Semitone up',
@@ -211,7 +233,7 @@ const strings = {
     },
     progress: {
       queue:      '⚪ In queue',
-      structure:  '🟡 Structure',
+      structure:  '🔴 Structure',
       mastering:  '🟠 Mastering',
       ready:      '🟢 Ready',
       readyCount: (n: number, total: number) => `${n}/${total} ready`,
@@ -235,6 +257,10 @@ const strings = {
       onlineEmpty: 'No active viewers.',
       onlineUnavailable: 'Online status unavailable.',
       onlineSetlist: 'Setlist',
+      onlineUser: 'User',
+      onlineScope: 'Section',
+      onlineRoom: 'Page',
+      onlineSeen: 'Last seen',
       onlineHint: 'Backlog and setlist viewers (editor or stage). Refreshes every 10 seconds; disconnected tabs expire within 90 seconds.',
       role: 'Role',
       telegramAccess: 'Telegram access',
@@ -281,6 +307,7 @@ const strings = {
       amount: 'Amount (€)',
       date: 'Date',
       comment: 'Comment',
+      cols: { kind: 'Type', who: 'Who', what: 'Details', paid: 'Status' },
       method: 'Method',
       methodCash: 'Cash',
       methodTransfer: 'Transfer',
@@ -323,6 +350,8 @@ const strings = {
       invalidAmount: 'Введите сумму больше нуля.',
       presenceOthers: 'Кто-то ещё здесь',
       presenceAlone: 'Только вы здесь',
+      dragMode: 'Перетаскивание',
+      accessDenied: 'У вас нет доступа к этому разделу, поэтому данные не отображаются.',
       themeToggle: 'Переключить тему',
       logout: 'Выйти',
       close: 'Закрыть',
@@ -330,6 +359,7 @@ const strings = {
       lyrics: 'Текст песни',
       commentPlaceholder: 'комментарий…',
       personalComment: 'Только мне',
+      actions: 'Действия',
       setlistComment: 'Комментарий',
       addComment: 'Добавить комментарий',
       expandComment: 'Показать больше',
@@ -371,12 +401,21 @@ const strings = {
     backlog: {
       search: 'Поиск по исполнителю или названию…',
       addSong: '+ Добавить',
-      cols: { artist: 'Исполнитель', title: 'Название', cat: 'Категория', musicians: 'Музыканты' },
+      cols: { artist: 'Исполнитель', title: 'Название', cat: 'Категория', musicians: 'Музыканты', guests: 'Гости' },
       progress: 'Прогресс',
       filterBtn: 'Фильтр',
       addMode: 'В сетлист',
       empty: 'Ничего не найдено',
       archivedFilter: 'Архив',
+      filterSearch: 'Поиск фильтров…',
+      filterCategories: 'Категории',
+      filterMusicians: 'Музыканты',
+      filterInstruments: 'Инструменты',
+      filterReset: 'Сбросить фильтры',
+      filterView: 'Вид',
+      showArchive: 'Показать архив',
+      filterRemove: 'Убрать фильтр',
+      filterNone: 'Ничего не найдено',
       shown: (n: number, total: number) => {
         const word = ruPlural(total, 'песня', 'песни', 'песен');
         return n === total ? `${n} ${word}` : `${n} / ${total} ${word}`;
@@ -432,6 +471,9 @@ const strings = {
       title: 'Сетлисты',
       newBtn: '+ Новый сетлист',
       namePlaceholder: 'Название (напр. 20.03.2025 Бар)',
+      colName: 'Сетлист',
+      colVibe: 'Вайб',
+      colSongs: 'Песни',
       create: 'Создать',
       cancel: 'Отмена',
       empty: 'Нет сетлистов.',
@@ -476,6 +518,8 @@ const strings = {
       filter: 'Фильтр',
       add: '+ Добавить',
       songColumn: 'Песня',
+      guestsColumn: 'Гости',
+      timeColumn: 'Время',
       editEntry: 'Редактировать в сетлисте',
       breakLabel: (n: number) => `Перерыв — ${n} мин`,
     },
@@ -494,6 +538,7 @@ const strings = {
       shown: (n: number) => `· ${n} показано`,
       noSongs: 'Нет песен по фильтру',
       onTime: 'По плану',
+      minShort: 'мин',
       behind: (n: number) => `Отставание ${n} мин`,
       ahead: (n: number) => `Опережение ${n} мин`,
       finish: 'Финиш',
@@ -505,6 +550,8 @@ const strings = {
       showChords: 'Показать аккорды',
       zoomOut: 'Уменьшить',
       zoomIn: 'Увеличить',
+      prevPage: 'Предыдущая страница',
+      nextPage: 'Следующая страница',
       semitoneDown: 'На полтона ниже',
       transpose: 'Транспонировать',
       semitoneUp: 'На полтона выше',
@@ -516,7 +563,7 @@ const strings = {
     },
     progress: {
       queue:      '⚪ В очередь',
-      structure:  '🟡 Структура',
+      structure:  '🔴 Структура',
       mastering:  '🟠 Пальцы',
       ready:      '🟢 Готово',
       readyCount: (n: number, total: number) => `${n}/${total} готово`,
@@ -540,6 +587,10 @@ const strings = {
       onlineEmpty: 'Нет активных пользователей.',
       onlineUnavailable: 'Статус сети недоступен.',
       onlineSetlist: 'Сетлист',
+      onlineUser: 'Пользователь',
+      onlineScope: 'Раздел',
+      onlineRoom: 'Страница',
+      onlineSeen: 'Был активен',
       onlineHint: 'Пользователи каталога и сетлистов (редактор или сцена). Обновление каждые 10 секунд; при потере связи вкладка исчезает в течение 90 секунд.',
       role: 'Роль',
       telegramAccess: 'Доступ Telegram',
@@ -586,6 +637,7 @@ const strings = {
       amount: 'Сумма (€)',
       date: 'Дата',
       comment: 'Комментарий',
+      cols: { kind: 'Тип', who: 'Кто', what: 'Детали', paid: 'Статус' },
       method: 'Способ',
       methodCash: 'Наличка',
       methodTransfer: 'Перевод',
@@ -620,12 +672,12 @@ const strings = {
   },
 };
 
-export const lang = writable<Lang>(
-  browser && localStorage.getItem('lang') === 'en' ? 'en' : 'ru'
-);
-
-lang.subscribe(l => {
-  if (browser) localStorage.setItem('lang', l);
-});
+const langSlice = useStore(settingsStore, s => s.lang);
+/** Writable-store facade over the Zustand settings store, so `$lang` / `$lang = 'en'` keep working. */
+export const lang = {
+  subscribe: langSlice.subscribe,
+  set: (l: Lang) => settingsStore.getState().setLang(l),
+  update: (fn: (l: Lang) => Lang) => settingsStore.getState().setLang(fn(settingsStore.getState().lang)),
+};
 
 export const t = derived(lang, $lang => strings[$lang]);

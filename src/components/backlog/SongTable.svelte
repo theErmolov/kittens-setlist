@@ -1,72 +1,99 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
-  import type { Song, Setlist, Category, Instrument, BandMusician } from '$lib/types';
-  import SongRow from './SongRow.svelte';
+  import type { Song, Setlist, Category, Instrument, LearningStage } from '$lib/types';
   import SongEditModal from './SongEditModal.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
-  import FilterChips from '$components/shared/FilterChips.svelte';
-  import { updatePersonalSongComment, updateSong, deleteSong, addSongsToSetlist } from '$lib/api';
-  import { formatDuration } from '$lib/utils';
+  import BacklogFilter from './BacklogFilter.svelte';
+  import ActiveFilters from './ActiveFilters.svelte';
+  import * as Popover from '$components/ui/popover';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { setlistsQuery, musiciansQuery } from '$lib/query/queries';
+  import { backlogSongsQuery, useSaveBacklogSong, useDeleteBacklogSong, patchBacklogSong } from '$lib/query/backlog';
+  import { useAddSongs } from '$lib/query/setlistMutations';
+  import { useStore } from '$lib/store/bridge';
+  import { backlogStore } from '$lib/store/backlog';
+  import { formatDuration, INSTRUMENT_ICONS } from '$lib/utils';
   import { isSetlistOpen, matchesBacklogFilters } from '$lib/backlog';
   import { lang, t } from '$lib/i18n';
-  import { canWrite } from '$lib/auth';
+  import { canWrite, currentUser } from '$lib/auth';
+  import { base } from '$app/paths';
+  import * as Dialog from '$components/ui/dialog';
+  import * as AlertDialog from '$components/ui/alert-dialog';
+  import { Button } from '$components/ui/button';
+  import { ButtonGroup } from '$components/ui/button-group';
+  import IconButton from '$components/shared/IconButton.svelte';
+  import PageControlsDivider from '$components/shared/PageControlsDivider.svelte';
+  import PageControls from '$components/shared/PageControls.svelte';
+  import * as NavigationMenu from '$components/ui/navigation-menu';
+  import * as Breadcrumb from '$components/ui/breadcrumb';
+  import * as Table from '$components/ui/table';
+  import { createSvelteTable, FlexRender, renderComponent } from '$components/ui/data-table';
+  import { getCoreRowModel, getSortedRowModel, type ColumnDef, type Row, type SortingState } from '@tanstack/table-core';
+  import CatCell from './cells/CatCell.svelte';
+  import CatHead from './cells/CatHead.svelte';
+  import SortHead from './cells/SortHead.svelte';
+  import TitleCell from './cells/TitleCell.svelte';
+  import MusicianCell from './cells/MusicianCell.svelte';
+  import GuestsCell from './cells/GuestsCell.svelte';
+  import ActionsCell from './cells/ActionsCell.svelte';
+  import { stageBg, guestTags } from './songView';
+  import * as Tooltip from '$components/ui/tooltip';
+  import * as Drawer from '$components/ui/drawer';
+  import * as Empty from '$components/ui/empty';
+  import { Badge } from '$components/ui/badge';
 
-  let {
-    songs: songsProp,
-    setlists,
-    musicians,
-    loading = false,
-    onadd
-  }: {
-    songs: Song[];
-    setlists: Setlist[];
-    musicians: BandMusician[];
-    loading?: boolean;
-    onadd: () => void;
-  } = $props();
+  const songsQ = createQuery(() => backlogSongsQuery(($currentUser?.isAdmin || $currentUser?.role === 'writer') ? 10000 : 50000));
+  const setlistsQ = createQuery(() => setlistsQuery());
+  const musiciansQ = createQuery(() => musiciansQuery());
+  const saveSong = useSaveBacklogSong();
+  const deleteSongM = useDeleteBacklogSong();
+  const addSongsM = useAddSongs();
 
-  let songs = $state(songsProp);
-  $effect(() => { songs = songsProp; });
+  let songs = $derived(songsQ.data ?? []);
+  let setlists = $derived(setlistsQ.data ?? []);
+  let musicians = $derived(musiciansQ.data ?? []);
+  let loading = $derived(songsQ.isPending || setlistsQ.isPending || musiciansQ.isPending);
 
-  let localSetlists = $state(setlists);
-  $effect(() => { localSetlists = setlists; });
-
-  let search = $state('');
-  let categoryFilter = $state(new Set<Category>());
-  let selectedMusicians = $state(new Set<string>());
-  let selectedInstruments = $state(new Set<Instrument>());
-  let showProgress = $state(false);
-  let showArchived = $state(false);
-  let filterOpen = $state(false);
-  let additionMode = $state(false);
-  // Song ids currently showing the green "added" flash
-  let flashing = $state(new Set<string>());
+  const search = useStore(backlogStore, s => s.search);
+  const categoryFilter = useStore(backlogStore, s => s.categoryFilter);
+  const selectedMusicians = useStore(backlogStore, s => s.selectedMusicians);
+  const selectedInstruments = useStore(backlogStore, s => s.selectedInstruments);
+  const showProgress = useStore(backlogStore, s => s.showProgress);
+  const showArchived = useStore(backlogStore, s => s.showArchived);
+  const filterOpen = useStore(backlogStore, s => s.filterOpen);
+  const filterPopoverOpen = useStore(backlogStore, s => s.filterPopoverOpen);
+  const additionMode = useStore(backlogStore, s => s.additionMode);
+  const sorting = useStore(backlogStore, s => s.sorting);
+  const editingSongId = useStore(backlogStore, s => s.editingSongId);
+  const addToSetlistSongId = useStore(backlogStore, s => s.addToSetlistSongId);
+  const lyricsViewSongId = useStore(backlogStore, s => s.lyricsViewSongId);
+  const songById = (id: string | null) => (id ? songs.find(s => s.id === id) ?? null : null);
+  const editingSong = $derived(songById($editingSongId));
+  const addToSetlistSong = $derived(songById($addToSetlistSongId));
+  const lyricsViewSong = $derived(songById($lyricsViewSongId));
+  const addRequest = useStore(backlogStore, s => s.addRequest);
+  const deleteRequest = useStore(backlogStore, s => s.deleteRequest);
+  const actions = backlogStore.getState();
+  const compact = useStore(backlogStore, s => s.compact);
 
   // Setlists still relevant for adding: not more than 24h past their start time
-  let openSetlists = $derived(localSetlists.filter(sl => isSetlistOpen(sl)));
+  let openSetlists = $derived(setlists.filter(sl => isSetlistOpen(sl)));
+  // eslint-disable-next-line prefer-const
+  let filterAnchor: HTMLElement | undefined;
+  let activeFilterCount = $derived(($search.trim() ? 1 : 0) + ($showArchived ? 1 : 0) + $categoryFilter.size + $selectedMusicians.size + $selectedInstruments.size);
   let hasActiveFilters = $derived(
-    search.length > 0 || categoryFilter.size > 0 || selectedMusicians.size > 0 || selectedInstruments.size > 0
+    $search.length > 0 || $categoryFilter.size > 0 || $selectedMusicians.size > 0 || $selectedInstruments.size > 0
   );
-  let editingSong = $state<Song | null>(null);
-  let addToSetlistSong = $state<Song | null>(null);
-  let lyricsViewSong = $state<Song | null>(null);
-  let addToSetlistSongDragInModal = false;
-  let sortCol = $state<'artist' | 'title'>('artist');
-  let sortDir = $state<1 | -1>(1);
 
-  const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤'
-  };
+  const instrumentIcons = INSTRUMENT_ICONS;
   const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
 
   // Column names — all registered musicians (guests are ad-hoc in song.musicians, not in roster)
   let permanentNames = $derived(musicians.map(m => m.name));
-  // Per-musician column width so all columns sum to 100%
-  // Fixed: cat 9% + artist 18% + title 28% + actions 9% = 64% → musicians get 36%, capped at 5%
-  let musicianColPct = $derived(Math.min(5, Math.floor(36 / (permanentNames.length || 1))));
 
   // Songs in scope for the current archive view (hides archived by default)
-  let scoped = $derived(() => songs.filter(s => showArchived ? !!s.archived : !s.archived));
+  let scoped = $derived(() => songs.filter(s => $showArchived ? !!s.archived : !s.archived));
 
   let categoryCounts = $derived(() => {
     const counts: Record<Category, number> = { top: 0, mid: 0, low: 0 };
@@ -87,423 +114,322 @@
     return counts;
   });
 
-  function toggleSort(col: 'artist' | 'title') {
-    if (sortCol === col) sortDir = (sortDir === 1 ? -1 : 1);
-    else { sortCol = col; sortDir = 1; }
-  }
-
   let filtered = $derived(() => {
     const f = scoped().filter(s => matchesBacklogFilters(
-      s, search, categoryFilter, selectedMusicians, selectedInstruments,
+      s, $search, $categoryFilter, $selectedMusicians, $selectedInstruments,
     ));
-    return [...f].sort((a, b) => a[sortCol].localeCompare(b[sortCol], undefined, { sensitivity: 'base' }) * sortDir);
+    return f;
   });
 
-  function toggleMusician(name: string) {
-    const next = new Set(selectedMusicians);
-    next.has(name) ? next.delete(name) : next.add(name);
-    selectedMusicians = next;
-  }
+  // ── Data Table (TanStack): column defs, sorting state lives in backlogStore ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rc = (component: any, props?: Record<string, unknown>) => renderComponent(component, (props ?? {}) as never);
+  interface ColMeta { compact?: string; minWidth?: string; head?: string; cell?: string; width?: string; cellStyle?: (song: Song) => string }
+  const isCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s.trimStart().charAt(0)) ? 1 : 0;
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  // Artist: English artists before Russian, then alphabetical, then title.
+  const artistSort = (a: Row<Song>, b: Row<Song>) =>
+    isCyrillic(a.original.artist) - isCyrillic(b.original.artist) || cmp(a.original.artist, b.original.artist) || cmp(a.original.title, b.original.title);
+  const titleSort = (a: Row<Song>, b: Row<Song>) => cmp(a.original.title, b.original.title);
 
-  function toggleInstrument(inst: Instrument) {
-    const next = new Set(selectedInstruments);
-    next.has(inst) ? next.delete(inst) : next.add(inst);
-    selectedInstruments = next;
-  }
+  let columns = $derived.by((): ColumnDef<Song>[] => {
+    const names = permanentNames;
+    const musicianCols: ColumnDef<Song>[] = names.map((name, i) => ({
+      id: `m:${name}`,
+      header: name,
+      enableSorting: false,
+      cell: ({ row }) => rc(MusicianCell, { song: row.original, name }),
+      meta: {
+        head: 'w-px',
+        cell: '',
+        compact: 'order-3 min-w-0 flex-1 basis-0',
+        // Wide enough for the most instruments any shown row has in this column (icons keep full size).
+        minWidth: `calc(${Math.max(1, ...filtered().map(song => song.musicians[name]?.instruments?.length ?? 0))} * 1.6rem + 1.5rem)`,
+        cellStyle: (song: Song) => {
+          const role = song.musicians[name];
+          return role?.instruments?.length ? `background: ${stageBg((song.progress?.[name] ?? 'queue') as LearningStage)}` : '';
+        },
+      } satisfies ColMeta,
+    }));
+    return [
+      { id: 'category', header: () => rc(CatHead), enableSorting: false,
+        cell: ({ row }) => rc(CatCell, { song: row.original, names }),
+        meta: { head: 'w-px', cell: 'text-center', compact: 'w-12 shrink-0' } satisfies ColMeta },
+      { id: 'artist', accessorKey: 'artist', sortingFn: artistSort,
+        header: () => rc(SortHead, { id: 'artist', label: $t.backlog.cols.artist }),
+        cell: ({ row }) => row.original.artist,
+        meta: { cell: 'max-w-0 truncate font-medium', width: '22%', compact: 'max-w-full! min-w-0 flex-1 basis-0' } satisfies ColMeta },
+      { id: 'title', accessorKey: 'title', sortingFn: titleSort,
+        header: () => rc(SortHead, { id: 'title', label: $t.backlog.cols.title }),
+        cell: ({ row }) => rc(TitleCell, { song: row.original }),
+        meta: { cell: 'whitespace-normal', width: '32%', compact: 'min-w-0 flex-[1.4] basis-0' } satisfies ColMeta },
+      ...musicianCols,
+      { id: 'guests', enableSorting: false,
+        header: () => $t.backlog.cols.guests,
+        cell: ({ row }) => rc(GuestsCell, { song: row.original, names }),
+        meta: { cell: 'whitespace-normal', width: '14%', compact: 'order-3 min-w-0 flex-[1.5] basis-0' } satisfies ColMeta },
+      { id: 'actions', enableSorting: false,
+        header: () => $t.song.editTitle,
+        cell: ({ row }) => rc(ActionsCell, { song: row.original }),
+        meta: { head: 'w-px', last: true, compact: 'w-16 shrink-0' } as ColMeta },
+    ];
+  });
+
+  let hasGuests = $derived(filtered().some(song => guestTags(song, permanentNames).length > 0));
+  const table = createSvelteTable<Song>({
+    get data() { return filtered(); },
+    get columns() { return columns; },
+    getRowId: song => song.id,
+    // The Guests column is shown only while some shown row has a guest.
+    state: { get sorting() { return $sorting; }, get columnVisibility() { return { guests: hasGuests }; } },
+    onSortingChange: updater => actions.setSorting(typeof updater === 'function' ? updater($sorting) : updater),
+    enableSortingRemoval: false,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+  let rows = $derived(table.getRowModel().rows);
+  const meta = (c: { columnDef: { meta?: unknown } }) => (c.columnDef.meta ?? {}) as ColMeta & { last?: boolean };
+  const ariaSort = (dir: false | 'asc' | 'desc') => dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined;
+  /** Compact view: each row is a flex-wrap line; the `before` item forces the people cells (order-3) onto a second line. */
+  const isPeople = (m: ColMeta) => !!m.compact?.includes('order-3');
+  /** Compact view: the song-info line of a row has a light violet fill. */
+  const tint = 'bg-[color-mix(in_srgb,var(--accent)_7%,var(--card))]';
+  const topTint = `content-center ${tint}`;
+  const rowCompact = 'overflow-hidden rounded-[4px] border! border-[color-mix(in_srgb,var(--text)_28%,var(--card))] flex flex-wrap before:order-2 before:h-0 before:basis-full before:content-[\'\']';
+  // Switch to the two-line layout when the full table would no longer fit the viewport (grows with the number of people).
+  $effect(() => {
+    if (!browser) return;
+    const mq = matchMedia(`(max-width: ${Math.max(700, 380 + 105 * permanentNames.length + (hasGuests ? 170 : 0))}px)`);
+    const update = () => actions.setCompact(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  });
+  const onRowClick = (song: Song) =>
+    $currentUser?.status === 'approved' ? ($canWrite && $additionMode ? actions.requestAdd(song.id) : actions.setEditingSong(song.id)) : undefined;
 
   async function handleSave(updated: Song) {
-    const saved = $canWrite ? await updateSong(updated) : updated;
-    await updatePersonalSongComment(updated.id, updated.personalComment ?? '');
-    songs = songs.map(s => s.id === updated.id ? { ...saved, personalComment: updated.personalComment ?? '' } : s);
-    editingSong = null;
+    await saveSong.mutateAsync({ song: updated, canWrite: $canWrite });
+    actions.setEditingSong(null);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm($t.deleteConfirm)) return;
-    await deleteSong(id);
-    songs = songs.filter(s => s.id !== id);
+  // Row delete requests arrive through the store and are confirmed in an AlertDialog.
+  function confirmDelete() {
+    const id = $deleteRequest;
+    actions.requestDelete(null);
+    if (id) deleteSongM.mutate(id);
   }
 
-  function flashSong(id: string) {
-    const next = new Set(flashing);
-    next.add(id);
-    flashing = next;
-    setTimeout(() => {
-      const n = new Set(flashing);
-      n.delete(id);
-      flashing = n;
-    }, 1000);
-  }
+  const onClass = 'data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90';
 
   // Add a song to a setlist, skipping if it's already there. Always shows green feedback.
-  async function addSongToSetlist(sl: Setlist, song: Song) {
-    flashSong(song.id);
+  function addSongToSetlist(sl: Setlist, song: Song) {
+    actions.flashSong(song.id);
     if (sl.entries.some(e => e.songId === song.id)) return;
-    const updated = await addSongsToSetlist(sl.id, [song]);
-    localSetlists = localSetlists.map(s => s.id === sl.id ? updated : s);
+    addSongsM.mutate({ setlistId: sl.id, songs: [song] });
   }
 
   // Entry point from a row/button: auto-add when exactly one open setlist, else show picker.
-  function startAddFlow(song: Song) {
-    const open = openSetlists;
-    if (open.length === 1) {
-      addSongToSetlist(open[0], song);
-    } else {
-      addToSetlistSong = song;
-    }
-  }
+  $effect(() => {
+    const song = songById($addRequest);
+    if (!$addRequest) return;
+    actions.requestAdd(null);
+    if (!song) return;
+    if (openSetlists.length === 1) addSongToSetlist(openSetlists[0], song);
+    else actions.setAddToSetlistSong(song.id);
+  });
 
-  async function handlePickSetlist(sl: Setlist) {
-    if (!addToSetlistSong) return;
+  function handlePickSetlist(sl: Setlist) {
     const song = addToSetlistSong;
-    addToSetlistSong = null;
-    await addSongToSetlist(sl, song);
+    if (!song) return;
+    actions.setAddToSetlistSong(null);
+    addSongToSetlist(sl, song);
   }
 </script>
 
-<div class="table-container">
-  <!-- Desktop toolbar (hidden on mobile) -->
-  <div class="toolbar">
-    <input class="search" placeholder={$t.backlog.search} bind:value={search} />
-    <div class="chips-row">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})</span>
-    </div>
-    {#if $canWrite}<button class="add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
-  </div>
+{#snippet filterPalette(autofocus = false)}
+  <BacklogFilter
+    {autofocus}
+    names={permanentNames}
+    categoryCounts={categoryCounts()}
+    musicianCounts={musicianCounts()}
+    result="{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})"
+  />
+{/snippet}
 
-  <!-- Desktop filter bar (hidden on mobile) -->
-  <div class="filter-bar">
-    <div class="filter-content">
-      <div class="filter-group">
-        {#each permanentNames as name}
-          <button
-            class="filter-chip"
-            class:active={selectedMusicians.has(name)}
-            onclick={() => toggleMusician(name)}
-          >{name} ({musicianCounts()[name] ?? 0})</button>
-        {/each}
-      </div>
-      <div class="filter-sep"></div>
-      <div class="filter-group">
-        {#each allInstruments as inst}
-          <button
-            class="filter-chip filter-chip-inst"
-            class:active={selectedInstruments.has(inst)}
-            onclick={() => toggleInstrument(inst)}
-            title={$t.instrument[inst]}
-          >{instrumentIcons[inst]}</button>
-        {/each}
-      </div>
-    </div>
-    <button
-      class="filter-chip archive-toggle"
-      class:active={showArchived}
-      onclick={() => { showArchived = !showArchived; }}
-    >📦 {$t.backlog.archivedFilter}</button>
-    <button
-      class="filter-chip progress-toggle"
-      class:active={showProgress}
-      onclick={() => { showProgress = !showProgress; }}
-    ><span class="progress-icon">📊</span><span class="progress-label">{$t.backlog.progress}</span></button>
-  </div>
-
-  <div class="scroll-wrap">
-    <table>
-      <colgroup>
-        <col style="width: 5%">
-        <col style="width: 18%">
-        <col style="width: 28%">
-        {#each permanentNames as _}
-          <col style="width: {musicianColPct}%">
-        {/each}
-        <col style="width: 9%">
-      </colgroup>
-      <thead>
-        <tr>
-          <th class="th-cat">{showProgress ? $t.backlog.progress : $t.backlog.cols.cat}</th>
-          <th class="th-sortable th-artist" onclick={() => toggleSort('artist')}>
-            {$t.backlog.cols.artist}{sortCol === 'artist' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
-          </th>
-          <th class="th-sortable" onclick={() => toggleSort('title')}>
-            {$t.backlog.cols.title}{sortCol === 'title' ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
-          </th>
-          {#each permanentNames as name, i}
-            <th class="th-musician" class:musician-alt={i % 2 === 0}>{name}</th>
+<Tooltip.Provider>
+<!-- Sticky controls bar (desktop): breadcrumb + search on the left, mode toggles + add on the right. Mobile keeps its bottom bar + drawer. -->
+<div class="contents max-[700px]:hidden">
+  <PageControls label={$t.nav.backlog}>
+    {#snippet start()}
+      <NavigationMenu.Item class="min-w-0"><Breadcrumb.Root><Breadcrumb.List class="flex-nowrap"><Breadcrumb.Item><Breadcrumb.Page class="inline-flex min-h-10 items-center whitespace-nowrap">{$t.nav.backlog}</Breadcrumb.Page></Breadcrumb.Item></Breadcrumb.List></Breadcrumb.Root></NavigationMenu.Item>
+      <PageControlsDivider />
+      <NavigationMenu.Item>
+        <span bind:this={filterAnchor} class="inline-flex">
+          <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterPopoverOpen} expanded={$filterPopoverOpen} onpressedchange={v => actions.setFilterPopoverOpen(v)}>
+            {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
+          </IconButton>
+        </span>
+        <Popover.Root open={$filterPopoverOpen} onOpenChange={v => actions.setFilterPopoverOpen(v)}>
+          <Popover.Content customAnchor={filterAnchor} align="start" class="w-[340px] p-1" onInteractOutside={(e) => { if (filterAnchor?.contains(e.target as Node)) e.preventDefault(); }}>
+            {@render filterPalette()}
+          </Popover.Content>
+        </Popover.Root>
+      </NavigationMenu.Item>
+      <NavigationMenu.Item class="min-w-0"><ActiveFilters class="flex-nowrap overflow-hidden" /></NavigationMenu.Item>
+    {/snippet}
+    {#snippet end()}
+      {#if $canWrite}<NavigationMenu.Item><IconButton variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} /></NavigationMenu.Item>{/if}
+    {/snippet}
+  </PageControls>
+</div>
+<div class="flex h-[calc(100dvh-56px)] flex-col min-[701px]:h-[calc(100dvh-112px)] max-[700px]:h-[calc(100dvh-56px-52px)]">
+  <div class="flex-1 overflow-auto px-4 pt-3 pb-4 max-[700px]:px-0 max-[700px]:py-0 **:data-[slot=table-container]:overflow-visible">
+    {#if loading}
+      <LoadingCat />
+    {:else}
+      <!-- shadcn Table; two-line rows when it would not fit (see `compact`) -->
+      <Table.Root class={$compact ? 'block' : ''}>
+        <Table.Header class={$compact ? 'sticky top-0 z-[2] block bg-card shadow-[0_2px_0_var(--border)]' : ''}>
+          {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+            <Table.Row class="hover:bg-transparent {$compact ? rowCompact : ''}">
+              {#each headerGroup.headers as header (header.id)}
+                {@const m = meta(header.column)}
+                <Table.Head
+                  class="{m.head ?? ''} {$compact ? `static block ${m.compact ?? ''} ${isPeople(m) ? 'content-center' : 'content-center border-b'}` : ''}"
+                  style={$compact ? '' : `${m.width ? `width: ${m.width};` : ''}${m.minWidth ? `min-width: ${m.minWidth}` : ''}`}
+                  aria-sort={ariaSort(header.column.getIsSorted())}
+                >
+                  {#if m.last}<span class="sr-only"><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></span>
+                  {:else}<FlexRender content={header.column.columnDef.header} context={header.getContext()} />{/if}
+                </Table.Head>
+              {/each}
+            </Table.Row>
           {/each}
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each filtered() as song (song.id)}
-          <SongRow
-            {song}
-            allMusicians={permanentNames}
-            {showProgress}
-            {additionMode}
-            flashAdded={flashing.has(song.id)}
-            onedit={() => { editingSong = song; }}
-            ondelete={() => handleDelete(song.id)}
-            onaddtosetlist={() => startAddFlow(song)}
-            onlyricsclick={() => { lyricsViewSong = song; }}
-          />
-        {/each}
-        {#if loading}
-          <tr><td colspan={4 + permanentNames.length} class="empty"><LoadingCat /></td></tr>
-        {:else if filtered().length === 0}
-          <tr><td colspan={4 + permanentNames.length} class="empty">{$t.backlog.empty}</td></tr>
-        {/if}
-      </tbody>
-    </table>
+        </Table.Header>
+        <Table.Body class={$compact ? 'block' : ''}>
+          {#each rows as row (row.id)}
+            <Table.Row class="group/row relative cursor-pointer border-0 hover:bg-transparent {$compact ? `${rowCompact} not-first:-mt-px` : ''}" onclick={() => onRowClick(row.original)}>
+              {#each row.getVisibleCells() as cell (cell.id)}
+                {@const m = meta(cell.column)}
+                <Table.Cell class="bg-card py-0.5 min-[701px]:group-hover/row:bg-(--row-hover) {m.cell ?? ''} {$compact ? `block ${m.compact ?? ''} ${isPeople(m) ? 'min-h-10 content-center border-t' : topTint}` : isPeople(m) ? '' : tint}" style={m.cellStyle?.(row.original) ?? ''}>
+                  <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+                </Table.Cell>
+              {/each}
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
+
+      {#if filtered().length === 0}
+        <Empty.Root class="p-10">
+          <Empty.Header>
+            <Empty.Media><span class="text-3xl">🎵</span></Empty.Media>
+            <Empty.Title class="text-base font-medium text-muted-foreground">{$t.backlog.empty}</Empty.Title>
+          </Empty.Header>
+        </Empty.Root>
+      {/if}
+    {/if}
   </div>
 
-  <!-- Mobile filter panel (fixed above bottom bar, shown when filterOpen) -->
-  <div class="mobile-filter-panel" class:open={filterOpen}>
-    <input class="search mobile-search" placeholder={$t.backlog.search} bind:value={search} />
-    <div class="mobile-chips-row">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
-      <span class="song-count">{$t.backlog.shown(filtered().length, scoped().length)}</span>
-    </div>
-    <div class="filter-group">
-      {#each permanentNames as name}
-        <button
-          class="filter-chip"
-          class:active={selectedMusicians.has(name)}
-          onclick={() => toggleMusician(name)}
-        >{name} ({musicianCounts()[name] ?? 0})</button>
-      {/each}
-    </div>
-    <div class="filter-sep-h"></div>
-    <div class="filter-group">
-      {#each allInstruments as inst}
-        <button
-          class="filter-chip filter-chip-inst"
-          class:active={selectedInstruments.has(inst)}
-          onclick={() => toggleInstrument(inst)}
-          title={$t.instrument[inst]}
-        >{instrumentIcons[inst]}</button>
-      {/each}
-    </div>
-    <div class="filter-sep-h"></div>
-    <div class="filter-group">
-      <button
-        class="filter-chip archive-chip-mobile"
-        class:active={showArchived}
-        onclick={() => { showArchived = !showArchived; }}
-      >📦 {$t.backlog.archivedFilter}</button>
-      <button
-        class="filter-chip progress-chip-mobile"
-        class:active={showProgress}
-        onclick={() => { showProgress = !showProgress; }}
-      >📊 {$t.backlog.progress}</button>
-    </div>
-  </div>
+  <!-- Mobile filter drawer -->
+  <Drawer.Root open={$filterOpen} onOpenChange={v => actions.setFilterOpen(v)} shouldScaleBackground={false}>
+    <Drawer.Content class="min-[701px]:hidden">
+      <Drawer.Header>
+        <Drawer.Title>{$t.backlog.filterBtn}</Drawer.Title>
+        <Drawer.Description class="sr-only">{$t.backlog.search}</Drawer.Description>
+      </Drawer.Header>
+      <div class="flex flex-col gap-3 px-4 pb-6">
+        <ActiveFilters />
+        {@render filterPalette(true)}
+      </div>
+    </Drawer.Content>
+  </Drawer.Root>
 
   <!-- Mobile bottom bar -->
-  <div class="mobile-bottom-bar">
-    <button
-      class="bottom-btn"
-      class:active={filterOpen || hasActiveFilters}
-      onclick={() => { filterOpen = !filterOpen; }}
-    >🎛️ {$t.backlog.filterBtn}</button>
-    {#if $canWrite}<button
-      class="bottom-btn"
-      class:active={additionMode}
-      onclick={() => { additionMode = !additionMode; }}
-    >📋 {$t.backlog.addMode}</button>{/if}
-    {#if $canWrite}<button class="bottom-add-btn" onclick={onadd}>{$t.backlog.addSong}</button>{/if}
+  <div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
+    <ButtonGroup>
+      <IconButton class="relative {onClass}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpen || hasActiveFilters} onpressedchange={() => actions.toggleFilterOpen()}>
+        {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
+      </IconButton>
+      {#if $canWrite}<IconButton class={onClass} icon="📋" label={$t.backlog.addMode} pressed={$additionMode} onpressedchange={() => actions.toggleAdditionMode()} />{/if}
+    </ButtonGroup>
+    {#if $canWrite}<IconButton class="ml-auto" variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} />{/if}
   </div>
 </div>
+</Tooltip.Provider>
 
 {#if editingSong}
   <SongEditModal
     song={editingSong}
     personalOnly={!$canWrite}
     {musicians}
-    onclose={() => { editingSong = null; }}
+    onclose={() => actions.setEditingSong(null)}
     onsave={handleSave}
     ondelete={$canWrite ? async () => {
-      const id = editingSong!.id;
-      await deleteSong(id);
-      songs = songs.filter(s => s.id !== id);
+      await deleteSongM.mutateAsync(editingSong!.id);
     } : undefined}
-    onaddtosetlist={$canWrite ? () => { if (editingSong) startAddFlow(editingSong); } : undefined}
+    onaddtosetlist={$canWrite ? () => { if (editingSong) actions.requestAdd(editingSong.id); } : undefined}
   />
 {/if}
 
-{#if addToSetlistSong && $canWrite}
-  <div class="modal-backdrop" onmousedown={e => { addToSetlistSongDragInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop'); }} onclick={e => { if (addToSetlistSongDragInModal) { addToSetlistSongDragInModal = false; return; } if ((e.target as HTMLElement).classList.contains('modal-backdrop')) addToSetlistSong = null; }} role="dialog" aria-modal="true">
-    <div class="picker-modal">
-      <div class="modal-header">
-        <h3>{$t.addToSetlist.title}</h3>
-        <button class="close-btn" onclick={() => { addToSetlistSong = null; }}>✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="song-name">"{addToSetlistSong.artist} – {addToSetlistSong.title}"</p>
+<!-- Add-to-setlist picker -->
+<Dialog.Root open={!!addToSetlistSong && $canWrite} onOpenChange={(open) => { if (!open) actions.setAddToSetlistSong(null); }}>
+  <Dialog.Content class="sm:max-w-sm">
+    {#if addToSetlistSong}
+      {@const pickSong = addToSetlistSong}
+      <Dialog.Header>
+        <Dialog.Title class="text-base font-bold">{$t.addToSetlist.title}</Dialog.Title>
+        <Dialog.Description>"{pickSong.artist} – {pickSong.title}"</Dialog.Description>
+      </Dialog.Header>
+      <div class="flex max-h-[60dvh] flex-col gap-1.5 overflow-y-auto">
         {#if openSetlists.length === 0}
-          <p class="empty">{$t.addToSetlist.noSetlists} <a href="/setlists">{$t.addToSetlist.createLink}</a></p>
+          <Empty.Root class="p-4">
+            <Empty.Header>
+              <Empty.Description>{$t.addToSetlist.noSetlists} <a class="text-primary-ink underline" href="{base}/setlists">{$t.addToSetlist.createLink}</a></Empty.Description>
+            </Empty.Header>
+          </Empty.Root>
         {:else}
           {#each openSetlists as sl}
-            {@const inSetlist = sl.entries.some(e => e.songId === addToSetlistSong!.id)}
-            <button class="setlist-option" class:in-setlist={inSetlist} onclick={() => handlePickSetlist(sl)}>
-              <span class="sl-name">{sl.name}</span>
-              <span class="sl-right">
-                {#if sl.date}<span class="sl-date">{sl.date}</span>{/if}
-                {#if inSetlist}<span class="sl-check">✓</span>{/if}
+            {@const inSetlist = sl.entries.some(e => e.songId === pickSong.id)}
+            <Button
+              variant="outline"
+              class="w-full justify-between px-3.5 text-[0.9rem] {inSetlist ? 'border-primary bg-primary/10 hover:bg-primary/20' : ''}"
+              onclick={() => handlePickSetlist(sl)}
+            >
+              <span class="font-medium">{sl.name}</span>
+              <span class="flex items-center gap-2">
+                {#if sl.date}<Badge variant="secondary" class="font-normal text-muted-foreground">{sl.date}</Badge>{/if}
+                {#if inSetlist}<span class="font-bold text-primary-ink">✓</span>{/if}
               </span>
-            </button>
+            </Button>
           {/each}
         {/if}
       </div>
-    </div>
-  </div>
-{/if}
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete-song confirmation -->
+<AlertDialog.Root open={$deleteRequest !== null} onOpenChange={(open) => { if (!open) actions.requestDelete(null); }}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{$t.song.remove}</AlertDialog.Title>
+      <AlertDialog.Description>{$t.deleteConfirm}</AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel>{$t.song.cancel}</AlertDialog.Cancel>
+      <AlertDialog.Action variant="destructive" onclick={confirmDelete}>{$t.song.remove}</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 {#if lyricsViewSong}
   <LyricsOverlay
     song={lyricsViewSong}
-    onclose={() => { lyricsViewSong = null; }}
+    onclose={() => actions.setLyricsViewSong(null)}
     onsongupdate={(updated) => {
-      songs = songs.map(s => s.id === updated.id ? updated : s);
-      lyricsViewSong = updated;
+      patchBacklogSong(updated);
     }}
   />
 {/if}
-
-<style>
-  .table-container { display: flex; flex-direction: column; height: calc(100dvh - 72px); }
-
-  .toolbar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
-  }
-  .search {
-    padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--bg); color: var(--text); font-size: 0.88rem; min-width: 200px;
-    touch-action: manipulation;
-  }
-  .song-count { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
-  .add-btn {
-    margin-left: auto; padding: 7px 16px;
-    background: var(--accent); color: #fff; border: none; border-radius: 6px;
-    cursor: pointer; font-weight: 600; font-size: 0.88rem;
-  }
-
-  .filter-bar {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .filter-content { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
-  .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
-  .filter-sep {
-    width: 1px; height: 22px; background: var(--border); flex-shrink: 0; align-self: center;
-  }
-  .mobile-filter-panel { display: none; }
-  .mobile-bottom-bar { display: none; }
-  .filter-chip {
-    padding: 3px 12px;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    transition: all 0.15s;
-  }
-  .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
-  .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .filter-chip-inst { padding: 3px 9px; font-size: 0.95rem; }
-  .archive-toggle { margin-left: auto; }
-
-  .scroll-wrap { overflow-x: auto; overflow-y: auto; flex: 1; }
-  table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
-  thead tr { background: var(--surface); }
-  th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
-  th {
-    text-align: left; padding: 8px 12px; font-size: 0.75rem; font-weight: 700;
-    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
-    white-space: nowrap; border-bottom: 1px solid var(--border); overflow: hidden;
-  }
-  .th-cat { text-align: center; }
-  .th-musician { text-align: left; padding-left: 12px; }
-  .musician-alt { background: var(--musician-alt-bg); }
-  .th-sortable { cursor: pointer; user-select: none; }
-  .th-sortable:hover { color: var(--accent); }
-  .empty { text-align: center; padding: 40px; color: var(--text-muted); }
-
-  .chips-row { display: flex; align-items: center; gap: 8px; }
-  .chips-row .song-count { flex-shrink: 0; }
-
-  @media (max-width: 700px) {
-    /* Hide desktop toolbar and filter bar entirely */
-    .toolbar { display: none; }
-    .filter-bar { display: none; }
-
-    /* Song list fills height minus bottom bar */
-    .table-container { height: calc(100dvh - 72px - 52px); }
-    .scroll-wrap { overflow-x: hidden; }
-
-    /* Mobile filter panel — slides up above bottom bar when open */
-    .mobile-filter-panel {
-      position: fixed; bottom: 52px; left: 0; right: 0; z-index: 20;
-      background: var(--surface); border-top: 1px solid var(--border);
-      padding: 12px; display: none; flex-direction: column; gap: 10px;
-    }
-    .mobile-filter-panel.open { display: flex; }
-    .mobile-search { font-size: 16px; width: 100%; box-sizing: border-box; }
-    .mobile-chips-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .mobile-chips-row .song-count { margin-left: auto; }
-    .filter-sep-h { height: 1px; background: var(--border); }
-
-    /* Mobile bottom bar */
-    .mobile-bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 52px; z-index: 21;
-      background: var(--surface); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 8px; padding: 0 12px;
-    }
-    .bottom-btn {
-      padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 500;
-      color: var(--text-muted); transition: all 0.15s; white-space: nowrap;
-    }
-    .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .bottom-add-btn {
-      margin-left: auto; padding: 6px 16px;
-      background: var(--accent); color: #fff; border: none; border-radius: 6px;
-      cursor: pointer; font-weight: 600; font-size: 0.88rem; white-space: nowrap;
-    }
-
-    /* Table → card list */
-    thead { display: none; }
-    table { display: block; }
-    tbody { display: block; }
-  }
-
-  .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
-  }
-  .picker-modal { background: var(--surface); border-radius: 12px; width: 100%; max-width: 360px; overflow: hidden; }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-  .modal-header h3 { margin: 0; font-size: 1rem; }
-  .close-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); }
-  .modal-body { padding: 12px 18px; display: flex; flex-direction: column; gap: 6px; }
-  .song-name { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 8px; }
-  .setlist-option {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
-    background: transparent; cursor: pointer; text-align: left; width: 100%; transition: background 0.12s, border-color 0.12s;
-  }
-  .setlist-option:hover { background: var(--row-hover); }
-  .setlist-option.in-setlist { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-  .setlist-option.in-setlist:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-  .sl-name { font-weight: 500; font-size: 0.9rem; }
-  .sl-right { display: flex; align-items: center; gap: 8px; }
-  .sl-date { font-size: 0.78rem; color: var(--text-muted); }
-  .sl-check { font-size: 0.9rem; color: var(--accent); font-weight: 700; }
-</style>

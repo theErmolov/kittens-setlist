@@ -1,16 +1,40 @@
 import { browser } from '$app/environment';
-import { writable, derived, get } from 'svelte/store';
+import { derived, get } from 'svelte/store';
+import { queryOptions } from '@tanstack/svelte-query';
 import type { User } from '$lib/types';
 import { PUBLIC_API_URL } from '$env/static/public';
+import { queryClient } from '$lib/query/client';
+import { queryStore } from '$lib/store/bridge';
 
 const TOKEN_KEY = 'auth_token';
+/** Placeholder stored when logged out, so the key is visible and editable in DevTools. */
+const NO_TOKEN = 'invalid';
 
-export const currentUser = writable<User | null>(null);
-export const authLoading = writable(true);
+/** `/auth/me` through TanStack Query: the user, or `null` when logged out. A network error rejects, so the guard never redirects to login while offline. */
+export const meQueryOptions = queryOptions({
+  queryKey: ['auth', 'me'] as const,
+  queryFn: async (): Promise<User | null> => {
+    const token = getToken();
+    if (!token) return null;
+    const res = await fetch(`${PUBLIC_API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) return await res.json() as User;
+    if (res.status === 401) { clearToken(); return null; }
+    throw new Error(`GET /auth/me → ${res.status}`);
+  },
+  staleTime: Infinity,
+  refetchOnWindowFocus: false,
+  retry: 2,
+});
+
+const me = queryStore<User | null>(queryClient, meQueryOptions);
+export const currentUser = derived(me, $me => $me.data ?? null);
+/** True until the first `/auth/me` result (or while it keeps failing on the network). */
+export const authLoading = derived(me, $me => $me.data === undefined);
 
 export function getToken(): string | null {
   if (!browser) return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token && token !== NO_TOKEN ? token : null;
 }
 
 export function setToken(token: string): void {
@@ -18,10 +42,13 @@ export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
+/** Logs out by storing the `invalid` placeholder (never sent as a token) instead of removing the key. */
 export function clearToken(): void {
   if (!browser) return;
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.setItem(TOKEN_KEY, NO_TOKEN);
 }
+
+if (browser && !localStorage.getItem(TOKEN_KEY)) clearToken();
 
 // Cached auth-derived nav flags. The nav bar reads these on first paint so the
 // icon count is stable before initAuth() resolves (avoids the reflow jump on
@@ -53,47 +80,18 @@ export function clearNavCache(): void {
   localStorage.removeItem(NAV_REHEARSALS_KEY);
 }
 
-/** Fetch /auth/me and populate currentUser. Call once on app init. */
+/** Re-run `/auth/me` (after login, or on app init). */
 export async function initAuth(): Promise<void> {
-  if (!browser) {
-    authLoading.set(false);
-    return;
-  }
-  const token = getToken();
-  if (!token) {
-    authLoading.set(false);
-    return;
-  }
-  try {
-    const res = await fetch(`${PUBLIC_API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const user = await res.json() as User;
-      currentUser.set(user);
-    } else {
-      clearToken();
-    }
-    authLoading.set(false);
-  } catch {
-    // network error — keep token, leave authLoading=true so the guard never
-    // redirects to login; the app stays in loading state until the user refreshes
-  }
+  if (!browser) return;
+  await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey });
 }
 
-export async function logout(): Promise<void> {
-  const token = getToken();
-  if (token) {
-    try {
-      await fetch(`${PUBLIC_API_URL}/auth/logout`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch { /* ignore */ }
-  }
+/** Local half of logging out (the server call is `useLogout` in `$lib/query/auth`): forget the token and drop all cached data. */
+export function clearSession(): void {
   clearToken();
   clearNavCache();
-  currentUser.set(null);
+  queryClient.setQueryData(meQueryOptions.queryKey, null);
+  queryClient.removeQueries({ predicate: q => q.queryKey[0] !== 'auth' });
 }
 
 /** Approved admins and writers can view and manage rehearsals. */

@@ -1,3 +1,20 @@
+import { clsx, type ClassValue } from 'clsx';
+import { pctTone, toneStyle, toneInk } from './palette.ts';
+import { twMerge } from 'tailwind-merge';
+
+/** Class-name helper used by the shadcn-svelte components. */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Type helpers used by the shadcn-svelte components (src/components/ui).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChild<T> = T extends { child?: any } ? Omit<T, 'child'> : T;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, 'children'> : T;
+export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
+export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
+
 import type { Instrument, LearningStage, MusicianRole, BudgetEntry, Setlist } from '$lib/types';
 
 export const STAGE_PCT: Record<LearningStage, number> = {
@@ -17,18 +34,21 @@ export function progressPct(
 
 /** Inline CSS style string for a progress percentage bubble. */
 export function pctBubbleStyle(pct: number): string {
-  if (pct === 100) return 'border: 1px solid #16a34a; color: #16a34a; background: transparent';
-  if (pct >= 75)   return 'background: rgba(255,220,0,0.2); color: #ca8a04';
-  if (pct > 0)     return 'background: rgba(255,0,0,0.2); color: #dc2626';
-  return                  'background: rgba(128,128,128,0.2); color: #6b7280';
+  const tone = pctTone(pct);
+  return `${toneStyle(tone)}; border: 1px solid color-mix(in srgb, ${toneInk(tone)} 45%, transparent)`;
 }
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
 
-export const INSTRUMENT_ICONS: Record<Instrument, string> = {
+const KNOWN_INSTRUMENT_ICONS: Record<Instrument, string> = {
   guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹',
   cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤',
 };
+
+/** Instrument → emoji. Unknown/legacy instrument values fall back to 🎵 so an icon is always shown. */
+export const INSTRUMENT_ICONS: Record<Instrument, string> = new Proxy(KNOWN_INSTRUMENT_ICONS, {
+  get: (target, key) => target[key as Instrument] ?? '🎵',
+});
 
 export function formatAuditSummary(summary: string): string {
   return summary.replace(
@@ -227,4 +247,12 @@ export function orderMusicianNames(names: string[], roster: { name: string }[]):
     if (remaining.delete(musician.name)) ordered.push(musician.name);
   }
   return [...ordered, ...remaining];
+}
+
+/** Clock-face emoji showing `date`'s time rounded to the nearest half hour (🕐 = 1:00 … 🕛 = 12:00, 🕜 = 1:30 … 🕧 = 12:30). */
+export function clockEmoji(date: Date): string {
+  const half = Math.round((date.getHours() * 60 + date.getMinutes()) / 30) % 48; // 0..47 half-hours
+  const hour12 = Math.floor(half / 2) % 12 === 0 ? 12 : Math.floor(half / 2) % 12;
+  const isHalf = half % 2 === 1;
+  return String.fromCodePoint((isHalf ? 0x1f55b : 0x1f54f) + hour12);
 }

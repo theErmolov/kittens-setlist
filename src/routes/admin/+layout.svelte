@@ -4,6 +4,7 @@
   import { base } from '$app/paths';
   import { currentUser, authLoading } from '$lib/auth';
   import { t } from '$lib/i18n';
+  import * as NavigationMenu from '$components/ui/navigation-menu';
 
   let { children } = $props();
   const path = $derived(page.url.pathname.slice(base.length));
@@ -14,27 +15,29 @@
   });
 </script>
 
+{#snippet navLink(href: string, label: string, active: boolean, external = false)}
+  <NavigationMenu.Item>
+    <NavigationMenu.Link {href} {active} {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      class="px-3 py-2 text-[0.85rem] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-secondary data-active:text-primary-ink data-active:hover:bg-secondary">
+      {label}{#if external}&nbsp;<span aria-hidden="true">↗</span>{/if}
+    </NavigationMenu.Link>
+  </NavigationMenu.Item>
+{/snippet}
+
 {#if $currentUser?.isAdmin}
-  <div class="page-shell">
+  <div class="page-shell max-[700px]:px-0">
     <header>
-      <nav class="admin-nav" aria-label={$t.admin.title}>
-        <a href="{base}/admin" class:active={path === '/admin' || path === '/admin/'} aria-current={path === '/admin' || path === '/admin/' ? 'page' : undefined}>{$t.admin.users}</a>
-        <a href="{base}/admin/audit" class:active={path.startsWith('/admin/audit')} aria-current={path.startsWith('/admin/audit') ? 'page' : undefined}>{$t.admin.auditLog}</a>
-        <a href="{base}/admin/budget" class:active={path.startsWith('/admin/budget')} aria-current={path.startsWith('/admin/budget') ? 'page' : undefined}>{$t.nav.budget}</a>
-        <a href="https://antispam.kittens.band/" target="_blank" rel="noopener noreferrer">{$t.nav.antispam} <span aria-hidden="true">↗</span></a>
-      </nav>
+      <NavigationMenu.Root viewport={false} class="admin-nav max-w-none justify-start border-b pb-3" aria-label={$t.admin.title}>
+        <NavigationMenu.List class="flex-wrap justify-start gap-1.5">
+          {@render navLink(`${base}/admin`, $t.admin.users, path === '/admin' || path === '/admin/')}
+          {@render navLink(`${base}/admin/audit`, $t.admin.auditLog, path.startsWith('/admin/audit'))}
+          {@render navLink(`${base}/admin/budget`, $t.nav.budget, path.startsWith('/admin/budget'))}
+          {@render navLink('https://antispam.kittens.band/', $t.nav.antispam, false, true)}
+        </NavigationMenu.List>
+      </NavigationMenu.Root>
     </header>
-    <div class="admin-content">
+    <div class="admin-content pt-6">
       {@render children()}
     </div>
   </div>
 {/if}
-
-<style>
-  .admin-content { padding-top: 24px; }
-  .admin-nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-  a { padding: 8px 12px; border-radius: 6px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; font-weight: 600; }
-  a:hover { background: var(--row-hover); color: var(--text); }
-  a.active { background: var(--chip-bg); color: var(--accent); }
-  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-</style>

@@ -1,70 +1,75 @@
 <script lang="ts">
   import { currentUser } from '$lib/auth';
-  import Note from '$components/shared/Note.svelte';
+  import LinkifiedText from '$components/shared/LinkifiedText.svelte';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import type { Setlist, Song, Category, SetlistEntry, SetlistSubset, BandMusician } from '$lib/types';
+  import { createQuery } from '@tanstack/svelte-query';
+  import type { Song, Category, SetlistEntry } from '$lib/types';
+  import { Button } from '$components/ui/button';
+  import IconButton from '$components/shared/IconButton.svelte';
+  import { Toggle } from '$components/ui/toggle';
+  import { Badge } from '$components/ui/badge';
+  import { Separator } from '$components/ui/separator';
+  import * as ToggleGroup from '$components/ui/toggle-group';
+  import * as Drawer from '$components/ui/drawer';
+  import * as Item from '$components/ui/item';
+  import * as Empty from '$components/ui/empty';
+  import { noteStore } from '$lib/store/shell';
+  import { chip, pressedOn } from '../setlist/classes';
   import StageSong from './StageSong.svelte';
   import LyricsOverlay from './LyricsOverlay.svelte';
   import FilterChips from '$components/shared/FilterChips.svelte';
-  import SortBar, { type SortKey } from '$components/shared/SortBar.svelte';
-  import { getSetlist, togglePlayed, toggleBreakPlayed, markThrough, updateEntrySong } from '$lib/api';
   import { lang, t } from '$lib/i18n';
-  import { startPolling } from '$lib/poller';
   import { PresenceController, setlistRoom } from '$lib/presence';
-  import { formatDuration, addMinutes, isEventLongOver, isEventFarFuture } from '$lib/utils';
+  import { clockEmoji, formatDuration, addMinutes, cn } from '$lib/utils';
   import { base } from '$app/paths';
+  import { musiciansQuery } from '$lib/query/queries';
+  import { stageSetlistQuery, setStagePresence, useStageMark, useSaveEntryTranspose } from '$lib/query/stage';
+  import { useStore } from '$lib/store/bridge';
+  import { stageStore, stageCanMark, stageIsApproved } from '$lib/store/stage';
 
-  let {
-    setlist,
-    musicians = [],
-    canMark = true,
-    pollInterval = 2000,
-  }: {
-    setlist: Setlist;
-    musicians: BandMusician[];
-    canMark?: boolean;
-    pollInterval?: number;
-  } = $props();
+  let { setlistId }: { setlistId: string } = $props();
 
-  let localComment = $state('');
-  $effect(() => { localComment = setlist.comment ?? ''; });
-  let localEntries = $state<SetlistEntry[]>([]);
-  let localSubsets = $state<SetlistSubset[]>([]);
-  $effect(() => { localEntries = [...setlist.entries]; });
-  $effect(() => { localSubsets = [...(setlist.subsets ?? [])]; });
+  stageStore.getState().reset();
+  stageStore.getState().setSetlistId(setlistId);
+  $effect(() => { stageStore.getState().setSetlistId(setlistId); });
 
-  function applyPoll(incoming: Setlist) {
-    localComment = incoming.comment ?? '';
-    const sorted = [...incoming.entries].sort((a, b) => a.order - b.order);
-    const localSorted = [...localEntries].sort((a, b) => a.order - b.order);
-    const subsetsIncoming = incoming.subsets ?? [];
-    if (JSON.stringify(sorted) === JSON.stringify(localSorted) && JSON.stringify(subsetsIncoming) === JSON.stringify(localSubsets)) return;
-    localEntries = incoming.entries;
-    localSubsets = subsetsIncoming;
-  }
+  const canMark = stageCanMark;
+  const stageChip = chip;
+  // admin/writer: 2s, reader: 10s, anonymous: 30s
+  let pollInterval = $derived($canMark ? 2000 : $currentUser?.status === 'approved' ? 10000 : 30000);
 
-  let now = $state(new Date());
+  const setlistQ = createQuery(() => stageSetlistQuery(setlistId, pollInterval));
+  const musiciansQ = createQuery(() => ({ ...musiciansQuery(), enabled: $stageIsApproved }));
+  const markMut = useStageMark(() => setlistId);
+  const saveEntryTranspose = useSaveEntryTranspose(() => setlistId);
+
+  let setlist = $derived(setlistQ.data!);
+  let musicians = $derived(musiciansQ.data ?? []);
+  let localComment = $derived(setlist.comment ?? '');
+  let localEntries = $derived(setlist.entries);
+  let localSubsets = $derived(setlist.subsets ?? []);
+
+  const categoryFilter = useStore(stageStore, s => s.categoryFilter);
+  const sortKey = useStore(stageStore, s => s.sortKey);
+  const onlyWithComment = useStore(stageStore, s => s.onlyWithComment);
+  const selectedMusician = useStore(stageStore, s => s.selectedMusician);
+  const filterOpen = useStore(stageStore, s => s.filterOpen);
+  const mobile = useStore(noteStore, s => s.mobile);
+  const unplayedToBottom = useStore(stageStore, s => s.unplayedToBottom);
+  const lyricsSongId = useStore(stageStore, s => s.lyricsSongId);
+  const lyricsEntry = $derived($lyricsSongId ? localEntries.find(e => e.songId === $lyricsSongId) ?? null : null);
+  const now = useStore(stageStore, s => s.now);
+  const { setCategoryFilter, setSelectedMusician, toggleFilterOpen, toggleUnplayedToBottom, setLyricsSong } = stageStore.getState();
 
   onMount(() => {
-    const presence = new PresenceController(setlistRoom(setlist.id), 'setlist');
+    const presence = new PresenceController(setlistRoom(setlistId), 'setlist');
     presence.start();
-    const stopPoller = startPolling(
-      async () => { const s = await getSetlist(setlist.id); if (s) applyPoll(s); },
-      isEventFarFuture(setlist.date, setlist.startTime) ? pollInterval * 10 : pollInterval,
-      () => isEventLongOver(setlist.date, setlist.startTime) || presence.isPaused(),
-    );
-    const clockTimer = setInterval(() => { now = new Date(); }, 1000);
-    return () => { stopPoller(); presence.stop(); clearInterval(clockTimer); };
+    setStagePresence(presence);
+    const clockTimer = setInterval(() => stageStore.getState().tick(), 1000);
+    return () => { setStagePresence(null); presence.stop(); clearInterval(clockTimer); };
   });
 
-  let categoryFilter = $state(new Set<Category>());
-  let sortKey = $state<SortKey>('default');
-  let onlyWithComment = $state(false);
-  let selectedMusician = $state(browser ? (localStorage.getItem('kittens_stage_musician') ?? '') : '');
-
   let permanentNames = $derived(new Set(musicians.map(m => m.name)));
-  let selectedMusicianSet = $derived(selectedMusician ? new Set([selectedMusician]) : new Set<string>());
   let guestNames = $derived((): string[] => {
     const guests = new Set<string>();
     for (const entry of localEntries) {
@@ -75,7 +80,6 @@
     }
     return [...guests].sort();
   });
-  $effect(() => { if (browser) localStorage.setItem('kittens_stage_musician', selectedMusician); });
 
   // Original position numbers (unfiltered, by setlist order)
   let songPositions = $derived((): Map<number, number> => {
@@ -115,17 +119,17 @@
   let sortedEntries = $derived((): DisplayItem[] => {
     const sorted = [...localEntries].sort((a, b) => a.order - b.order);
 
-    if (sortKey !== 'default') {
+    if ($sortKey !== 'default') {
       // When sorting by name, only show songs (no breaks)
       return sorted
         .filter(e => e.songId && e.song)
         .map(e => ({ kind: 'song' as const, entry: e, song: e.song! }))
         .filter(({ song, entry }) => {
-          if (categoryFilter.size > 0 && !categoryFilter.has(song.category)) return false;
-          if (onlyWithComment && !entry.comment && !entry.personalComment) return false;
+          if ($categoryFilter.size > 0 && !$categoryFilter.has(song.category)) return false;
+          if ($onlyWithComment && !entry.comment && !entry.personalComment) return false;
           return true;
         })
-        .sort((a, b) => sortKey === 'artist'
+        .sort((a, b) => $sortKey === 'artist'
           ? a.song.artist.localeCompare(b.song.artist)
           : a.song.title.localeCompare(b.song.title));
     }
@@ -133,12 +137,12 @@
     const items = sorted.flatMap((e): DisplayItem[] => {
       if (e.breakMinutes) return [{ kind: 'break', entry: e }];
       if (!e.song) return [];
-      if (categoryFilter.size > 0 && !categoryFilter.has(e.song.category)) return [];
-      if (onlyWithComment && !e.comment && !e.personalComment) return [];
+      if ($categoryFilter.size > 0 && !$categoryFilter.has(e.song.category)) return [];
+      if ($onlyWithComment && !e.comment && !e.personalComment) return [];
       return [{ kind: 'song', entry: e, song: e.song }];
     });
 
-    if (unplayedToBottom && setlist.vibe) {
+    if ($unplayedToBottom && setlist.vibe) {
       const played = items.filter(item => item.entry.played);
       const unplayed = items.filter(item => !item.entry.played);
       return [...played, ...unplayed];
@@ -147,34 +151,9 @@
     return items;
   });
 
-  async function handleToggle(songId: string) {
-    if (!canMark) return;
-    const entry = localEntries.find(e => e.songId === songId);
-    if (!entry) return;
-    if (!setlist.vibe && !entry.played) {
-      localEntries = localEntries.map(e => e.order <= entry.order && !e.played ? { ...e, played: true } : e);
-      const updated = await markThrough(setlist.id, entry.order);
-      applyPoll(updated);
-    } else {
-      localEntries = localEntries.map(e => e.songId === songId ? { ...e, played: !e.played } : e);
-      const updated = await togglePlayed(setlist.id, songId);
-      applyPoll(updated);
-    }
-  }
-
-  async function handleBreakToggle(order: number) {
-    if (!canMark) return;
-    const entry = localEntries.find(e => e.order === order && e.breakMinutes !== undefined);
-    if (!entry) return;
-    if (!setlist.vibe && !entry.played) {
-      localEntries = localEntries.map(e => e.order <= order && !e.played ? { ...e, played: true } : e);
-      const updated = await markThrough(setlist.id, order);
-      applyPoll(updated);
-    } else {
-      localEntries = localEntries.map(e => e.order === order && e.breakMinutes !== undefined ? { ...e, played: !e.played } : e);
-      const updated = await toggleBreakPlayed(setlist.id, order);
-      applyPoll(updated);
-    }
+  function handleBreakToggle(order: number) {
+    if (!$canMark) return;
+    markMut.mark({ kind: 'break', order });
   }
 
   let playedCount = $derived(localEntries.filter(e => e.songId && e.played).length);
@@ -182,17 +161,9 @@
   let totalMinutes = $derived(localEntries.reduce((s, e) => s + (e.breakMinutes ?? (e.song?.lengthMinutes ?? 5)), 0));
   let visibleCount = $derived(sortedEntries().length);
 
-  let filterOpen = $state(false);
-  let unplayedToBottom = $state(false);
-  let isFiltered = $derived(categoryFilter.size > 0 || selectedMusician !== '' || unplayedToBottom);
+  let isFiltered = $derived($categoryFilter.size > 0 || $selectedMusician !== '' || $unplayedToBottom);
 
-  let lyricsForEntry = $state<SetlistEntry | null>(null);
-
-  async function saveSetlistOnlyTranspose(entry: SetlistEntry, song: Song): Promise<Song> {
-    const updated = await updateEntrySong(setlist.id, entry.order, song);
-    applyPoll(updated);
-    return updated.entries.find(candidate => candidate.songId === entry.songId)?.song ?? song;
-  }
+  const saveSetlistOnlyTranspose = (entry: SetlistEntry, song: Song) => saveEntryTranspose(entry.order, entry.songId, song);
 
   // Per-entry start times keyed by entry order, only when startTime is set
   let entryTimes = $derived((): Map<number, string> => {
@@ -230,8 +201,8 @@
 
   let timingInfo = $derived((): { currentTime: string; finishTime: string; pace?: number } | null => {
     if (!setlist.startTime) return null;
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
+    const hh = String($now.getHours()).padStart(2, '0');
+    const mm = String($now.getMinutes()).padStart(2, '0');
     const currentTime = `${hh}:${mm}`;
 
     const sorted = [...localEntries].sort((a, b) => a.order - b.order);
@@ -264,303 +235,163 @@
   });
 </script>
 
-<div class="stage">
-  <div class="stage-header">
-    <div class="stage-title">
-      <a href="{base}/setlists/{setlist.id}" class="back-link">←</a>
-      <span class="name">{setlist.name}</span>
+{#snippet musicianGroup(names: string[], guest: boolean, withCount: boolean)}
+  {#if names.length > 0}
+    <ToggleGroup.Root
+      type="single"
+      spacing={1}
+      class="flex-wrap gap-1.5"
+      value={names.includes($selectedMusician) ? $selectedMusician : ''}
+      onValueChange={(v) => setSelectedMusician(v)}
+    >
+      {#each names as name}
+        <ToggleGroup.Item value={name} class="{stageChip} {guest ? 'border-dashed' : ''}">{name}{withCount ? ` (${musicianCounts()[name] ?? 0})` : ''}</ToggleGroup.Item>
+      {/each}
+    </ToggleGroup.Root>
+  {/if}
+{/snippet}
+
+<div class="stage flex min-h-screen max-w-full flex-col overflow-x-clip bg-background">
+  <div class="stage-header sticky top-14 z-10 flex flex-col gap-1.5 border-b bg-card px-3 py-2 shadow-sm">
+    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <IconButton icon="←" label={$t.notFound.backToSetlists} href="{base}/setlists/{setlist.id}" />
+      <span class="shrink-0 text-[1.05rem] font-bold">{setlist.name}</span>
+      <!-- The setlist comment sits to the right of the title (no label); links show as «domain.tld». -->
+      <span class="min-w-0 flex-1 truncate text-[0.9rem] text-muted-foreground" title={localComment}><LinkifiedText text={localComment} /></span>
       {#if timingInfo()}
-        <span class="timing-sep">·</span>
-        <span class="timing-clock">🕐 {timingInfo()!.currentTime}</span>
+        <span class="mx-0.5 text-[0.85rem] text-muted-foreground">·</span>
+        <!-- Clock with the schedule delta right below it (like the gap in Formula 1 timing). -->
+        <span class="flex shrink-0 flex-col items-end gap-0.5">
+          <span class="font-semibold tabular-nums">{#key clockEmoji($now)}<span aria-hidden="true">{clockEmoji($now)}</span>{/key} {timingInfo()!.currentTime}</span>
+          {#if timingInfo()!.pace !== undefined}
+            {@const pace = timingInfo()!.pace!}
+            <!-- Formula 1 style gap in clock format right under the time: red +h:mm when behind schedule, green −h:mm when ahead, ±0:00 on time. -->
+            {@const onTime = Math.abs(pace) <= 2}
+            {@const gap = `${Math.floor(Math.abs(pace) / 60)}:${String(Math.abs(pace) % 60).padStart(2, '0')}`}
+            <span
+              class="text-[0.95rem] leading-none font-semibold whitespace-nowrap tabular-nums {onTime || pace < 0 ? 'text-success-ink' : 'text-danger-solid'}"
+              title={onTime ? $t.stage.onTime : pace > 0 ? $t.stage.behind(pace) : $t.stage.ahead(-pace)}
+            >{onTime ? '±0:00' : pace > 0 ? `+${gap}` : `−${gap}`}</span>
+          {/if}
+        </span>
       {/if}
-      <span class="progress">
+      <Badge variant="secondary" class="h-auto min-h-5 max-w-full flex-wrap gap-x-1 gap-y-0.5 py-0.5 whitespace-normal px-2 text-[0.88rem] font-normal text-muted-foreground max-[700px]:order-last max-[700px]:w-full max-[700px]:justify-center">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes, $lang)})
         {#if timingInfo()}
           {@const info = timingInfo()!}
-          <span class="progress-sep">·</span>{$t.stage.finish}: {info.finishTime}
-          {#if info.pace !== undefined}
-            <span class="timing-pace"
-              class:on-time={Math.abs(info.pace) <= 2}
-              class:behind={info.pace > 2}
-              class:ahead={info.pace < -2}
-            >
-              {#if Math.abs(info.pace) <= 2}
-                {$t.stage.onTime} ✓
-              {:else if info.pace > 0}
-                {$t.stage.behind(info.pace)}
-              {:else}
-                {$t.stage.ahead(-info.pace)}
-              {/if}
-            </span>
-          {/if}
+          <span class="mx-0.5 opacity-60">·</span>{$t.stage.finish}: {info.finishTime}
         {/if}
-        {#if visibleCount !== totalCount}<span class="filtered-count">{$t.stage.shown(visibleCount)}</span>{/if}
-      </span>
-      <button
-        class="header-filter-btn"
-        class:active={filterOpen || isFiltered}
-        onclick={() => { filterOpen = !filterOpen; }}
-        title={$t.stage.filters}
-      >🎛️ <span class="filter-btn-label">{$t.stage.filter}</span></button>
+        {#if visibleCount !== totalCount}<span class="text-[0.78rem] opacity-75">{$t.stage.shown(visibleCount)}</span>{/if}
+      </Badge>
+      <IconButton icon="🎛️" label={$t.stage.filters} class="hidden shrink-0 min-[701px]:inline-flex {pressedOn}" pressed={$filterOpen || isFiltered} onpressedchange={() => toggleFilterOpen()} />
     </div>
-    <Note value={localComment} label={$t.common.setlistComment} collapsible />
-    {#if !canMark && !$currentUser}
-      <a href="{base}/login" class="login-hint">{$t.login.stageHint}</a>
+    {#if !$canMark && !$currentUser}
+      <a href="{base}/login" class="text-center text-[0.8rem] text-muted-foreground no-underline hover:text-primary-ink">{$t.login.stageHint}</a>
     {/if}
-    {#if filterOpen}
-    <div class="header-filters">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} counts={categoryCounts()} />
+    {#if $filterOpen}
+    <div class="flex flex-col gap-1.5 max-[700px]:hidden">
+      <FilterChips selected={$categoryFilter} onchange={setCategoryFilter} counts={categoryCounts()} />
       {#if musicians.length > 0 || guestNames().length > 0}
-        <div class="musician-picker">
-          {#each musicians as m}
-            <button
-              class="musician-chip"
-              class:active={selectedMusician === m.name}
-              onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
-            >{m.name} ({musicianCounts()[m.name] ?? 0})</button>
-          {/each}
-          {#each guestNames() as name}
-            <button
-              class="musician-chip guest-chip"
-              class:active={selectedMusician === name}
-              onclick={() => { selectedMusician = selectedMusician === name ? '' : name; }}
-            >{name} ({musicianCounts()[name] ?? 0})</button>
-          {/each}
+        <div class="flex flex-wrap gap-1.5">
+          {@render musicianGroup(musicians.map(m => m.name), false, true)}
+          {@render musicianGroup(guestNames(), true, true)}
         </div>
       {/if}
       {#if setlist.vibe}
-        <button
-          class="musician-chip"
-          class:active={unplayedToBottom}
-          onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-        >{$t.stage.unplayedToBottom}</button>
+        <Toggle class="{stageChip} w-fit" pressed={$unplayedToBottom} onPressedChange={() => toggleUnplayedToBottom()}>{$t.stage.unplayedToBottom}</Toggle>
       {/if}
     </div>
     {/if}
   </div>
 
-  <div class="song-list">
+  <div class="song-list flex flex-col gap-2 py-2.5 max-[700px]:gap-0 max-[700px]:pt-0 max-[700px]:pb-16">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
-      {@const subsetId = sortKey === 'default' && item.kind === 'song' ? item.entry.subsetId : undefined}
+      {@const subsetId = $sortKey === 'default' && item.kind === 'song' ? item.entry.subsetId : undefined}
       {@const prevItem = i > 0 ? sortedEntries()[i - 1] : undefined}
-      {@const prevSubsetId = sortKey === 'default' && prevItem?.kind === 'song' ? prevItem.entry.subsetId : undefined}
+      {@const prevSubsetId = $sortKey === 'default' && prevItem?.kind === 'song' ? prevItem.entry.subsetId : undefined}
       {#if subsetId && subsetId !== prevSubsetId}
         {@const subset = localSubsets.find(s => s.id === subsetId)}
         {#if subset}
-          <div class="stage-subset-header">⏭ {subset.name}</div>
+          <Item.Title class="mt-1 px-2 py-1 text-[0.8rem] font-bold text-primary-ink">⏭ {subset.name}</Item.Title>
         {/if}
       {/if}
-      <div class="stage-entry-wrap" class:in-subset={!!subsetId}>
+      <div class={subsetId ? 'border-l-[3px] border-primary-ink pl-1' : ''}>
         {#if item.kind === 'song'}
           <StageSong song={item.song} entry={item.entry} position={songPositions().get(item.entry.order) ?? 0}
-            startTime={entryTimes().get(item.entry.order)}
-            {musicians}
-            {selectedMusician}
-            {canMark}
-            ontoggle={() => handleToggle(item.entry.songId!)}
-            onlyricsclick={() => { lyricsForEntry = item.entry; }} />
+            startTime={entryTimes().get(item.entry.order)} />
         {:else}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="stage-break" class:played={item.entry.played} class:can-mark={canMark} onclick={() => handleBreakToggle(item.entry.order)}>
-            <span class="break-main">⏸ {$t.stage.breakMinutes(item.entry.breakMinutes!)}{#if item.entry.comment} — <span class="break-note">{item.entry.comment}</span>{/if}</span>
-            {#if setlist.startTime}<span class="break-time">{entryTimes().get(item.entry.order)}</span>{/if}
-          </div>
+          <Item.Root
+            variant="outline"
+            class={cn(
+              'min-h-12 flex-nowrap gap-2 border-dashed bg-info px-3.5 py-3 text-[0.82rem] tracking-[0.03em] text-muted-foreground transition-opacity min-[701px]:px-3 min-[701px]:py-2 min-[701px]:text-base',
+              'max-[700px]:rounded-none max-[700px]:border-x-0',
+              item.entry.played && 'opacity-45',
+              $canMark && 'cursor-pointer touch-manipulation select-none hover:bg-info/70',
+            )}
+            role={$canMark ? 'button' : undefined}
+            tabindex={$canMark ? 0 : undefined}
+            aria-pressed={$canMark ? !!item.entry.played : undefined}
+            onclick={() => handleBreakToggle(item.entry.order)}
+            onkeydown={(e) => { if ($canMark && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleBreakToggle(item.entry.order); } }}
+          >
+            <Item.Media>⏸</Item.Media>
+            <Item.Content class={cn('flex-row items-baseline gap-1.5', item.entry.played && 'line-through')}>
+              <span>{$t.stage.breakMinutes(item.entry.breakMinutes!)}</span>{#if item.entry.comment}<span>—</span><span class="italic opacity-85">{item.entry.comment}</span>{/if}
+            </Item.Content>
+            {#if setlist.startTime}<Item.Actions class="text-[0.82rem] font-semibold whitespace-nowrap text-primary-ink min-[701px]:text-[0.9rem] min-[701px]:font-bold">{entryTimes().get(item.entry.order)}</Item.Actions>{/if}
+          </Item.Root>
         {/if}
       </div>
     {/each}
     {#if sortedEntries().length === 0}
-      <p class="empty">{$t.stage.noSongs}</p>
+      <Empty.Root class="mx-4 my-10 flex-none">
+        <Empty.Header><Empty.Title class="text-base font-normal text-muted-foreground">{$t.stage.noSongs}</Empty.Title></Empty.Header>
+      </Empty.Root>
     {/if}
   </div>
 
-  <!-- Mobile filter panel (slides up above bottom bar) -->
-  <div class="mobile-filter-panel" class:open={filterOpen}>
-    <div class="filter-group">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-    </div>
-    {#if musicians.length > 0 || guestNames().length > 0}
-      <div class="filter-sep-h"></div>
-      <div class="filter-group">
-        {#each musicians as m}
-          <button
-            class="musician-chip"
-            class:active={selectedMusician === m.name}
-            onclick={() => { selectedMusician = selectedMusician === m.name ? '' : m.name; }}
-          >{m.name}</button>
-        {/each}
-        {#each guestNames() as name}
-          <button
-            class="musician-chip guest-chip"
-            class:active={selectedMusician === name}
-            onclick={() => { selectedMusician = selectedMusician === name ? '' : name; }}
-          >{name}</button>
-        {/each}
+  <!-- Mobile filter panel: bottom drawer -->
+  <Drawer.Root open={$filterOpen && $mobile} onOpenChange={(o) => { if (!o && stageStore.getState().filterOpen) toggleFilterOpen(); }} shouldScaleBackground={false}>
+    <Drawer.Content onOpenAutoFocus={(e) => e.preventDefault()}>
+      <Drawer.Header class="pb-0 text-left">
+        <Drawer.Title>🎛️ {$t.stage.filters}</Drawer.Title>
+      </Drawer.Header>
+      <div class="flex max-h-[65dvh] flex-col gap-2.5 overflow-y-auto p-3">
+        <div class="flex flex-wrap gap-2">
+          <FilterChips selected={$categoryFilter} onchange={setCategoryFilter} />
+        </div>
+        {#if musicians.length > 0 || guestNames().length > 0}
+          <Separator />
+          <div class="flex flex-wrap gap-[5px]">
+            {@render musicianGroup(musicians.map(m => m.name), false, false)}
+            {@render musicianGroup(guestNames(), true, false)}
+          </div>
+        {/if}
+        {#if setlist.vibe}
+          <Separator />
+          <div class="flex flex-wrap gap-[5px]">
+            <Toggle class={stageChip} pressed={$unplayedToBottom} onPressedChange={() => toggleUnplayedToBottom()}>{$t.stage.unplayedToBottom}</Toggle>
+          </div>
+        {/if}
       </div>
-    {/if}
-    {#if setlist.vibe}
-      <div class="filter-sep-h"></div>
-      <div class="filter-group">
-        <button
-          class="musician-chip"
-          class:active={unplayedToBottom}
-          onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-        >{$t.stage.unplayedToBottom}</button>
-      </div>
-    {/if}
-  </div>
+    </Drawer.Content>
+  </Drawer.Root>
 
-  {#if lyricsForEntry?.song}
+  {#if lyricsEntry?.song}
     <LyricsOverlay
-      song={lyricsForEntry.song}
-      onclose={() => { lyricsForEntry = null; }}
-      onsongupdate={(updated) => {
-        if (lyricsForEntry) lyricsForEntry = { ...lyricsForEntry, song: updated };
-      }}
-      onsavetranspose={lyricsForEntry.setlistOnly
-        ? (song) => saveSetlistOnlyTranspose(lyricsForEntry!, song)
+      song={lyricsEntry.song}
+      onclose={() => setLyricsSong(null)}
+      onsavetranspose={lyricsEntry.setlistOnly
+        ? (song) => saveSetlistOnlyTranspose(lyricsEntry!, song)
         : undefined}
     />
   {/if}
 
   <!-- Mobile bottom bar -->
-  <div class="mobile-bottom-bar">
-    <button
-      class="bottom-btn"
-      class:active={filterOpen || isFiltered}
-      onclick={() => { filterOpen = !filterOpen; }}
-    >🎛️ {$t.stage.filter}</button>
+  <div class="fixed right-0 bottom-0 left-0 z-[21] hidden h-16 items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
+    <IconButton icon="🎛️" label={$t.stage.filters} class={pressedOn} pressed={$filterOpen || isFiltered} onpressedchange={() => toggleFilterOpen()} />
     {#if setlist.vibe}
-      <button
-        class="bottom-btn"
-        class:active={unplayedToBottom}
-        onclick={() => { unplayedToBottom = !unplayedToBottom; }}
-      >{$t.stage.unplayedToBottom}</button>
+      <IconButton icon="🔁" label={$t.stage.unplayedToBottom} class={pressedOn} pressed={$unplayedToBottom} onpressedchange={() => toggleUnplayedToBottom()} />
     {/if}
   </div>
 </div>
-
-<style>
-  .stage { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); max-width: 100%; overflow-x: clip; }
-
-  .stage-header {
-    position: sticky; top: 56px; z-index: 10;
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 8px 12px; display: flex; flex-direction: column; gap: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-  }
-  .stage-title { display: flex; align-items: center; gap: 10px; }
-  .back-link { text-decoration: none; color: var(--accent); font-size: 2.4rem; line-height: 1; }
-  .name { font-size: 1.05rem; font-weight: 700; flex: 1; }
-
-  .progress {
-    display: flex; align-items: center; gap: 4px;
-    font-size: 0.88rem; color: var(--text-muted);
-    background: var(--chip-bg); padding: 2px 8px; border-radius: 10px; white-space: nowrap;
-  }
-  .filtered-count { font-size: 0.78rem; opacity: 0.75; }
-
-  .timing-sep { color: var(--text-muted); font-size: 0.85rem; margin: 0 2px; }
-  .timing-clock { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-  .progress-sep { margin: 0 2px; opacity: 0.6; }
-  .timing-pace {
-    padding: 1px 6px; border-radius: 10px; font-weight: 600; font-size: 0.75rem;
-    background: var(--chip-bg); color: var(--text-muted);
-  }
-  .timing-pace.on-time { color: #16a34a; background: #dcfce7; }
-  .timing-pace.behind { color: #b45309; background: #fef3c7; }
-  .timing-pace.ahead { color: #2563eb; background: #dbeafe; }
-
-  .header-filter-btn { display: none; }
-  .header-filters { display: flex; flex-direction: column; gap: 6px; }
-  .musician-picker { display: flex; flex-wrap: wrap; gap: 6px; }
-  .musician-chip {
-    padding: 3px 12px; border: 1px solid var(--border); border-radius: 20px;
-    background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 500;
-    color: var(--text-muted); transition: all 0.15s;
-  }
-  .musician-chip:hover { border-color: var(--accent); color: var(--accent); }
-  .musician-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .guest-chip { border-style: dashed; }
-
-  .song-list { padding: 10px 0; display: flex; flex-direction: column; gap: 8px; }
-  .empty { text-align: center; color: var(--text-muted); padding: 40px; }
-
-  .stage-subset-header {
-    font-size: 0.8rem; font-weight: 700; color: #7c3aed;
-    padding: 4px 8px; margin-top: 4px;
-  }
-  .stage-entry-wrap.in-subset { border-left: 3px solid #7c3aed; padding-left: 4px; }
-
-  .mobile-filter-panel { display: none; }
-  .mobile-bottom-bar { display: none; }
-  .stage-break {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 14px; min-height: 48px; font-size: 0.82rem;
-    color: var(--text-muted); border: 1px dashed var(--border); border-radius: 8px;
-    background: rgba(59, 130, 246, 0.09); letter-spacing: 0.03em;
-    transition: opacity 0.15s;
-    touch-action: manipulation; user-select: none;
-  }
-  .stage-break.can-mark { cursor: pointer; }
-  .stage-break.can-mark:hover { background: rgba(59, 130, 246, 0.16); }
-  .stage-break.played { opacity: 0.45; }
-  .stage-break.played .break-main { text-decoration: line-through; }
-  .break-main { flex: 1; }
-  .break-note { font-style: italic; opacity: 0.85; }
-  .break-time { margin-left: auto; font-weight: 600; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
-
-  @media (min-width: 701px) {
-    .stage-break { font-size: 1rem; padding: 8px 12px; }
-    .break-time { font-size: 0.9rem; font-weight: 700; }
-
-    .header-filter-btn {
-      display: flex; align-items: center; gap: 6px;
-      height: 36px; flex-shrink: 0; padding: 0 12px;
-      border: 1px solid var(--border); border-radius: 8px;
-      background: transparent; cursor: pointer; font-size: 1.1rem;
-      color: var(--text-muted); transition: all 0.15s;
-    }
-    .filter-btn-label { font-size: 0.88rem; font-weight: 600; }
-    .header-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .header-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  }
-
-  .login-hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    text-align: center;
-  }
-  .login-hint:hover { color: var(--accent); }
-
-  @media (max-width: 700px) {
-    .header-filters { display: none; }
-    .song-list { padding-bottom: 74px; gap: 0; }
-    .stage-break { border-radius: 0; border-left: none; border-right: none; }
-    .musician-chip:hover { border-color: var(--border); color: var(--text-muted); }
-
-    .mobile-filter-panel {
-      position: fixed; bottom: 64px; left: 0; right: 0; z-index: 20;
-      background: var(--surface); border-top: 1px solid var(--border);
-      padding: 12px; display: none; flex-direction: column; gap: 10px;
-    }
-    .mobile-filter-panel.open { display: flex; }
-    .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
-    .filter-sep-h { height: 1px; background: var(--border); }
-
-    .mobile-bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 64px; z-index: 21;
-      background: var(--surface); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 8px; padding: 0 12px;
-    }
-    .bottom-btn {
-      padding: 10px 16px; border: 1px solid var(--border); border-radius: 20px;
-      background: transparent; cursor: pointer; font-size: 0.9rem; font-weight: 500;
-      color: var(--text-muted); white-space: nowrap;
-    }
-    .bottom-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-    .musician-chip { padding: 7px 14px; font-size: 0.88rem; }
-  }
-</style>

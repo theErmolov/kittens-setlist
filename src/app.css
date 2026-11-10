@@ -1,0 +1,196 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* The app switches themes with [data-theme="dark"] on <html> (see AppShell). */
+@custom-variant dark (&:is([data-theme="dark"] *));
+/* shadcn-svelte's Base UI-style `data-open:` / `data-checked:` ... variants, mapped to bits-ui's `data-state` attributes. */
+@custom-variant data-open (&:is([data-open], [data-state="open"]));
+@custom-variant data-closed (&:is([data-closed], [data-state="closed"]));
+@custom-variant data-checked (&:is([data-checked], [data-state="checked"]));
+@custom-variant data-unchecked (&:is([data-unchecked], [data-state="unchecked"]));
+@custom-variant data-active (&:is([data-active], [data-state="active"]));
+@custom-variant data-horizontal (&:is([data-horizontal], [data-orientation="horizontal"]));
+@custom-variant data-vertical (&:is([data-vertical], [data-orientation="vertical"]));
+
+/*
+ * shadcn-svelte tokens mapped onto the app's own palette (--bg, --surface, --text, --accent ... defined below), so the existing brand colours and light/dark themes carry over unchanged.
+ * Note: the app's `--accent` is the brand purple; shadcn's "accent" (hover surface) is mapped to --row-hover.
+ */
+:root {
+  --radius: 0.5rem;
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: #342440; /* primary text colour; also the ink on the pastel accent fill (both themes) */
+  --primary-ink: var(--t-accent-ink); /* accent used as TEXT/borders on cards (pastel is only a fill) */
+  --secondary: var(--chip-bg);
+  --secondary-foreground: var(--text);
+  --muted: var(--chip-bg);
+  --muted-foreground: var(--text-muted);
+  --shadcn-accent: var(--row-hover);
+  --shadcn-accent-foreground: var(--text);
+  --destructive: #ef4444;
+  --input: var(--border);
+  --ring: color-mix(in srgb, var(--t-accent-ink) 45%, var(--accent)); /* soft accent focus ring */
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--shadcn-accent);
+  --color-accent-foreground: var(--shadcn-accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary-ink: var(--primary-ink);
+  /* Semantic tones: `bg-success text-success-ink`, `bg-warning ...`, `bg-info ...`, `bg-neutral ...`, `bg-danger ...` */
+  --color-success: var(--t-success-bg);
+  --color-success-ink: var(--t-success-ink);
+  --color-warning: var(--t-warning-bg);
+  --color-warning-ink: var(--t-warning-ink);
+  --color-info: var(--t-info-bg);
+  --color-info-ink: var(--t-info-ink);
+  --color-neutral: var(--t-neutral-bg);
+  --color-neutral-ink: var(--t-neutral-ink);
+  --color-danger: var(--t-danger-bg);
+  --color-danger-ink: var(--t-danger-ink);
+  --color-danger-solid: var(--c-danger);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+}
+
+/* Keep the app's pre-Tailwind base look: Tailwind's reset zeroes heading weight and sets html line-height to 1.5. */
+@layer base {
+  html { line-height: normal; }
+  h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+}
+
+/* ── App palette (light + dark). Everything else (shadcn tokens above) derives from these. ── */
+:root, [data-theme="light"] {
+  --bg: #f5f4f8;
+  --surface: #ffffff;
+  --border: #e2e0ea;
+  --text: #342440; /* primary text colour (light theme) */
+  --text-muted: #7a7890;
+  --accent: #dcbffe;
+  --row-hover: #f0effe;
+  --chip-bg: #eceaf8;
+  /* Brand palette: accent #dcbffe, green #e8f6ed, orange #ffedd5, blue #e8f1ff, gray #ebebeb, red #ef4444.
+     Each tone = a fill (-bg) and a readable text/border colour (-ink). Pastels are fills only. */
+  --c-danger: #ef4444;
+  /* Emoji duotone is derived from the primary (--accent): highlights = primary itself, shadows = primary darkened. */
+  --tint-hi: var(--accent); --tint-lo: color-mix(in srgb, var(--accent) 40%, #1b0a3d);
+  --t-accent-bg: #dcbffe;   --t-accent-ink: #5b21b6;
+  --t-success-bg: #e8f6ed;  --t-success-ink: #166534;
+  --t-warning-bg: #ffedd5;  --t-warning-ink: #9a3412;
+  --t-info-bg: #e8f1ff;     --t-info-ink: #1d4ed8;
+  --t-neutral-bg: #ebebeb;  --t-neutral-ink: #52525b;
+  --t-danger-bg: color-mix(in srgb, #ef4444 14%, white); --t-danger-ink: #b91c1c;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #1a1d26;
+  --border: #2a2d3a;
+  --text: #e8eaf0;
+  --text-muted: #7a7d90;
+  --accent: #6d4aae; /* active / primary fill in dark: a deeper purple than the light pastel */
+  --primary-foreground: #f5eefe;
+  --row-hover: #1f2230;
+  --chip-bg: #23263a;
+  /* Dark theme: the same hues as the light palette — green / orange / blue / gray / red — as clear tints on the dark surface, with light inks. */
+  --c-danger: #ef4444;
+  --tint-hi: #dcbffe; --tint-lo: color-mix(in srgb, #dcbffe 65%, #1b0a3d);
+  --t-accent-bg: #6d4aae;   --t-accent-ink: #dcbffe;
+  --t-success-bg: color-mix(in srgb, #22c55e 30%, var(--surface));  --t-success-ink: #86efac;
+  --t-warning-bg: color-mix(in srgb, #f97316 32%, var(--surface));  --t-warning-ink: #fdba74;
+  --t-info-bg: color-mix(in srgb, #3b82f6 32%, var(--surface));     --t-info-ink: #93c5fd;
+  --t-neutral-bg: color-mix(in srgb, #a1a1aa 22%, var(--surface));  --t-neutral-ink: #d4d4d8;
+  --t-danger-bg: color-mix(in srgb, #ef4444 34%, var(--surface));   --t-danger-ink: #fca5a5;
+  color-scheme: dark;
+}
+
+/* Margin/padding/box-sizing reset comes from Tailwind preflight; an unlayered `*` reset would beat every utility class. */
+
+/* Prevent automatic small zoom on focus in iOS Safari by forcing font-size to be at least 16px on mobile */
+@media (max-width: 900px) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+img.emoji {
+  /* Tailwind's `img { max-width: 100% }` squeezes emoji to ~0px inside shrink-to-fit badges: keep their own size. */
+  max-width: none;
+  flex-shrink: 0;
+  height: 1em;
+  width: 1em;
+  vertical-align: -0.1em;
+  display: inline-block;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: background 0.2s, color 0.2s;
+}
+
+.page-shell { max-width: 1000px; margin: 0 auto; padding: 24px 16px 16px; }
+@media (max-width: 600px) {
+  .page-shell { padding: 18px 10px 16px; }
+}
+
+/* Nav dots: pending-approval (red) and presence (green = others here, yellow = alone) */
+@keyframes pending-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-danger) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes presence-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--t-success-ink) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes presence-pulse-alone {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--t-warning-ink) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Every emoji is tinted with the accent through the #tint-primary SVG filter (defined in AppShell). */
+img.emoji { filter: url(#tint-primary); }
+
+/* Tailwind's reset makes buttons use the arrow cursor: every enabled button-like control gets the hand pointer. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="tab"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+}

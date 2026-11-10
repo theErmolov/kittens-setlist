@@ -32,5 +32,5 @@ How to apply: When you need to clip horizontal overflow but the container has st
 **Emoji SVG download: the CDN in CLAUDE.md (`cdn.jsdelivr.net`) is BLOCKED by the web-session egress policy (403). Use `raw.githubusercontent.com` instead — it's allowed.**
 Why: When adding 💰/🧾 for the budget view, the documented jsdelivr curl returned 403 from the agent proxy (org egress policy). The Noto source repo on raw.githubusercontent.com works (200).
 How to apply: To vendor a missing emoji, run:
-`curl -fsS -o static/emoji/{cp}.svg "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/svg/emoji_u{cp}.svg"`
+`curl -fsS -o static/emoji/{cp}.svg "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/2D/svg/emoji_u{cp}.svg"`
 (codepoint lowercase hex, drop `U+`/variation selectors). Always vendor the SVG in the same change that introduces the emoji — never ship an emoji whose SVG isn't in `static/emoji/` (it 404s via the twemoji MutationObserver).

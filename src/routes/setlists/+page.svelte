@@ -1,116 +1,202 @@
 <script lang="ts">
+  import VibeBadge from '$components/shared/VibeBadge.svelte';
+  import LinkifiedText from '$components/shared/LinkifiedText.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
-  import { onMount } from 'svelte';
-  import SetlistCard from '$components/setlist/SetlistCard.svelte';
-  import { createSetlist, deleteSetlist, getSetlists } from '$lib/api';
+  import PageControlsDivider from '$components/shared/PageControlsDivider.svelte';
+  import PageControls from '$components/shared/PageControls.svelte';
+  import * as NavigationMenu from '$components/ui/navigation-menu';
+  import * as Breadcrumb from '$components/ui/breadcrumb';
+  import { Button } from '$components/ui/button';
+  import { Input } from '$components/ui/input';
+  import { Label } from '$components/ui/label';
+  import { Switch } from '$components/ui/switch';
+  import * as Card from '$components/ui/card';
+  import * as Empty from '$components/ui/empty';
+  import * as Table from '$components/ui/table';
+  import { Badge } from '$components/ui/badge';
+  import RowActions from '$components/shared/RowActions.svelte';
+  import IconButton from '$components/shared/IconButton.svelte';
+  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { getCoreRowModel, getSortedRowModel, type ColumnDef } from '@tanstack/table-core';
+  import { base } from '$app/paths';
+  import { lang } from '$lib/i18n';
+  import { rehearsalText as rt } from '$lib/rehearsalI18n';
+  import { cn, formatDuration, formatDate } from '$lib/utils';
+  import type { Setlist } from '$lib/types';
+  import * as AlertDialog from '$components/ui/alert-dialog';
+  import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
-  import type { Setlist } from '$lib/types';
   import { canWrite } from '$lib/auth';
+  import { setlistsQuery } from '$lib/query/queries';
+  import { useCreateSetlist, useDeleteSetlist } from '$lib/query/setlistMutations';
+  import { useStore } from '$lib/store/bridge';
+  import { setlistListStore } from '$lib/store/setlistList';
 
-  let setlists = $state<Setlist[]>([]);
-  let sortedSetlists = $derived([...setlists].sort((a, b) => {
-    if (!a.date && !b.date) return 0;
-    if (!a.date) return 1;
-    if (!b.date) return -1;
-    return b.date.localeCompare(a.date);
-  }));
-  let showNew = $state(false);
-  let newName = $state('');
-  let newDate = $state('');
-  let newStartTime = $state('');
-  let newVibe = $state(true);
-  let loading = $state(true);
+  const setlistsQ = createQuery(() => setlistsQuery());
+  const createMut = useCreateSetlist();
+  const deleteMut = useDeleteSetlist();
 
-  onMount(async () => {
-    setlists = await getSetlists();
-    loading = false;
+  const showNew = useStore(setlistListStore, s => s.showNew);
+  const newName = useStore(setlistListStore, s => s.name);
+  const newDate = useStore(setlistListStore, s => s.date);
+  const newStartTime = useStore(setlistListStore, s => s.startTime);
+  const newVibe = useStore(setlistListStore, s => s.vibe);
+  const deleteId = useStore(setlistListStore, s => s.deleteId);
+  const { setShowNew, setField, resetForm, setDeleteId } = setlistListStore.getState();
+
+  const sorting = useStore(setlistListStore, s => s.sorting);
+  const songCount = (sl: Setlist) => sl.entries.filter(e => e.songId).length;
+  const totalMinutes = (sl: Setlist) => sl.entries.reduce((n, e) => n + (e.breakMinutes ?? (e.songId ? (e.song?.lengthMinutes ?? 5) : 0)), 0);
+  const columns: ColumnDef<Setlist>[] = [
+    { id: 'name', accessorFn: sl => sl.name, header: () => $t.setlists.colName, cell: ({ row }) => renderSnippet(nameCell, row.original), meta: { cls: 'max-[700px]:whitespace-normal' } },
+    { id: 'date', accessorFn: sl => sl.date || undefined, header: () => $rt.date, sortUndefined: 'last', cell: ({ row }) => row.original.date ? formatDate(row.original.date, $lang) : '', meta: { cls: 'max-[700px]:hidden', head: 'max-[700px]:hidden' } },
+    { id: 'startTime', accessorFn: sl => sl.startTime ?? '', header: '⏱', enableSorting: false, cell: ({ row }) => row.original.startTime ?? '', meta: { cls: 'max-[700px]:hidden', head: 'max-[700px]:hidden' } },
+    { id: 'songs', accessorFn: songCount, header: () => $t.setlists.colSongs, cell: ({ row }) => `${$t.setlists.songs(songCount(row.original))} (${formatDuration(totalMinutes(row.original), $lang)})`, meta: { cls: 'max-[700px]:hidden', head: 'max-[700px]:hidden' } },
+    { id: 'vibe', accessorFn: sl => sl.vibe, header: () => $t.setlists.colVibe, enableSorting: false, cell: ({ row }) => renderSnippet(vibeCell, row.original), meta: { cls: 'max-[700px]:hidden', head: 'max-[700px]:hidden' } },
+    { id: 'actions', header: '', enableSorting: false, cell: ({ row }) => renderSnippet(actionsCell, row.original), meta: { cls: 'w-px text-right', head: 'w-px' } },
+  ];
+  const table = createSvelteTable<Setlist>({
+    get data() { return setlistsQ.data ?? []; },
+    columns,
+    state: { get sorting() { return $sorting; } },
+    onSortingChange: u => setlistListStore.getState().setSorting(typeof u === 'function' ? u($sorting) : u),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getRowId: sl => sl.id,
   });
+  const metaOf = (c: { columnDef: { meta?: unknown } }) => (c.columnDef.meta ?? {}) as { cls?: string; head?: string };
 
   async function handleCreate() {
-    if (!newName.trim()) return;
-    const sl = await createSetlist(newName.trim(), newDate.trim() || undefined, newStartTime.trim() || undefined, newVibe || undefined);
-    setlists = [...setlists, sl];
-    newName = ''; newDate = ''; newStartTime = ''; newVibe = true; showNew = false;
+    const { name, date, startTime, vibe } = setlistListStore.getState();
+    if (!name.trim()) return;
+    const sl = await createMut.mutateAsync({ name: name.trim(), date: date.trim() || undefined, startTime: startTime.trim() || undefined, vibe: vibe || undefined });
+    resetForm();
     goto(`/setlists/${sl.id}`);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm($t.setlists.deleteConfirm)) return;
-    await deleteSetlist(id);
-    setlists = setlists.filter(s => s.id !== id);
+  function confirmDelete() {
+    const id = setlistListStore.getState().deleteId;
+    setDeleteId(null);
+    if (id) deleteMut.mutate(id);
   }
+
+  const primaryBtn = 'font-semibold';
+  const secondaryBtn = '';
+  // 16px on mobile so iOS does not zoom on focus.
+  const field = 'bg-background';
 </script>
 
-<div class="page-shell">
-  {#if $canWrite}
-    <div class="page-header">
-      <button class="btn-primary" onclick={() => { showNew = !showNew; }}>{$t.setlists.newBtn}</button>
-    </div>
-  {/if}
+<!-- Desktop bar; on small screens the actions live in a bottom bar (as in the catalog). -->
+<div class="contents max-[700px]:hidden">
+<PageControls label={$t.nav.setlists}>
+  {#snippet start()}
+    <NavigationMenu.Item class="min-w-0"><Breadcrumb.Root><Breadcrumb.List class="flex-nowrap"><Breadcrumb.Item><Breadcrumb.Page class="inline-flex min-h-10 items-center whitespace-nowrap">{$t.nav.setlists}</Breadcrumb.Page></Breadcrumb.Item></Breadcrumb.List></Breadcrumb.Root></NavigationMenu.Item>
+  {/snippet}
+  {#snippet end()}
+    {#if $canWrite}
+      <PageControlsDivider />
+      <NavigationMenu.Item><IconButton icon="➕" variant="default" label={$t.setlists.newBtn.replace(/^\+\s*/, '')} onclick={() => setShowNew(!setlistListStore.getState().showNew)} /></NavigationMenu.Item>
+    {/if}
+  {/snippet}
+</PageControls>
+</div>
+{#if $canWrite}
+  <div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
+    <IconButton class="ml-auto" variant="default" icon="➕" label={$t.setlists.newBtn.replace(/^\+\s*/, '')} onclick={() => setShowNew(!setlistListStore.getState().showNew)} />
+  </div>
+{/if}
 
-  {#if showNew && $canWrite}
-    <div class="new-form">
-      <input bind:value={newName} placeholder={$t.setlists.namePlaceholder} />
-      <div class="new-form-row">
-        <input type="date" bind:value={newDate} />
-        <input type="time" bind:value={newStartTime} />
-        <div class="new-form-actions">
-          <button class="btn-secondary" onclick={() => { showNew = false; }}>{$t.setlists.cancel}</button>
-          <button class="btn-primary" onclick={handleCreate}>{$t.setlists.create}</button>
+<div class="px-4 pt-3 pb-4 max-[700px]:px-0 max-[700px]:pt-0 max-[700px]:pb-[52px]">
+
+  {#if $showNew && $canWrite}
+    <Card.Root class="mb-5 max-w-[1000px] gap-2 rounded-[10px] p-3.5 max-[700px]:mx-3">
+      <Input class={field} value={$newName} oninput={e => setField({ name: e.currentTarget.value })} placeholder={$t.setlists.namePlaceholder} aria-label={$t.setlists.namePlaceholder} />
+      <div class="flex flex-wrap items-center gap-2">
+        <Input type="date" class="{field} min-w-[120px] flex-1" value={$newDate} oninput={e => setField({ date: e.currentTarget.value })} />
+        <Input type="time" class="{field} min-w-[120px] flex-1" value={$newStartTime} oninput={e => setField({ startTime: e.currentTarget.value })} />
+        <div class="ml-auto flex gap-2">
+          <Button variant="outline" class={secondaryBtn} onclick={() => setShowNew(false)}>{$t.setlists.cancel}</Button>
+          <Button class={primaryBtn} onclick={handleCreate}>{$t.setlists.create}</Button>
         </div>
       </div>
-      <div class="vibe-toggle">
-        <label class="vibe-label">
-          <input type="checkbox" bind:checked={newVibe} />
-          {$t.setlists.vibe}
-        </label>
-        <span class="help-tip" title={$t.setlists.vibeTooltip}>?</span>
+      <div class="flex w-fit items-center gap-2">
+        <Switch id="new-vibe" size="sm" checked={$newVibe} onCheckedChange={v => setField({ vibe: v })} />
+        <Label for="new-vibe" class="text-[0.88rem] font-normal text-muted-foreground">{$t.setlists.vibe}</Label>
+        <span class="inline-flex size-4 shrink-0 cursor-default items-center justify-center rounded-full border text-[0.7rem] leading-none text-muted-foreground" title={$t.setlists.vibeTooltip}>?</span>
       </div>
-    </div>
+    </Card.Root>
   {/if}
 
-  {#if loading}
-    <p class="loading"><LoadingCat /></p>
-  {:else if setlists.length === 0}
-    <div class="empty">
-      <p>{$t.setlists.empty}</p>
-      {#if !showNew && $canWrite}
-        <button class="btn-primary" onclick={() => { showNew = true; }}>{$t.setlists.createFirst}</button>
+  {#if setlistsQ.isPending}
+    <LoadingCat />
+  {:else if (setlistsQ.data ?? []).length === 0}
+    <Empty.Root class="border py-[60px]">
+      <Empty.Header>
+        <Empty.Title class="text-base font-normal text-muted-foreground">{$t.setlists.empty}</Empty.Title>
+      </Empty.Header>
+      {#if !$showNew && $canWrite}
+        <Empty.Content>
+          <Button class={primaryBtn} onclick={() => setShowNew(true)}>{$t.setlists.createFirst}</Button>
+        </Empty.Content>
       {/if}
-    </div>
+    </Empty.Root>
   {:else}
-    <div class="cards">
-      {#each sortedSetlists as sl (sl.id)}
-        <SetlistCard setlist={sl} ondelete={() => handleDelete(sl.id)} />
-      {/each}
-    </div>
+    <Table.Root>
+      <Table.Header>
+        {#each table.getHeaderGroups() as group (group.id)}
+          <Table.Row class="border-0 hover:bg-transparent">
+            {#each group.headers as header (header.id)}
+              <Table.Head class={metaOf(header.column).head}><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></Table.Head>
+            {/each}
+          </Table.Row>
+        {/each}
+      </Table.Header>
+      <Table.Body>
+        {#each table.getRowModel().rows as row (row.id)}
+          <Table.Row class="group/row cursor-pointer border-0 hover:bg-transparent" onclick={() => goto(`${base}/setlists/${row.original.id}`)}>
+            {#each row.getVisibleCells() as cell (cell.id)}
+              <Table.Cell class={cn('bg-card py-0.5 min-[701px]:group-hover/row:bg-(--row-hover)', metaOf(cell.column).cls)}><FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} /></Table.Cell>
+            {/each}
+          </Table.Row>
+        {/each}
+      </Table.Body>
+    </Table.Root>
   {/if}
 </div>
 
-<style>
-  .page-header { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 20px; }
-  .new-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-  .new-form input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.9rem; }
-  .new-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .new-form-row input { flex: 1; min-width: 120px; }
-  .new-form-actions { display: flex; gap: 8px; margin-left: auto; }
-  .cards { display: flex; flex-direction: column; gap: 10px; }
-  .empty, .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-  .empty p { margin-bottom: 12px; }
-  .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
-  .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
-  .vibe-toggle { display: flex; align-items: center; gap: 6px; width: fit-content; }
-  .vibe-label { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--text-muted); cursor: pointer; }
-  .vibe-label input[type="checkbox"] { cursor: pointer; }
-  .help-tip {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 16px; height: 16px; border-radius: 50%;
-    border: 1px solid var(--border); font-size: 0.7rem;
-    color: var(--text-muted); cursor: default; flex-shrink: 0; line-height: 1;
-  }
+{#snippet nameCell(sl: Setlist)}
+  <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 max-[700px]:flex-col max-[700px]:items-start">
+    <a href="{base}/setlists/{sl.id}" class="block shrink-0 text-inherit no-underline" onclick={(e) => e.stopPropagation()}>
+      <span class="font-semibold">{sl.name}</span>
+      <span class="mt-0.5 block text-[0.78rem] text-muted-foreground min-[701px]:hidden">{[sl.date ? formatDate(sl.date, $lang) : '', sl.startTime ?? '', `${$t.setlists.songs(songCount(sl))} (${formatDuration(totalMinutes(sl), $lang)})`].filter(Boolean).join(' · ')}</span>
+    </a>
+    <!-- The comment sits to the right of the name (no label), links shown as «domain.tld». -->
+    {#if sl.comment}<span class="min-w-0 flex-1 truncate text-[0.88rem] text-muted-foreground" title={sl.comment}><LinkifiedText text={sl.comment} /></span>{/if}
+  </div>
+{/snippet}
 
-  @media (max-width: 700px) {
-    .new-form input { font-size: 16px; }
-  }
-</style>
+{#snippet vibeCell(sl: Setlist)}
+  <VibeBadge vibe={sl.vibe} />
+{/snippet}
+
+{#snippet actionsCell(sl: Setlist)}
+  <div class="flex justify-end">
+    <RowActions actions={[
+      { icon: '🎤', label: $t.setlists.stage, href: `${base}/setlists/${sl.id}/stage` },
+      ...($canWrite ? [{ icon: '🗑', label: $t.song.remove, destructive: true, separatorBefore: true, onselect: () => setDeleteId(sl.id) }] : []),
+    ]} />
+  </div>
+{/snippet}
+
+<AlertDialog.Root open={$deleteId !== null} onOpenChange={o => { if (!o) setDeleteId(null); }}>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{$t.setlists.deleteConfirm}</AlertDialog.Title>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel>{$t.setlists.cancel}</AlertDialog.Cancel>
+      <AlertDialog.Action variant="destructive" onclick={confirmDelete}>{$t.song.remove}</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>

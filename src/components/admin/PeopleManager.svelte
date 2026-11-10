@@ -1,31 +1,52 @@
 <script lang="ts">
   import OnlineUsersPanel from './OnlineUsersPanel.svelte';
-  import { browser } from '$app/environment';
-  import { addMusician, deleteMusician, getUsers, patchUser, updateMusician } from '$lib/api';
+  import { Button } from '$components/ui/button';
+  import { Badge } from '$components/ui/badge';
+  import { Input } from '$components/ui/input';
+  import * as Select from '$components/ui/select';
+  import { Toggle } from '$components/ui/toggle';
+  import * as Table from '$components/ui/table';
+  import { getCoreRowModel, type ColumnDef } from '@tanstack/table-core';
+  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { Alert } from '$components/ui/alert';
+  import { Card } from '$components/ui/card';
+  import * as Empty from '$components/ui/empty';
+  import RowActions, { type RowAction } from '$components/shared/RowActions.svelte';
+  import ButtonRow from '$components/shared/ButtonRow.svelte';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { t } from '$lib/i18n';
   import type { BandMusician, Instrument, User, UserRole } from '$lib/types';
   import { INSTRUMENT_ICONS } from '$lib/utils';
-
-  let { users = $bindable() }: { users: User[] } = $props();
+  import type { UserPatch } from '$lib/api';
+  import { keys, usersQuery } from '$lib/query/queries';
+  import { useAdminUserMutations } from '$lib/query/shell';
+  import { useStore } from '$lib/store/bridge';
+  import { peopleStore } from '$lib/store/shell';
 
   const allInstruments: Instrument[] = ['guitar', 'bass', 'drums', 'keys', 'cajon', 'violin', 'saxophone', 'trumpet', 'percussion', 'vocals'];
 
-  let saving = $state<string | null>(null);
-  let error = $state(false);
-  let roleSelections = $state<Record<string, UserRole>>({});
-  let approvalMusicianSelections = $state<Record<string, string>>({});
-  let approvalMusicianNames = $state<Record<string, string>>({});
-  let approvalMusicianInstruments = $state<Record<string, Instrument[]>>({});
+  const qc = useQueryClient();
+  const usersResult = createQuery(() => usersQuery());
+  const users = $derived(usersResult.data ?? []);
+  const mutations = useAdminUserMutations();
+  const ps = peopleStore.getState;
 
-  let editorKind = $state<'standalone' | 'attach' | 'edit' | null>(null);
-  let editorUserId = $state<string | null>(null);
-  let draftName = $state('');
-  let draftInstruments = $state<Instrument[]>([]);
-  let draftMergeTargetId = $state('');
-
-  let dragId = $state<string | null>(null);
-  let dragOverId = $state<string | null>(null);
-  let canDrag = $state(false);
+  const saving = useStore(peopleStore, s => s.saving);
+  const error = useStore(peopleStore, s => s.error);
+  const roleSelections = useStore(peopleStore, s => s.roleSelections);
+  const approvalMusicianSelections = useStore(peopleStore, s => s.approvalSelections);
+  const approvalMusicianNames = useStore(peopleStore, s => s.approvalNames);
+  const approvalMusicianInstruments = useStore(peopleStore, s => s.approvalInstruments);
+  const editorKind = useStore(peopleStore, s => s.editorKind);
+  const editorUserId = useStore(peopleStore, s => s.editorUserId);
+  const draftName = useStore(peopleStore, s => s.draftName);
+  const draftInstruments = useStore(peopleStore, s => s.draftInstruments);
+  const draftMergeTargetId = useStore(peopleStore, s => s.draftMergeTargetId);
+  const dragId = useStore(peopleStore, s => s.dragId);
+  const dragOverId = useStore(peopleStore, s => s.dragOverId);
+  const canDrag = useStore(peopleStore, s => s.canDrag);
+  const removeTarget = useStore(peopleStore, s => s.removeTarget);
 
   let musicians = $derived(
     users
@@ -38,16 +59,19 @@
   let mergeTargets = $derived(musicians.filter(user => !user.telegramId));
   let orderedUsers = $derived([...users].sort(comparePeople));
 
-  $effect(() => {
-    canDrag = browser && !('ontouchstart' in window);
-  });
-
-  $effect(() => {
-    for (const user of users) {
-      if (approvalMusicianSelections[user.id] === undefined) approvalMusicianSelections[user.id] = '';
-      if (approvalMusicianNames[user.id] === undefined) approvalMusicianNames[user.id] = '';
-      if (approvalMusicianInstruments[user.id] === undefined) approvalMusicianInstruments[user.id] = [];
-    }
+  // Data Table: rows are the users in their stored display order; the cells are snippets below.
+  const cellBase = 'min-w-0';
+  const columns = $derived<ColumnDef<User>[]>([
+    { id: 'person', header: $t.admin.person, meta: { cellClass: `identity ${cellBase} whitespace-normal max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(personCell, row.original) },
+    { id: 'role', header: $t.admin.role, meta: { cellClass: `role-cell ${cellBase} max-[760px]:self-start max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(roleCell, row.original) },
+    { id: 'musician', header: $t.musicians.title, meta: { cellClass: `musician-cell ${cellBase} whitespace-normal max-[760px]:col-span-2 max-[760px]:min-h-[30px] max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(musicianCell, row.original) },
+    { id: 'actions', header: '', meta: { cellClass: `actions-cell ${cellBase} w-16 max-[760px]:self-start max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
+  ]);
+  const table = createSvelteTable<User>({
+    get data() { return orderedUsers; },
+    get columns() { return columns; },
+    getRowId: user => user.id,
+    getCoreRowModel: getCoreRowModel(),
   });
 
   function comparePeople(a: User, b: User): number {
@@ -81,188 +105,167 @@
   }
 
   async function refresh() {
-    const loaded = await getUsers();
-    for (const user of loaded) roleSelections[user.id] = user.role ?? 'reader';
-    users = loaded;
-  }
-
-  function toggleApprovalInstrument(userId: string, instrument: Instrument) {
-    const current = approvalMusicianInstruments[userId] ?? [];
-    approvalMusicianInstruments[userId] = current.includes(instrument)
-      ? current.filter(item => item !== instrument)
-      : [...current, instrument];
-  }
-
-  function toggleDraftInstrument(instrument: Instrument) {
-    draftInstruments = draftInstruments.includes(instrument)
-      ? draftInstruments.filter(item => item !== instrument)
-      : [...draftInstruments, instrument];
+    await mutations.refresh();
+    ps().clearRoles();
   }
 
   async function setStatus(user: User, status: 'approved' | 'rejected') {
-    saving = user.id;
-    error = false;
+    const s = ps();
+    s.setSaving(user.id);
+    s.setError(false);
     try {
-      const patch: Parameters<typeof patchUser>[1] = {
+      const patch: UserPatch = {
         status,
-        role: roleSelections[user.id] ?? user.role ?? 'reader',
+        role: s.roleSelections[user.id] ?? user.role ?? 'reader',
       };
-      const choice = approvalMusicianSelections[user.id] ?? '';
+      const choice = s.approvalSelections[user.id] ?? '';
       if (status === 'approved' && !user.musicianName && choice === '__new__') {
-        const name = approvalMusicianNames[user.id]?.trim();
+        const name = s.approvalNames[user.id]?.trim();
         if (!name) return;
         patch.musicianName = name;
-        patch.defaultInstruments = approvalMusicianInstruments[user.id] ?? [];
+        patch.defaultInstruments = s.approvalInstruments[user.id] ?? [];
         patch.sortOrder = musicians.length;
       } else if (status === 'approved' && !user.musicianName && choice) {
         patch.mergeIntoUserId = choice;
       }
-      await patchUser(user.id, patch);
+      await mutations.patchUser.mutateAsync({ id: user.id, patch });
       await refresh();
     } catch {
-      error = true;
+      ps().setError(true);
     } finally {
-      saving = null;
+      ps().setSaving(null);
     }
   }
 
   async function saveRole(user: User, role: UserRole) {
-    saving = user.id;
-    error = false;
+    ps().setSaving(user.id);
+    ps().setError(false);
     try {
-      await patchUser(user.id, { role });
+      await mutations.patchUser.mutateAsync({ id: user.id, patch: { role } });
       await refresh();
     } catch {
-      roleSelections[user.id] = user.role ?? 'reader';
-      error = true;
+      ps().setRole(user.id, user.role ?? 'reader');
+      ps().setError(true);
     } finally {
-      saving = null;
+      ps().setSaving(null);
     }
   }
 
-  function handleRoleChange(user: User, event: Event) {
-    const role = (event.currentTarget as HTMLSelectElement).value as UserRole;
-    roleSelections[user.id] = role;
+  function handleRoleChange(user: User, role: UserRole) {
+    ps().setRole(user.id, role);
     if (user.status === 'approved') void saveRole(user, role);
   }
 
-  function startStandaloneMusician() {
-    editorKind = 'standalone';
-    editorUserId = null;
-    draftName = '';
-    draftInstruments = [];
-    draftMergeTargetId = '';
-  }
-
-  function startAttachMusician(user: User) {
-    editorKind = 'attach';
-    editorUserId = user.id;
-    draftName = '';
-    draftInstruments = [];
-    draftMergeTargetId = '';
-  }
-
-  function startEditMusician(user: User & { musicianName: string }) {
-    editorKind = 'edit';
-    editorUserId = user.id;
-    draftName = user.musicianName;
-    draftInstruments = [...(user.defaultInstruments ?? [])];
-    draftMergeTargetId = '';
-  }
-
-  function cancelEditor() {
-    editorKind = null;
-    editorUserId = null;
-  }
-
   async function saveMusician() {
-    if (!editorKind) return;
-    const operationId = editorUserId ?? '__new__';
-    saving = operationId;
-    error = false;
+    const s = ps();
+    const kind = s.editorKind;
+    if (!kind) return;
+    const userId = s.editorUserId;
+    const name = s.draftName.trim();
+    s.setSaving(userId ?? '__new__');
+    s.setError(false);
     try {
-      if (editorKind === 'standalone') {
-        if (!draftName.trim()) return;
-        await addMusician({
-          name: draftName.trim(),
-          defaultInstruments: draftInstruments,
+      if (kind === 'standalone') {
+        if (!name) return;
+        await mutations.addMusician.mutateAsync({
+          name,
+          defaultInstruments: s.draftInstruments,
           sortOrder: musicians.length,
         });
-      } else if (editorKind === 'attach' && editorUserId) {
-        if (draftMergeTargetId) {
-          await patchUser(editorUserId, { mergeIntoUserId: draftMergeTargetId });
+      } else if (kind === 'attach' && userId) {
+        if (s.draftMergeTargetId) {
+          await mutations.patchUser.mutateAsync({ id: userId, patch: { mergeIntoUserId: s.draftMergeTargetId } });
         } else {
-          if (!draftName.trim()) return;
-          await patchUser(editorUserId, {
-            musicianName: draftName.trim(),
-            defaultInstruments: draftInstruments,
-            sortOrder: musicians.length,
+          if (!name) return;
+          await mutations.patchUser.mutateAsync({
+            id: userId,
+            patch: { musicianName: name, defaultInstruments: s.draftInstruments, sortOrder: musicians.length },
           });
         }
-      } else if (editorKind === 'edit' && editorUserId) {
-        const user = users.find(item => item.id === editorUserId);
-        if (!user?.musicianName || !draftName.trim()) return;
-        await updateMusician({
+      } else if (kind === 'edit' && userId) {
+        const user = users.find(item => item.id === userId);
+        if (!user?.musicianName || !name) return;
+        await mutations.updateMusician.mutateAsync({
           ...asMusician(user as User & { musicianName: string }),
-          name: draftName.trim(),
-          defaultInstruments: draftInstruments,
+          name,
+          defaultInstruments: s.draftInstruments,
         });
       }
-      cancelEditor();
+      ps().cancelEditor();
       await refresh();
     } catch {
-      error = true;
+      ps().setError(true);
     } finally {
-      saving = null;
+      ps().setSaving(null);
     }
   }
 
-  async function removeMusician(user: User & { musicianName: string }) {
-    const confirmation = user.telegramId ? $t.musicians.removeConfirm : $t.musicians.deleteConfirm;
-    if (!confirm(confirmation)) return;
-    saving = user.id;
-    error = false;
+  async function removeMusician(id: string) {
+    ps().setRemoveTarget(null);
+    ps().setSaving(id);
+    ps().setError(false);
     try {
-      await deleteMusician(user.id);
+      await mutations.deleteMusician.mutateAsync(id);
       await refresh();
     } catch {
-      error = true;
+      ps().setError(true);
     } finally {
-      saving = null;
+      ps().setSaving(null);
     }
   }
 
   function onDragOver(event: DragEvent, id: string) {
     event.preventDefault();
-    dragOverId = id;
+    ps().setDragOver(id);
   }
 
   async function onDrop(event: DragEvent) {
     event.preventDefault();
-    if (!dragId || !dragOverId || dragId === dragOverId) {
-      dragId = null;
-      dragOverId = null;
+    const { dragId: from_, dragOverId: to_ } = ps();
+    if (!from_ || !to_ || from_ === to_) {
+      ps().resetDrag();
       return;
     }
     const reordered = [...musicians];
-    const from = reordered.findIndex(user => user.id === dragId);
-    const to = reordered.findIndex(user => user.id === dragOverId);
+    const from = reordered.findIndex(user => user.id === from_);
+    const to = reordered.findIndex(user => user.id === to_);
     if (from < 0 || to < 0) return;
     const [moved] = reordered.splice(from, 1);
     reordered.splice(to, 0, moved);
     const orderById = new Map(reordered.map((user, index) => [user.id, index]));
-    users = users.map(user => orderById.has(user.id) ? { ...user, sortOrder: orderById.get(user.id) } : user);
-    dragId = null;
-    dragOverId = null;
-    error = false;
+    qc.setQueryData<User[]>(keys.users, old => (old ?? []).map(user => orderById.has(user.id) ? { ...user, sortOrder: orderById.get(user.id) } : user));
+    ps().resetDrag();
+    ps().setError(false);
     try {
-      await Promise.all(reordered.map((user, index) => updateMusician({ ...asMusician(user), sortOrder: index })));
+      await Promise.all(reordered.map((user, index) => mutations.updateMusician.mutateAsync({ ...asMusician(user), sortOrder: index })));
       await refresh();
     } catch {
-      error = true;
+      ps().setError(true);
       await refresh();
     }
   }
+
+  // Row actions («⋯» menu): the same actions the inline buttons offered, by user state; destructive ones last.
+  function rowActions(user: User): RowAction[] {
+    const out: RowAction[] = [];
+    const canAct = Boolean(user.telegramId) && !user.isAdmin;
+    const approveBlocked = user.status === 'pending' && $approvalMusicianSelections[user.id] === '__new__' && !$approvalMusicianNames[user.id]?.trim();
+    if (canAct && user.status !== 'approved') out.push({ icon: '✅', label: $t.admin.approve, disabled: approveBlocked, onselect: () => void setStatus(user, 'approved') });
+    if ($editorUserId !== user.id) {
+      if (user.musicianName) out.push({ icon: '✏️', label: $t.common.edit, onselect: () => ps().startEdit(user.id, user.musicianName ?? '', user.defaultInstruments ?? []) });
+      else if (user.status !== 'pending') out.push({ icon: '🎸', label: $t.admin.makeMusician, onselect: () => ps().startAttach(user.id) });
+    }
+    const destructive: RowAction[] = [];
+    if (canAct && user.status === 'pending') destructive.push({ icon: '❌', label: $t.admin.reject, destructive: true, onselect: () => void setStatus(user, 'rejected') });
+    if (canAct && user.status === 'approved') destructive.push({ icon: '🚫', label: $t.admin.revoke, destructive: true, onselect: () => void setStatus(user, 'rejected') });
+    if (user.musicianName && $editorUserId !== user.id) destructive.push({ icon: '🗑️', label: $t.budget.delete, destructive: true, onselect: () => ps().setRemoveTarget({ id: user.id, linked: Boolean(user.telegramId) }) });
+    if (destructive.length && out.length) destructive[0].separatorBefore = true;
+    return [...out, ...destructive];
+  }
+
+  const btnCls = 'whitespace-nowrap';
+  const NONE = '__none__';
+  const roleLabel = (role: string) => role === 'writer' ? $t.admin.roleWriter : $t.admin.roleReader;
 
   function statusLabel(user: User): string {
     if (user.status === 'pending') return $t.admin.pending;
@@ -273,228 +276,171 @@
 
 <OnlineUsersPanel />
 
-<section class="people-section">
-  <div class="people-title">
-    <button class="btn primary" onclick={startStandaloneMusician}>{$t.musicians.addBtn}</button>
+<section class="people-section mb-7 max-[760px]:mb-[18px]">
+  <div class="people-title mb-2.5 flex items-center justify-end max-[760px]:mb-2 max-[760px]:gap-2">
+    <Button class="add-musician px-3 text-[0.79rem] font-semibold max-[760px]:px-2 max-[760px]:text-[0.7rem]" onclick={() => ps().startStandalone()}>{$t.musicians.addBtn}</Button>
   </div>
 
-  {#if error}<p class="error">{$t.common.requestFailed}</p>{/if}
+  {#if $error}<Alert variant="destructive" class="error mb-2 border-0 bg-transparent p-0 text-[0.82rem]">{$t.common.requestFailed}</Alert>{/if}
 
-  {#if editorKind === 'standalone'}
-    <div class="standalone-editor">
-      <MusicianEditor />
-    </div>
+  {#if $editorKind === 'standalone'}
+    <Card class="standalone-editor mb-2.5 gap-0 rounded-[10px] p-3">
+      {@render MusicianEditor()}
+    </Card>
   {/if}
 
   {#if users.length === 0}
-    <p class="hint">{$t.admin.empty}</p>
+    <Empty.Root class="border">
+      <Empty.Header><Empty.Description>{$t.admin.empty}</Empty.Description></Empty.Header>
+    </Empty.Root>
   {:else}
     <div class="people-table">
-      <div class="people-header">
-        <span>{$t.admin.person}</span>
-        <span>{$t.admin.role}</span>
-        <span>{$t.admin.telegramAccess}</span>
-        <span>{$t.musicians.title}</span>
-      </div>
-      {#each orderedUsers as user (user.id)}
-        <div
-          class="people-row"
-          role="group"
-          class:drag-over={dragOverId === user.id && dragId !== user.id}
-          draggable={canDrag && Boolean(user.musicianName) && !editorKind}
-          ondragstart={canDrag && user.musicianName ? () => { dragId = user.id; } : undefined}
-          ondragover={canDrag && user.musicianName ? event => onDragOver(event, user.id) : undefined}
-          ondrop={canDrag && user.musicianName ? onDrop : undefined}
-          ondragend={canDrag && user.musicianName ? () => { dragId = null; dragOverId = null; } : undefined}
-        >
-          <div class="identity">
-            {#if canDrag && user.musicianName}<span class="drag-handle" title={$t.admin.dragToReorder}>⠿</span>{/if}
-            {#if user.photoUrl}<img class="avatar" src={user.photoUrl} alt="" />{/if}
-            <div class="identity-text">
-              <span class="name">{displayName(user)}</span>
-              {#if user.username}<span class="hint">@{user.username}</span>{/if}
-              {#if user.isAdmin}
-                <span class="badge admin-badge">{$t.admin.adminBadge}</span>
-              {:else if user.telegramId}
-                <span class="badge status" class:pending={user.status === 'pending'} class:rejected={user.status === 'rejected'}>{statusLabel(user)}</span>
-              {/if}
-            </div>
-          </div>
-
-          <div class="role-cell">
-            {#if user.telegramId && !user.isAdmin}
-              <select value={roleSelections[user.id] ?? user.role ?? 'reader'} class="role-select" disabled={saving === user.id}
-                onchange={event => handleRoleChange(user, event)}>
-                <option value="writer">{$t.admin.roleWriter}</option><option value="reader">{$t.admin.roleReader}</option>
-              </select>
-            {/if}
-          </div>
-
-          <div class="access-cell">
-            {#if user.telegramId && !user.isAdmin}
-              {#if user.status === 'pending'}
-                <button class="btn approve" disabled={saving === user.id || (approvalMusicianSelections[user.id] === '__new__' && !approvalMusicianNames[user.id]?.trim())}
-                  onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
-                <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.reject}</button>
-              {:else if user.status === 'approved'}
-                <button class="btn reject" disabled={saving === user.id} onclick={() => setStatus(user, 'rejected')}>{$t.admin.revoke}</button>
-              {:else}
-                <button class="btn approve" disabled={saving === user.id} onclick={() => setStatus(user, 'approved')}>{$t.admin.approve}</button>
-              {/if}
-            {:else if !user.telegramId}
-              <span class="hint">{$t.admin.noTelegramAccess}</span>
-            {/if}
-          </div>
-
-          <div class="musician-cell">
-            {#if editorUserId === user.id}
-              <MusicianEditor />
-            {:else if user.musicianName}
-              <div class="musician-summary">
-                <span class="musician-name">{user.musicianName}</span>
-                <span class="instrument-list">
-                  {#if user.defaultInstruments?.length}
-                    {#each user.defaultInstruments as instrument}
-                      <span title={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</span>
-                    {/each}
-                  {:else}
-                    <span class="hint">{$t.musicians.free}</span>
-                  {/if}
-                </span>
-              </div>
-              <div class="musician-actions">
-                <button class="icon-btn" disabled={saving === user.id} onclick={() => startEditMusician(user as User & { musicianName: string })}>✏️</button>
-                <button class="icon-btn delete" disabled={saving === user.id} onclick={() => removeMusician(user as User & { musicianName: string })}>🗑</button>
-              </div>
-            {:else if user.status === 'pending'}
-              <div class="approval-musician">
-                <select bind:value={approvalMusicianSelections[user.id]} class="musician-select">
-                  <option value="">{$t.admin.accessOnly}</option>
-                  <option value="__new__">{$t.admin.newMusician}</option>
-                  {#each mergeTargets as musician}
-                    <option value={musician.id}>{$t.admin.mergeMusician}: {musician.musicianName}</option>
-                  {/each}
-                </select>
-                {#if approvalMusicianSelections[user.id] === '__new__'}
-                  <input bind:value={approvalMusicianNames[user.id]} placeholder={$t.musicians.name} />
-                  <div class="instrument-buttons">
-                    {#each allInstruments as instrument}
-                      <button class="instrument-btn" class:active={(approvalMusicianInstruments[user.id] ?? []).includes(instrument)}
-                        onclick={() => toggleApprovalInstrument(user.id, instrument)} title={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {:else}
-              <button class="btn secondary" onclick={() => startAttachMusician(user)}>{$t.admin.makeMusician}</button>
-            {/if}
-          </div>
-        </div>
-      {/each}
+      <Table.Root class="max-[760px]:block max-[760px]:[&_tbody]:grid max-[760px]:[&_tbody]:gap-[3px] max-[760px]:[&_thead]:hidden">
+        <Table.Header>
+          {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+            <Table.Row class="people-header">
+              {#each headerGroup.headers as header (header.id)}
+                <Table.Head>
+                  <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+                </Table.Head>
+              {/each}
+            </Table.Row>
+          {/each}
+        </Table.Header>
+        <Table.Body>
+          {#each table.getRowModel().rows as row (row.id)}
+            {@const user = row.original}
+            <Table.Row
+              class="people-row max-[760px]:grid max-[760px]:grid-cols-[minmax(0,1fr)_auto_auto] max-[760px]:gap-x-1.5 max-[760px]:gap-y-[7px] max-[760px]:px-[9px] max-[760px]:py-2 {$dragOverId === user.id && $dragId !== user.id ? 'drag-over shadow-[inset_0_2px_var(--accent)]' : ''}"
+              role="group"
+              draggable={$canDrag && Boolean(user.musicianName) && !$editorKind}
+              ondragstart={$canDrag && user.musicianName ? () => ps().setDrag(user.id) : undefined}
+              ondragover={$canDrag && user.musicianName ? (event: DragEvent) => onDragOver(event, user.id) : undefined}
+              ondrop={$canDrag && user.musicianName ? onDrop : undefined}
+              ondragend={$canDrag && user.musicianName ? () => ps().resetDrag() : undefined}
+            >
+              {#each row.getVisibleCells() as cell (cell.id)}
+                <Table.Cell class="max-[760px]:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
+                  <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+                </Table.Cell>
+              {/each}
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
     </div>
   {/if}
 </section>
 
-{#snippet MusicianEditor()}
-  <div class="musician-editor">
-    {#if editorKind === 'attach' && mergeTargets.length > 0}
-      <select bind:value={draftMergeTargetId} class="musician-select">
-        <option value="">{$t.admin.newMusician}</option>
-        {#each mergeTargets as musician}
-          <option value={musician.id}>{$t.admin.mergeMusician}: {musician.musicianName}</option>
-        {/each}
-      </select>
-    {/if}
-    {#if !draftMergeTargetId}
-      <input bind:value={draftName} placeholder={$t.musicians.name} />
-      <div class="instrument-buttons">
-        {#each allInstruments as instrument}
-          <button class="instrument-btn" class:active={draftInstruments.includes(instrument)}
-            onclick={() => toggleDraftInstrument(instrument)} title={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</button>
-        {/each}
-      </div>
-    {/if}
-    <div class="editor-actions">
-      <button class="btn secondary" onclick={cancelEditor}>{$t.musicians.cancel}</button>
-      <button class="btn primary" disabled={saving !== null || (!draftMergeTargetId && !draftName.trim())} onclick={saveMusician}>{$t.musicians.save}</button>
-    </div>
+<ConfirmDialog
+  open={$removeTarget !== null}
+  description={$removeTarget?.linked ? $t.musicians.removeConfirm : $t.musicians.deleteConfirm}
+  confirmLabel={$removeTarget?.linked ? $t.editor.remove : $t.budget.delete}
+  onopenchange={open => { if (!open) ps().setRemoveTarget(null); }}
+  onconfirm={() => { const target = ps().removeTarget; if (target) return removeMusician(target.id); }}
+/>
+
+{#snippet personCell(user: User)}
+                <div class="flex min-w-0 items-center gap-[9px] max-[760px]:gap-[7px]">
+                  {#if $canDrag && user.musicianName}<span class="drag-handle cursor-grab select-none text-muted-foreground opacity-55" title={$t.admin.dragToReorder}>⠿</span>{/if}
+                  {#if user.photoUrl}<img class="avatar size-9 shrink-0 rounded-full max-[760px]:size-8" src={user.photoUrl} alt="" />{/if}
+                  <div class="identity-text flex min-w-0 flex-col items-start gap-0.5 max-[760px]:gap-0">
+                    <span class="name text-[0.9rem] font-semibold [overflow-wrap:anywhere] max-[760px]:text-[0.82rem]">{displayName(user)}</span>
+                    {#if !user.telegramId}<span class="hint text-[0.78rem] text-muted-foreground">{$t.admin.noTelegramAccess}</span>{/if}
+                    {#if user.username}<span class="hint text-[0.78rem] text-muted-foreground max-[760px]:text-[0.7rem] max-[760px]:leading-[1.1]">@{user.username}</span>{/if}
+                    {#if user.isAdmin}
+                      <Badge variant="secondary" class="badge admin-badge bg-primary px-1.5 text-[0.65rem] font-bold uppercase text-primary-foreground-ink max-[760px]:px-[5px] max-[760px]: max-[760px]:text-[0.56rem]">{$t.admin.adminBadge}</Badge>
+                    {:else if user.telegramId}
+                      <Badge variant="secondary" class="badge status px-1.5 text-[0.65rem] font-bold uppercase max-[760px]:px-[5px] max-[760px]: max-[760px]:text-[0.56rem] {user.status === 'pending' ? 'pending bg-warning text-warning-ink' : user.status === 'rejected' ? 'rejected bg-danger text-danger-ink' : 'bg-success text-success-ink'}">{statusLabel(user)}</Badge>
+                    {/if}
+                  </div>
+                </div>
+{/snippet}
+
+{#snippet roleCell(user: User)}
+                {#if user.telegramId && !user.isAdmin}
+                  {@const role = $roleSelections[user.id] ?? user.role ?? 'reader'}
+                  <Select.Root type="single" value={role} disabled={$saving === user.id} onValueChange={v => handleRoleChange(user, v as UserRole)}>
+                    <Select.Trigger class="role-select bg-card text-[0.82rem] max-md:text-base" aria-label={$t.admin.role}>{roleLabel(role)}</Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="writer" label={$t.admin.roleWriter} />
+                      <Select.Item value="reader" label={$t.admin.roleReader} />
+                    </Select.Content>
+                  </Select.Root>
+                {/if}
+{/snippet}
+
+{#snippet actionsCell(user: User)}
+  {@const actions = rowActions(user)}
+  {#if actions.length}<RowActions {actions} disabled={$saving === user.id} />{/if}
+{/snippet}
+
+{#snippet musicianCell(user: User)}
+                {#if $editorUserId === user.id}
+                  {@render MusicianEditor()}
+                {:else if user.musicianName}
+                  <div class="flex min-w-0 items-center justify-between gap-2">
+                    <div class="musician-summary flex min-w-0 flex-wrap items-center gap-[9px] max-[760px]:gap-[7px]">
+                      <span class="musician-name text-[0.9rem] font-semibold [overflow-wrap:anywhere] max-[760px]:text-[0.82rem]">{user.musicianName}</span>
+                      <span class="instrument-list flex flex-wrap items-center gap-1 max-[760px]:gap-[3px] max-[760px]:text-[0.95rem]">
+                        {#if user.defaultInstruments?.length}
+                          {#each user.defaultInstruments as instrument}
+                            <span title={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</span>
+                          {/each}
+                        {:else}
+                          <span class="hint text-[0.78rem] text-muted-foreground">{$t.musicians.free}</span>
+                        {/if}
+                      </span>
+                    </div>
+                  </div>
+                {:else if user.status === 'pending'}
+                  <div class="approval-musician flex w-full min-w-0 flex-col items-start gap-[7px]">
+                    {@render musicianSelect($approvalMusicianSelections[user.id] ?? '', v => ps().setApprovalSelection(user.id, v), $t.admin.accessOnly, true)}
+                    {#if $approvalMusicianSelections[user.id] === '__new__'}
+                      <Input class="bg-card text-[0.82rem] max-md:text-base" value={$approvalMusicianNames[user.id] ?? ''} oninput={event => ps().setApprovalName(user.id, event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
+                      {@render instrumentToggles($approvalMusicianInstruments[user.id] ?? [], instrument => ps().toggleApprovalInstrument(user.id, instrument))}
+                    {/if}
+                  </div>
+                {/if}
+{/snippet}
+
+{#snippet musicianSelect(value: string, onChange: (value: string) => void, noneLabel: string, withNew: boolean)}
+  {@const current = value || NONE}
+  <Select.Root type="single" value={current} onValueChange={v => onChange(v === NONE ? '' : v)}>
+    <Select.Trigger class="musician-select w-full bg-card text-[0.82rem] max-md:text-base" aria-label={$t.musicians.title}>
+      {current === NONE ? noneLabel : current === '__new__' ? $t.admin.newMusician : `${$t.admin.mergeMusician}: ${musicians.find(m => m.id === current)?.musicianName ?? ''}`}
+    </Select.Trigger>
+    <Select.Content>
+      <Select.Item value={NONE} label={noneLabel} />
+      {#if withNew}<Select.Item value="__new__" label={$t.admin.newMusician} />{/if}
+      {#each mergeTargets as musician (musician.id)}
+        <Select.Item value={musician.id} label="{$t.admin.mergeMusician}: {musician.musicianName}" />
+      {/each}
+    </Select.Content>
+  </Select.Root>
+{/snippet}
+
+{#snippet instrumentToggles(selected: Instrument[], toggle: (instrument: Instrument) => void)}
+  <div class="instrument-buttons flex flex-wrap gap-2">
+    {#each allInstruments as instrument}
+      <Toggle variant="outline" class="instrument-btn p-0 data-[state=on]:border-primary-ink data-[state=on]:bg-primary data-[state=on]:text-primary-foreground hover:data-[state=on]:bg-primary/90"
+        pressed={selected.includes(instrument)} onPressedChange={() => toggle(instrument)} title={$t.instrument[instrument]} aria-label={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</Toggle>
+    {/each}
   </div>
 {/snippet}
 
-<style>
-  .people-section { margin-bottom: 28px; }
-  .people-title { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
-  .people-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .people-header, .people-row { display: grid; grid-template-columns: minmax(190px, 1.2fr) minmax(90px, 0.5fr) minmax(120px, 0.65fr) minmax(250px, 1.35fr); gap: 12px; align-items: center; }
-  .people-header { padding: 8px 12px; background: var(--surface); color: var(--text-muted); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-  .people-row { padding: 11px 12px; border-top: 1px solid var(--border); background: var(--bg); }
-  .people-row.drag-over { box-shadow: inset 0 2px var(--accent); }
-  .identity, .role-cell, .musician-cell, .musician-summary, .musician-actions, .instrument-list, .editor-actions { display: flex; align-items: center; }
-  .identity { gap: 9px; min-width: 0; }
-  .identity-text { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-  .avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
-  .name, .musician-name { font-weight: 650; font-size: 0.9rem; overflow-wrap: anywhere; }
-  .hint { color: var(--text-muted); font-size: 0.78rem; }
-  .drag-handle { color: var(--text-muted); cursor: grab; opacity: 0.55; user-select: none; }
-  .badge { display: inline-block; width: fit-content; font-size: 0.65rem; padding: 2px 6px; border-radius: 5px; font-weight: 700; text-transform: uppercase; }
-  .admin-badge { background: #6c63ff22; color: var(--accent); }
-  .status { background: #22c55e22; color: #16a34a; }
-  .status.pending { background: #f59e0b22; color: #d97706; }
-  .status.rejected { background: #ef444422; color: #dc2626; }
-  .role-cell { min-width: 0; }
-  .access-cell, .approval-musician, .musician-editor { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; }
-  .musician-actions, .editor-actions { gap: 6px; }
-  .musician-cell { justify-content: space-between; gap: 8px; min-width: 0; }
-  .musician-summary { min-width: 0; gap: 9px; flex-wrap: wrap; }
-  .instrument-list { gap: 4px; flex-wrap: wrap; }
-  .standalone-editor { padding: 12px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-  .musician-editor, .approval-musician { width: 100%; }
-  .musician-editor input, .approval-musician input, .musician-select, .role-select { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 0.82rem; }
-  .role-select { width: auto; }
-  .instrument-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
-  .instrument-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px; background: transparent; cursor: pointer; }
-  .instrument-btn.active { background: var(--accent); border-color: var(--accent); }
-  .btn { padding: 6px 11px; border-radius: 6px; border: 0; font-size: 0.79rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
-  .btn:disabled, .icon-btn:disabled { opacity: 0.45; cursor: default; }
-  .btn.primary { background: var(--accent); color: #fff; }
-  .btn.secondary { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
-  .btn.approve { background: #22c55e; color: #fff; }
-  .btn.reject { background: #e05252; color: #fff; }
-  .icon-btn { width: 50px; height: 50px; box-sizing: border-box; background: none; border: 0; cursor: pointer; padding: 6px; font-size: 2.4rem; line-height: 1; opacity: 0.7; }
-  .icon-btn:hover { opacity: 1; }
-  .icon-btn.delete:hover { color: #ef4444; }
-  .error { color: #dc2626; font-size: 0.82rem; margin-bottom: 8px; }
-
-  @media (max-width: 760px) {
-    .people-section { margin-bottom: 18px; }
-    .people-title { gap: 8px; margin-bottom: 8px; }
-    .people-title .btn { padding: 5px 8px; font-size: 0.7rem; }
-    .people-header { display: none; }
-    .people-row {
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      grid-template-areas:
-        "identity role access"
-        "musician musician musician";
-      column-gap: 6px;
-      row-gap: 7px;
-      padding: 8px 9px;
-    }
-    .people-row:first-child { border-top: 0; }
-    .identity { grid-area: identity; gap: 7px; }
-    .avatar { width: 32px; height: 32px; }
-    .identity-text { gap: 0; }
-    .name, .musician-name { font-size: 0.82rem; }
-    .identity .hint { font-size: 0.7rem; line-height: 1.1; }
-    .badge { padding: 1px 5px; font-size: 0.56rem; }
-    .role-cell { grid-area: role; align-self: start; }
-    .access-cell { grid-area: access; align-self: start; gap: 4px; }
-    .musician-cell { grid-area: musician; min-height: 30px; padding-left: 0; }
-    .musician-summary { gap: 7px; }
-    .instrument-list { gap: 3px; font-size: 0.95rem; }
-    .musician-actions { gap: 2px; }
-    .icon-btn { width: 30px; height: 30px; padding: 4px; font-size: 1.2rem; }
-    .access-cell .btn { min-height: 30px; padding: 4px 7px; font-size: 0.7rem; }
-    .musician-editor input, .approval-musician input, .musician-select { font-size: 16px; }
-    .role-select { width: 78px; height: 30px; padding: 2px 5px; font-size: 16px; }
-  }
-</style>
+{#snippet MusicianEditor()}
+  <div class="musician-editor flex w-full min-w-0 flex-col items-start gap-[7px]">
+    {#if $editorKind === 'attach' && mergeTargets.length > 0}
+      {@render musicianSelect($draftMergeTargetId, v => ps().setDraftMergeTarget(v), $t.admin.newMusician, false)}
+    {/if}
+    {#if !$draftMergeTargetId}
+      <Input class="bg-card text-[0.82rem] max-md:text-base" value={$draftName} oninput={event => ps().setDraftName(event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
+      {@render instrumentToggles($draftInstruments, instrument => ps().toggleDraftInstrument(instrument))}
+    {/if}
+    <ButtonRow class="editor-actions">
+      <Button variant="outline" class={btnCls} onclick={() => ps().cancelEditor()}>{$t.musicians.cancel}</Button>
+      <Button class={btnCls} disabled={$saving !== null || (!$draftMergeTargetId && !$draftName.trim())} onclick={saveMusician}>{$t.musicians.save}</Button>
+    </ButtonRow>
+  </div>
+{/snippet}

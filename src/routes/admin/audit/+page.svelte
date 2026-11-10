@@ -1,48 +1,61 @@
 <script lang="ts">
   import LoadingCat from '$components/shared/LoadingCat.svelte';
+  import { Button } from '$components/ui/button';
+  import * as Select from '$components/ui/select';
+  import * as Table from '$components/ui/table';
+  import IconButton from '$components/shared/IconButton.svelte';
+  import * as Empty from '$components/ui/empty';
+  import { getCoreRowModel, type ColumnDef, type PaginationState, type Updater } from '@tanstack/table-core';
+  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import type { AuditLogEntry } from '$lib/types';
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
-  import { getAuditLog } from '$lib/api';
-  import type { AuditLogEntry } from '$lib/types';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { auditPageQuery } from '$lib/query/shell';
+  import { useStore } from '$lib/store/bridge';
+  import { auditStore } from '$lib/store/shell';
   import { formatLocalizedAuditSummary, formatLocalizedAuditEntity } from '$lib/auditI18n';
 
-  let auditPageSize = $state(20);
-  let auditItems = $state<AuditLogEntry[]>([]);
-  let auditCursorStack = $state<string[]>([]);
-  let auditNextCursor = $state<string | undefined>(undefined);
-  let auditLoading = $state(false);
+  const auditPageSize = useStore(auditStore, s => s.pageSize);
+  const auditCursorStack = useStore(auditStore, s => s.cursorStack);
 
-  async function loadAuditPage(cursor?: string) {
-    auditLoading = true;
-    try {
-      const result = await getAuditLog(auditPageSize, cursor);
-      auditItems = result.items;
-      auditNextCursor = result.nextCursor;
-    } finally {
-      auditLoading = false;
-    }
+  const audit = createQuery(() => auditPageQuery(
+    $auditPageSize,
+    $auditCursorStack[$auditCursorStack.length - 1],
+    !$authLoading && $currentUser?.isAdmin === true,
+  ));
+  const auditItems = $derived(audit.data?.items ?? []);
+  const auditNextCursor = $derived(audit.data?.nextCursor);
+  const auditLoading = $derived(audit.isFetching);
+
+  // Data Table with server (cursor) pagination: pageIndex = number of cursors consumed; moving forward pushes
+  // the API's next cursor, moving back pops one. The TanStack Query cursor flow above is unchanged.
+  function onPaginationChange(updater: Updater<PaginationState>) {
+    const current: PaginationState = { pageIndex: $auditCursorStack.length, pageSize: $auditPageSize };
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    if (next.pageSize !== current.pageSize) auditStore.getState().setPageSize(next.pageSize);
+    else if (next.pageIndex > current.pageIndex && auditNextCursor) auditStore.getState().next(auditNextCursor);
+    else if (next.pageIndex < current.pageIndex) auditStore.getState().prev();
   }
 
-  $effect(() => {
-    const _size = auditPageSize;
-    if ($authLoading || !$currentUser?.isAdmin) return;
-    auditCursorStack = [];
-    auditNextCursor = undefined;
-    loadAuditPage();
+  const columns = $derived<ColumnDef<AuditLogEntry>[]>([
+    { id: 'when', header: $t.admin.auditWhen, meta: { cellClass: 'audit-when w-36 text-muted-foreground' }, cell: ({ row }) => renderSnippet(whenCell, row.original) },
+    { id: 'who', header: $t.admin.auditWho, meta: { cellClass: 'audit-who w-28 font-semibold whitespace-normal' }, cell: ({ row }) => renderSnippet(whoCell, row.original) },
+    { id: 'entity', header: $t.admin.auditEntity, meta: { cellClass: 'whitespace-normal' }, cell: ({ row }) => renderSnippet(entityCell, row.original) },
+    { id: 'details', header: $t.admin.auditDetails, meta: { cellClass: 'audit-details whitespace-normal break-words text-muted-foreground' }, cell: ({ row }) => renderSnippet(detailsCell, row.original) },
+  ]);
+  const table = createSvelteTable<AuditLogEntry>({
+    get data() { return auditItems; },
+    get columns() { return columns; },
+    getRowId: entry => entry.sk,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    get pageCount() { return $auditCursorStack.length + (auditNextCursor ? 2 : 1); },
+    state: {
+      get pagination() { return { pageIndex: $auditCursorStack.length, pageSize: $auditPageSize }; },
+    },
+    onPaginationChange,
   });
-
-  function auditNext() {
-    if (!auditNextCursor) return;
-    auditCursorStack = [...auditCursorStack, auditNextCursor];
-    loadAuditPage(auditNextCursor);
-  }
-
-  function auditPrev() {
-    const stack = [...auditCursorStack];
-    stack.pop();
-    auditCursorStack = stack;
-    loadAuditPage(stack[stack.length - 1]);
-  }
 
   function formatTimestamp(timestamp: string) {
     return new Date(timestamp).toLocaleString($lang === 'ru' ? 'ru-RU' : 'en-GB', {
@@ -54,48 +67,54 @@
 
 {#if $currentUser?.isAdmin}
     <section>
-      <div class="audit-header">
-        <select bind:value={auditPageSize} class="page-size-select"><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select>
+      <div class="audit-header mb-2 flex justify-end">
+        <Select.Root type="single" value={String($auditPageSize)} onValueChange={v => table.setPageSize(Number(v))}>
+          <Select.Trigger class="page-size-select w-20 bg-card max-md:text-base" aria-label={$t.admin.auditLog}>{$auditPageSize}</Select.Trigger>
+          <Select.Content>
+            {#each [20, 50, 100] as size (size)}
+              <Select.Item value={String(size)} label={String(size)} />
+            {/each}
+          </Select.Content>
+        </Select.Root>
       </div>
-      {#if auditLoading}<p class="loading"><LoadingCat /></p>
-      {:else if auditItems.length === 0}<p class="hint">{$t.admin.auditEmpty}</p>
+      {#if auditLoading}<LoadingCat />
+      {:else if auditItems.length === 0}<Empty.Root class="hint border"><Empty.Header><Empty.Description>{$t.admin.auditEmpty}</Empty.Description></Empty.Header></Empty.Root>
       {:else}
         <div class="audit-table">
-          <div class="audit-row audit-header-row"><span>{$t.admin.auditWhen}</span><span>{$t.admin.auditWho}</span><span>{$t.admin.auditEntity}</span><span>{$t.admin.auditDetails}</span></div>
-          {#each auditItems as entry (entry.sk)}
-            <div class="audit-row">
-              <span class="audit-when">{formatTimestamp(entry.timestamp)}</span><span class="audit-who">{entry.actorName}</span>
-              <span><span class="entity-type">{$t.admin.auditEntities[entry.entityType]}</span>{formatLocalizedAuditEntity(entry, $lang)}</span>
-              <span class="audit-details">{formatLocalizedAuditSummary(entry, $lang)}</span>
-            </div>
-          {/each}
+          <Table.Root class="max-[700px]:[&_tbody]:grid max-[700px]:[&_tbody]:gap-[3px] max-[700px]:[&_thead]:hidden">
+            <Table.Header>
+              {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+                <Table.Row>
+                  {#each headerGroup.headers as header (header.id)}
+                    <Table.Head>
+                      <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+                    </Table.Head>
+                  {/each}
+                </Table.Row>
+              {/each}
+            </Table.Header>
+            <Table.Body>
+              {#each table.getRowModel().rows as row (row.id)}
+                <Table.Row class="max-[700px]:grid max-[700px]:grid-cols-2 max-[700px]:gap-x-2">
+                  {#each row.getVisibleCells() as cell (cell.id)}
+                    <Table.Cell class="max-[700px]:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
+                      <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+                    </Table.Cell>
+                  {/each}
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
         </div>
-        <div class="audit-nav">
-          <button class="btn btn-nav" disabled={auditCursorStack.length === 0} onclick={auditPrev}>{$t.admin.auditPrev}</button>
-          <button class="btn btn-nav" disabled={!auditNextCursor} onclick={auditNext}>{$t.admin.auditNext}</button>
+        <div class="audit-nav mt-2.5 flex gap-2">
+          <IconButton icon="⬅️" label={$t.admin.auditPrev} disabled={!table.getCanPreviousPage()} onclick={() => table.previousPage()} />
+          <IconButton icon="➡️" label={$t.admin.auditNext} disabled={!table.getCanNextPage()} onclick={() => table.nextPage()} />
         </div>
       {/if}
     </section>
 {/if}
 
-<style>
-  .loading { padding: 40px 20px; }
-  .hint { font-size: 0.8rem; color: var(--text-muted); }
-  .page-size-select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 0.85rem; }
-  .audit-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-  .audit-table { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .audit-row { display: grid; grid-template-columns: 9rem 7rem 1fr 1fr; gap: 8px; padding: 8px 12px; font-size: 0.83rem; border-bottom: 1px solid var(--border); }
-  .audit-row:last-child { border-bottom: 0; }
-  .audit-header-row { background: var(--surface); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
-  .audit-when, .audit-details { color: var(--text-muted); }
-  .audit-when { white-space: nowrap; }
-  .audit-who { font-weight: 600; }
-  .entity-type { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-right: 4px; }
-  .audit-details { word-break: break-word; }
-  .audit-nav { display: flex; gap: 8px; margin-top: 10px; }
-  .btn-nav { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-  @media (max-width: 700px) {
-    .audit-row { grid-template-columns: 1fr 1fr; }
-    .audit-header-row { display: none; }
-  }
-</style>
+{#snippet whenCell(entry: AuditLogEntry)}{formatTimestamp(entry.timestamp)}{/snippet}
+{#snippet whoCell(entry: AuditLogEntry)}{entry.actorName}{/snippet}
+{#snippet entityCell(entry: AuditLogEntry)}<span class="entity-type mr-1 text-[0.68rem] font-bold uppercase text-primary-ink">{$t.admin.auditEntities[entry.entityType]}</span>{formatLocalizedAuditEntity(entry, $lang)}{/snippet}
+{#snippet detailsCell(entry: AuditLogEntry)}{formatLocalizedAuditSummary(entry, $lang)}{/snippet}

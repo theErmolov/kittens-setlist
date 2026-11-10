@@ -4,13 +4,19 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import { page } from '$app/state';
-  import { PUBLIC_API_URL, PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
+  import { PUBLIC_TELEGRAM_BOT_USERNAME } from '$env/static/public';
   import { lang, t } from '$lib/i18n';
-  import { currentUser, authLoading, setToken, getToken } from '$lib/auth';
-  import type { User } from '$lib/types';
+  import { currentUser, authLoading, setToken, getToken, meQueryOptions } from '$lib/auth';
+  import { queryClient } from '$lib/query/client';
+  import { useTelegramLogin } from '$lib/query/auth';
+  import { useStore } from '$lib/store/bridge';
+  import { loginStore } from '$lib/store/shell';
   import LogoCat from '$components/shared/LogoCat.svelte';
+  import { Card } from '$components/ui/card';
+  import { Alert, AlertDescription } from '$components/ui/alert';
 
-  let status: 'idle' | 'loading' | 'pending' | 'rejected' | 'error' = $state('idle');
+  const status = useStore(loginStore, s => s.status);
+  const setStatus = loginStore.getState().setStatus;
 
   // Only this exact external callback is allowed — prevents /login?return= from
   // becoming an open redirect to an arbitrary origin.
@@ -39,35 +45,28 @@
     else goto(`${base}/backlog`);
   });
 
+  const telegramLogin = useTelegramLogin();
+
   // Called by Telegram widget via global callback
   async function onTelegramAuth(data: Record<string, string>) {
-    status = 'loading';
+    setStatus('loading');
     try {
-      const res = await fetch(`${PUBLIC_API_URL}/auth/telegram`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        status = 'error';
-        return;
-      }
-      const { token, user } = await res.json() as { token: string; user: User };
+      const { token, user } = await telegramLogin.mutateAsync(data);
       setToken(token);
-      currentUser.set(user);
+      queryClient.setQueryData(meQueryOptions.queryKey, user);
       if (user.status === 'approved') {
         afterLogin(token);
       } else if (user.status === 'rejected') {
-        status = 'rejected';
+        setStatus('rejected');
       } else {
-        status = 'pending';
+        setStatus('pending');
       }
     } catch {
-      status = 'error';
+      setStatus('error');
     }
   }
 
-  const showWidget = $derived(status === 'idle' || status === 'loading');
+  const showWidget = $derived($status === 'idle' || $status === 'loading');
 
   $effect(() => {
     const widgetLang = $lang;
@@ -93,85 +92,26 @@
   });
 </script>
 
-<div class="login-page">
-  <div class="card">
+<div class="login-page flex min-h-screen items-center justify-center bg-background">
+  <Card class="card w-full max-w-[360px] items-center gap-4 rounded-2xl px-10 py-12">
     <LogoCat size={72} />
-    <h1>{$t.login.title}</h1>
+    <h1 class="text-center text-[1.4rem] font-extrabold text-primary-ink">{$t.login.title}</h1>
 
     {#if showWidget}
-      <p class="subtitle">{$t.login.subtitle}</p>
-      <div id="tg-widget" class="widget-wrap"></div>
-      {#if status === 'loading'}
-        <p class="hint"><LoadingCat /></p>
+      <p class="subtitle text-center text-[0.95rem] text-muted-foreground">{$t.login.subtitle}</p>
+      <div id="tg-widget" class="widget-wrap flex min-h-12 justify-center"></div>
+      {#if $status === 'loading'}
+        <LoadingCat />
       {/if}
-    {:else if status === 'pending'}
-      <p class="status-msg">{$t.login.pending}</p>
-      <p class="hint">{$t.login.pendingHint}</p>
-    {:else if status === 'rejected'}
-      <p class="status-msg rejected">{$t.login.rejected}</p>
-    {:else if status === 'error'}
-      <p class="status-msg rejected">{$t.login.error}</p>
+    {:else if $status === 'pending'}
+      <Alert class="status-msg text-center">
+        <AlertDescription class="text-base text-foreground">{$t.login.pending}</AlertDescription>
+        <AlertDescription class="hint text-[0.85rem]">{$t.login.pendingHint}</AlertDescription>
+      </Alert>
+    {:else if $status === 'rejected'}
+      <Alert variant="destructive" class="status-msg rejected text-center"><AlertDescription class="text-base">{$t.login.rejected}</AlertDescription></Alert>
+    {:else if $status === 'error'}
+      <Alert variant="destructive" class="status-msg rejected text-center"><AlertDescription class="text-base">{$t.login.error}</AlertDescription></Alert>
     {/if}
-  </div>
+  </Card>
 </div>
-
-<style>
-  .login-page {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg);
-  }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 48px 40px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    max-width: 360px;
-    width: 100%;
-  }
-
-  h1 {
-    font-size: 1.4rem;
-    font-weight: 800;
-    background: linear-gradient(90deg, #6c63ff, #c026d3);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-align: center;
-  }
-
-  .subtitle {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    text-align: center;
-  }
-
-  .widget-wrap {
-    display: flex;
-    justify-content: center;
-    min-height: 48px;
-  }
-
-  .status-msg {
-    font-size: 1rem;
-    text-align: center;
-    color: var(--text);
-  }
-
-  .status-msg.rejected {
-    color: #e05252;
-  }
-
-  .hint {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    text-align: center;
-  }
-</style>

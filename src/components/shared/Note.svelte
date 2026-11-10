@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { t } from '$lib/i18n';
+  import LinkifiedText from '$components/shared/LinkifiedText.svelte';
+  import { Button } from '$components/ui/button';
+  import { Textarea } from '$components/ui/textarea';
+  import { useStore } from '$lib/store/bridge';
+  import { noteStore, defaultNoteUi } from '$lib/store/shell';
 
   let { value = '', label, onsave, preview = false, collapsible = false, mobileCollapsible = false, singleLineCollapsible = false }: {
     value?: string;
@@ -11,48 +16,42 @@
     mobileCollapsible?: boolean;
     singleLineCollapsible?: boolean;
   } = $props();
-  let expanded = $state(false);
+
+  // Per-instance UI state lives in the note store, keyed by this component's id.
+  const id = $props.id();
+  const ui = useStore(noteStore, s => s.notes[id] ?? defaultNoteUi);
+  const mobile = useStore(noteStore, s => s.mobile);
+  const patch = (p: Parameters<ReturnType<typeof noteStore.getState>['patch']>[1]) => noteStore.getState().patch(id, p);
+  onDestroy(() => noteStore.getState().dispose(id));
+
+  let expanded = $derived($ui.expanded);
+  let editing = $derived($ui.editing);
+  let saving = $derived($ui.saving);
+  let failed = $derived($ui.failed);
   let long = $derived(collapsible && (value.length > 240 || value.split('\n').length > 3));
-  let mobile = $state(false);
-  let textElement = $state<HTMLDivElement>();
-  let mobileOverflow = $state(false);
-  let canExpand = $derived(long || ((singleLineCollapsible || (mobileCollapsible && mobile)) && mobileOverflow));
+  let canExpand = $derived(long || ((singleLineCollapsible || (mobileCollapsible && $mobile)) && $ui.overflow));
 
-  onMount(() => {
-    const query = window.matchMedia('(max-width: 700px)');
-    const update = () => { mobile = query.matches; };
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  });
-
-  $effect(() => {
-    const element = textElement;
+  // Measures whether the collapsed text overflows its single line.
+  function measureOverflow(element: HTMLElement) {
     value;
     expanded;
-    if (!(mobileCollapsible || singleLineCollapsible) || !element) return;
+    if (!(mobileCollapsible || singleLineCollapsible)) return;
     const measure = () => {
-      mobileOverflow = element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) + 1;
+      patch({ overflow: element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) + 1 });
     };
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     measure();
     return () => observer.disconnect();
-  });
-
-  let editing = $state(false);
-  let draft = $state('');
-  let saving = $state(false);
-  let failed = $state(false);
+  }
 
   async function save() {
-    saving = true;
-    failed = false;
+    patch({ saving: true, failed: false });
     try {
-      await onsave?.(draft);
-      editing = false;
-    } catch { failed = true; }
-    finally { saving = false; }
+      await onsave?.($ui.draft);
+      patch({ editing: false });
+    } catch { patch({ failed: true }); }
+    finally { patch({ saving: false }); }
   }
 </script>
 
@@ -63,17 +62,17 @@
     {#if editing}
       <label>
         <span class="label">{label}</span>
-        <textarea bind:value={draft} maxlength="4000" rows="3" disabled={saving}></textarea>
+        <Textarea class="my-1 min-h-16 resize-y bg-card text-base md:text-[0.85rem]" value={$ui.draft} oninput={e => patch({ draft: e.currentTarget.value })} maxlength={4000} rows={3} disabled={saving} />
       </label>
       <div class="actions">
-        <button disabled={saving} onclick={save}>{saving ? '…' : $t.editor.save}</button>
-        <button disabled={saving} onclick={() => { editing = false; failed = false; }}>{$t.editor.cancel}</button>
+        <Button size="sm" disabled={saving} onclick={save}>{saving ? '…' : $t.editor.save}</Button>
+        <Button size="sm" variant="outline" disabled={saving} onclick={() => patch({ editing: false, failed: false })}>{$t.editor.cancel}</Button>
       </div>
       {#if failed}<span class="error" role="alert">{$t.common.commentSaveFailed}</span>{/if}
     {:else}
-      {#if value}<div bind:this={textElement} class="text" class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded} class:single-line-collapsed={singleLineCollapsible && !expanded}><span class="label">{label}: </span>{value}</div>{/if}
-      {#if canExpand}<button class="edit" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); expanded = !expanded; }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</button>{/if}
-      {#if onsave}<button class="edit" onclick={() => { draft = value; editing = true; failed = false; }}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible && !singleLineCollapsible} · {label}{/if}</button>{/if}
+      {#if value}<div {@attach measureOverflow} class="text" class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded} class:single-line-collapsed={singleLineCollapsible && !expanded}><span class="label">{label}: </span><LinkifiedText text={value} /></div>{/if}
+      {#if canExpand}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); patch({ expanded: !expanded }); }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</Button>{/if}
+      {#if onsave}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" onclick={() => patch({ draft: value, editing: true, failed: false })}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible && !singleLineCollapsible} · {label}{/if}</Button>{/if}
     {/if}
   </div>
 {/if}
@@ -86,15 +85,10 @@
   .collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .single-line-collapsed { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .preview .text { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  textarea { display: block; width: 100%; box-sizing: border-box; margin: 4px 0; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 6px; font: inherit; resize: vertical; }
-  button { cursor: pointer; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 4px 7px; font: inherit; font-size: 0.78rem; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .edit { background: transparent; border: none; padding: 2px 0; }
-  .compact-actions .edit { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
+  .compact-actions :global(.edit) { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
   .actions { display: flex; gap: 6px; }
-  .error { color: #ef4444; }
+  .error { color: var(--c-danger); }
   @media (max-width: 700px) {
     .mobile-collapsed, .preview .text { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-    textarea { font-size: 16px; }
   }
 </style>
