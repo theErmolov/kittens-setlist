@@ -1,7 +1,6 @@
 <script lang="ts">
   import SongEntryRow from '$components/setlist/SongEntryRow.svelte';
   import { Button } from '$components/ui/button';
-  import { Toggle } from '$components/ui/toggle';
   import CommentInput from '$components/setlist/CommentInput.svelte';
   import { Alert, AlertDescription } from '$components/ui/alert';
   import { Card, CardContent } from '$components/ui/card';
@@ -19,13 +18,11 @@
   import PageControls from '$components/shared/PageControls.svelte';
   import DateTimeCrumb from '$components/shared/DateTimeCrumb.svelte';
   import { isPastRehearsal, rehearsalTime } from '$components/rehearsals/classes';
-  import { chip } from '$components/setlist/classes';
   import SongTableHead from '$components/setlist/SongTableHead.svelte';
   import { songColumns, songVisibility, type SongTableRow } from '$components/setlist/songColumns';
   import { createSvelteTable } from '$components/ui/data-table';
   import { getCoreRowModel } from '@tanstack/table-core';
   import * as Popover from '$components/ui/popover';
-  import * as Drawer from '$components/ui/drawer';
   import { noteStore } from '$lib/store/shell';
   import { dragModeStore } from '$lib/store/drag';
   import { onDestroy, untrack } from 'svelte';
@@ -70,7 +67,7 @@
   const { patch } = detail.getState();
   const st = () => detail.getState();
   const busyS = useStore(detail, s => s.busy), errorS = useStore(detail, s => s.error), showFormS = useStore(detail, s => s.showForm);
-  const repeatingS = useStore(detail, s => s.repeating), readinessFirstS = useStore(detail, s => s.readinessFirst), participantsS = useStore(detail, s => s.participantFilter), filterOpenS = useStore(detail, s => s.filterOpen);
+  const repeatingS = useStore(detail, s => s.repeating), readinessFirstS = useStore(detail, s => s.readinessFirst), participantsS = useStore(detail, s => s.participantFilter), filterOpenS = useStore(detail, s => s.filterOpen), filterTextS = useStore(detail, s => s.filterText);
   const lyricsS = useStore(detail, s => s.lyricsKey), confirmS = useStore(detail, s => s.confirm);
   const dragEnabled = useStore(dragModeStore, s => s.enabled);
   const mobile = useStore(noteStore, s => s.mobile);
@@ -92,17 +89,17 @@
   const activeAttendees = $derived(rehearsal?.attendees ?? []);
   const plays = (item: RehearsalSong, name: string) => (item.song.musicians[name]?.instruments.length ?? 0) > 0;
   const participants = $derived($participantsS);
-  const filtering = $derived(participants.length > 0);
+  const text = $derived($filterTextS.trim().toLowerCase());
+  const filtering = $derived(participants.length > 0 || text !== '');
   const sortedSongs = $derived(readinessFirst
     ? [...(rehearsal?.songs ?? [])].sort((a, b) => (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity))
     : rehearsal?.songs ?? []);
   // Participant filter: AND, like the backlog's musician filter.
-  const displayedSongs = $derived(filtering ? sortedSongs.filter(item => participants.every(name => plays(item, name))) : sortedSongs);
+  const displayedSongs = $derived(filtering ? sortedSongs.filter(item => participants.every(name => plays(item, name)) && (!text || `${item.song.artist} ${item.song.title}`.toLowerCase().includes(text))) : sortedSongs);
   const filterNames = $derived(orderMusicianNames(activeAttendees, musicians));
   const filterCounts = $derived(Object.fromEntries(filterNames.map(name => [name, (rehearsal?.songs ?? []).filter(item => plays(item, name)).length])));
-  let filterAnchor = $state<HTMLElement | null>(null); // DOM handle only
-  const activeFilterCount = $derived(participants.length + (readinessFirst ? 1 : 0));
-  const onClass = 'data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90';
+  const activeFilterCount = $derived(participants.length + (text ? 1 : 0) + (readinessFirst ? 1 : 0));
+  const onClass = 'data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
   // The API strips personal comments from rehearsals, so show the caller's own note from the source
   // setlist entry (or the backlog song), which both come back already personalised.
   function personalNote(item: RehearsalSong): string | undefined {
@@ -395,20 +392,20 @@
 {/snippet}
 
 {#snippet songHeader()}
-  <span class="text-[.85rem] font-bold text-foreground">{$rt.songs}</span> <span class="ml-1 text-muted-foreground">{rehearsal!.songs.filter(song => song.played).length}/{rehearsal!.songs.length}</span>
+  <span class="max-mid:hidden"><span class="text-[.85rem] font-bold text-foreground">{$rt.songs}</span> <span class="ml-1 text-muted-foreground">{rehearsal!.songs.filter(song => song.played).length}/{rehearsal!.songs.length}</span></span>
 {/snippet}
 
 {#if $canAccessRehearsals}
 {#if !loading && rehearsal}
 <!-- Desktop bar; on small screens the date header sits in the page and the controls in a bottom bar (as in the catalog). -->
-<div class="contents max-[700px]:hidden">
+<div class="contents max-mid:hidden">
 <PageControls label={$rt.title}>
   {#snippet start()}
   <NavigationMenu.Item class="min-w-0 max-w-full">
     <Breadcrumb.Root>
       <Breadcrumb.List class="flex-nowrap items-center gap-1.5 sm:gap-1.5">
-        <Breadcrumb.Item class="shrink-0 max-[700px]:hidden"><Breadcrumb.Link href="{base}/rehearsals" class="inline-flex min-h-10 items-center">{$rt.title}</Breadcrumb.Link></Breadcrumb.Item>
-        <Breadcrumb.Separator class="max-[700px]:hidden" />
+        <Breadcrumb.Item class="shrink-0 max-mid:hidden"><Breadcrumb.Link href="{base}/rehearsals" class="inline-flex min-h-10 items-center">{$rt.title}</Breadcrumb.Link></Breadcrumb.Item>
+        <Breadcrumb.Separator class="max-mid:hidden" />
         <Breadcrumb.Item class="min-w-0 flex-col items-start gap-0.5 py-0.5">
           <DateTimeCrumb date={rehearsal.date} time={rehearsalTime(rehearsal)} past={isPastRehearsal(rehearsal)} />
           {#if linked}
@@ -420,61 +417,45 @@
       </Breadcrumb.List>
     </Breadcrumb.Root>
   </NavigationMenu.Item>
-  <PageControlsDivider />
-  <NavigationMenu.Item>
-    <span bind:this={filterAnchor} class="inline-flex">
-      <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpenS} expanded={$filterOpenS} onpressedchange={v => patch({ filterOpen: v })}>
-        {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
-      </IconButton>
-    </span>
-    <Popover.Root open={$filterOpenS && !$mobile} onOpenChange={v => patch({ filterOpen: v })}>
-      <Popover.Content customAnchor={filterAnchor} align="start" class="w-[340px] p-1" onInteractOutside={e => { if (filterAnchor?.contains(e.target as Node)) e.preventDefault(); }}>
-        <RehearsalFilter names={filterNames} counts={filterCounts} shown={displayedSongs.length} total={rehearsal.songs.length} />
-      </Popover.Content>
-    </Popover.Root>
-  </NavigationMenu.Item>
-  <NavigationMenu.Item>{@render dragBtn()}</NavigationMenu.Item>
-  <NavigationMenu.Item class="min-w-0"><ButtonRow class="min-w-0 flex-nowrap gap-1.5 overflow-hidden">
-    {#if readinessFirst}<Badge variant="secondary" class="h-6 max-w-48 gap-1 pr-1 text-[0.8rem] font-medium"><span aria-hidden="true">📉</span><span class="truncate">{$rt.leastReadyFirst}</span><button type="button" class="rounded-full px-1 leading-none text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="{$t.backlog.filterRemove}: {$rt.leastReadyFirst}" onclick={() => patch({ readinessFirst: false })}>✕</button></Badge>{/if}
-    {#each participants as name (name)}<Badge variant="secondary" class="h-6 max-w-48 gap-1 pr-1 text-[0.8rem] font-medium"><span class="truncate">{name}</span><button type="button" class="rounded-full px-1 leading-none text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="{$t.backlog.filterRemove}: {name}" onclick={() => detail.getState().toggleParticipant(name)}>✕</button></Badge>{/each}
-  </ButtonRow></NavigationMenu.Item>
   {/snippet}
   {#snippet end()}
+  <NavigationMenu.Item>
+    <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpenS} expanded={$filterOpenS} onpressedchange={v => patch({ filterOpen: v })}>
+      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
+    </IconButton>
+  </NavigationMenu.Item>
+  <NavigationMenu.Item>{@render dragBtn()}</NavigationMenu.Item>
   <NavigationMenu.Item>{@render actionsMenu()}</NavigationMenu.Item>
   {/snippet}
 </PageControls>
 </div>
-<div class="flex flex-col gap-0.5 px-3 pt-3 min-[701px]:hidden">
+<RehearsalFilter names={filterNames.filter(n => permanentNames.includes(n))} guests={filterNames.filter(n => !permanentNames.includes(n))} counts={filterCounts} />
+<div class="flex flex-col gap-0.5 border-b bg-(--table-selected) px-3 py-2 min-mid:hidden">
   <DateTimeCrumb date={rehearsal.date} time={rehearsalTime(rehearsal)} past={isPastRehearsal(rehearsal)} />
   {#if linked}
     <a href="{base}/setlists/{linked.id}" class="block text-[.85rem] leading-tight text-primary-ink no-underline"><span aria-hidden="true">🎪</span> {linked.name}</a>
   {:else if rehearsal.setlistId}
     <span class="block text-[.8rem] leading-tight text-muted-foreground"><span aria-hidden="true">🎪</span> {$rt.unavailableSetlist}</span>
   {/if}
+  <div class="mt-1 text-[.8rem] font-bold tracking-wide text-foreground uppercase">{$rt.songs} <span class="ml-1 font-normal text-muted-foreground">{rehearsal.songs.filter(song => song.played).length}/{rehearsal.songs.length}</span></div>
 </div>
-<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
+<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-mid:grid grid-cols-[1fr_auto_1fr]">
+  <div class="flex justify-end gap-2">
   <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpenS} onpressedchange={v => patch({ filterOpen: v })}>
     {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
   </IconButton>
-  {@render dragBtn()}
-  <div class="ml-auto">{@render actionsMenu()}</div>
+  </div>
+  <div>{@render actionsMenu()}</div>
+  <div class="flex justify-start gap-2">{@render dragBtn()}</div>
 </div>
-<Drawer.Root open={$filterOpenS && $mobile} onOpenChange={v => patch({ filterOpen: v })} shouldScaleBackground={false}>
-  <Drawer.Content class="min-[701px]:hidden">
-    <Drawer.Header><Drawer.Title>{$t.backlog.filterBtn}</Drawer.Title></Drawer.Header>
-    <div class="flex flex-col gap-3 px-2 pb-6">
-      <RehearsalFilter names={filterNames} counts={filterCounts} shown={displayedSongs.length} total={rehearsal.songs.length} />
-    </div>
-  </Drawer.Content>
-</Drawer.Root>
 {/if}
-<div class="px-4 pt-3 pb-4 max-[700px]:px-0 max-[700px]:pb-[52px]">
-  {#if error}<Alert variant="destructive" class="mb-3 flex items-center justify-between gap-2"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={reload} disabled={busy}>{$rt.reload}</Button></Alert>{/if}
+<div class="p-0 max-mid:pb-[52px]">
+  {#if error}<Alert variant="destructive" class="m-3 flex w-auto items-center justify-between gap-2"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={reload} disabled={busy}>{$rt.reload}</Button></Alert>{/if}
   {#if loading}<LoadingCat />
   {:else if rehearsal}
     <h1 class="sr-only">{formatDate(rehearsal.date, $lang)} {rehearsalTime(rehearsal)}</h1>
     {#if rehearsal.cancelled || rehearsal.location || rehearsal.note}
-    <Card class="mb-3 max-[700px]:mx-3">
+    <Card class="m-3">
       <CardContent class="flex flex-col items-start gap-2">
         {#if rehearsal.cancelled}<Alert><AlertDescription>{$rt.cancelledHint}</AlertDescription></Alert>{/if}
         {#if rehearsal.location}<p class="m-0 text-base">{rehearsal.location}</p>{/if}
@@ -482,7 +463,7 @@
       </CardContent>
     </Card>
     {/if}
-    {#if !rehearsal.songs.length}<h2 class="mt-3 mb-3 text-base font-bold">{$rt.songs}</h2>{/if}
+    {#if !rehearsal.songs.length}<h2 class="m-3 text-base font-bold">{$rt.songs}</h2>{/if}
     {#if !rehearsal.songs.length}<Empty class="border"><EmptyHeader><EmptyTitle class="text-base font-normal text-muted-foreground">{$rt.emptySongs}</EmptyTitle></EmptyHeader></Empty>{/if}
     {#if rehearsal.songs.length}
     <div>
@@ -508,6 +489,7 @@
         bubbleMusicians={permanentNames}
         rowClass={{ dragging: dragMoved && dragIndex === index, 'drag-over': dragMoved && dropIndex === index && dragIndex !== index }}
         rowProps={{ 'data-rehearsal-index': index }}
+        titleFirst
         onlyrics={() => patch({ lyricsKey: songKey })}
         personalNote={personalNote(item)}
         onpersonal={anchor => { patch({ levelPicker: null }); notePopoverStore.getState().toggle(songKey, personalNote(item) ?? '', anchor); }}

@@ -60,6 +60,12 @@ curl -o static/emoji/{codepoint}.svg \
 
 Find the codepoint from the emoji character (e.g. `U+1F3B8` → `1f3b8`). Drop variation selectors (`U+FE0F`).
 
+## Screen sizes (breakpoints)
+
+Three tiers matching real devices, defined once as theme variables in `src/app.css` (`--breakpoint-mid: 1025px`, `--breakpoint-big: 1367px`): **small** (phones and iPads in portrait; bottom action bars, compact two-line rows), **mid** (iPads in landscape and small laptops; top bar, rows still compact, time column hidden) and **big** (desktop).
+- Tailwind: `max-mid:` (small only), `mid:` / `min-mid:` (mid and up), `max-big:` (small + mid), `big:` / `min-big:`; the `compact:` variant means small or very short screens.
+- JS: `below('mid')` / `below('big')` from `$lib/breakpoints` (reads the same theme variables). Never hard-code widths like 700/1024.
+
 ## UI standards — apply to every new page and form
 
 Before implementing UI, inspect the closest existing page/form and reuse its components, styles, helpers, and interaction patterns. UI consistency is part of feature completion; do not wait for a separate polish request. The references below define the default for new UI, not permission to restyle unrelated existing screens.

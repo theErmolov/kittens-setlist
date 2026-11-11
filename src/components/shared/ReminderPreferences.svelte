@@ -6,6 +6,7 @@
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { Switch } from '$components/ui/switch';
   import { Label } from '$components/ui/label';
+  import TelegramIcon from './TelegramIcon.svelte';
 
   const prefs = createQuery(() => ({
     ...notificationPreferencesQuery(),
@@ -21,11 +22,12 @@
 
 {#if $currentUser?.status === 'approved' && $currentUser.telegramId}
   <div class="reminder-setting min-w-0">
-    <!-- Bordered chip around the switch and its label; the label wraps onto two lines. -->
+    <!-- Bordered chip around the switch and its two-line label. -->
     <div class="flex h-10 w-fit items-center gap-2.5 rounded-lg border bg-background px-2.5">
       <!-- Controlled: the visible state always follows the server value (reverts on failure). -->
       <Switch id="{id}-reminders" bind:checked={() => enabled, v => update.mutate(v)} disabled={loading || update.isPending} />
-      <Label for="{id}-reminders" class="w-[8.75rem] cursor-pointer text-[0.78rem] leading-[1.15] font-normal whitespace-normal {loading || update.isPending ? 'opacity-50' : ''}">{$rt.personalReminders}</Label>
+<!-- «Напоминать / мне в [Telegram]» on two lines at every size (the full text stays as the tooltip). -->
+      <Label for="{id}-reminders" title={$rt.personalReminders} class="cursor-pointer text-[0.82rem] leading-[1.15] font-normal whitespace-nowrap {loading || update.isPending ? 'opacity-50' : ''}"><span class="flex flex-col">{$rt.remindShort}<span class="inline-flex items-center gap-1">{$rt.remindShortMe} <TelegramIcon class="size-3.5 shrink-0" /></span></span></Label>
     </div>
     {#if error}<p class="mt-2 text-destructive" role="alert">{error}</p>{/if}
   </div>

@@ -6,6 +6,7 @@ import { browser } from '$app/environment';
 import { createStore } from 'zustand/vanilla';
 import type { SortingState, Updater } from '@tanstack/table-core';
 import { getCachedNavFlags } from '$lib/auth';
+import { below } from '$lib/breakpoints';
 import type { BudgetEntry, BudgetKind, Instrument, PaymentMethod, UserRole } from '$lib/types';
 
 // ─── Nav bar (flags seeded from cache so first paint has the right icon count) ──
@@ -242,7 +243,10 @@ export const defaultNoteUi: NoteUi = { expanded: false, editing: false, draft: '
 
 interface NoteState {
   notes: Record<string, NoteUi>;
+  /** Small tier. */
   mobile: boolean;
+  /** Small or mid tier (below the big tier): touch-sized layouts, e.g. action drawers. */
+  narrow: boolean;
   patch: (id: string, patch: Partial<NoteUi>) => void;
   dispose: (id: string) => void;
 }
@@ -250,6 +254,7 @@ interface NoteState {
 export const noteStore = createStore<NoteState>(set => ({
   notes: {},
   mobile: false,
+  narrow: false,
   patch: (id, patch) => set(s => ({ notes: { ...s.notes, [id]: { ...defaultNoteUi, ...s.notes[id], ...patch } } })),
   dispose: id => set(s => {
     const { [id]: _removed, ...notes } = s.notes;
@@ -258,9 +263,10 @@ export const noteStore = createStore<NoteState>(set => ({
 }));
 
 if (browser) {
-  const query = window.matchMedia('(max-width: 700px)');
-  const update = () => noteStore.setState({ mobile: query.matches });
+  const mid = below('mid'), big = below('big');
+  const update = () => noteStore.setState({ mobile: mid.matches, narrow: big.matches });
   update();
-  query.addEventListener('change', update);
+  mid.addEventListener('change', update);
+  big.addEventListener('change', update);
 }
 

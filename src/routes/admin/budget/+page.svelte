@@ -59,14 +59,14 @@
   // Data Table: default sort is date descending; sorting state lives in budgetStore.
   const who = (e: BudgetEntry) => e.kind === 'income' ? e.person || '—' : e.kind === 'expense' ? e.spentBy || '—' : e.creditor || '—';
   const columns = $derived<ColumnDef<BudgetEntry>[]>([
-    { id: 'date', accessorFn: e => e.date, header: $t.budget.date, meta: { cellClass: 'whitespace-nowrap max-[700px]:basis-full' }, cell: ({ row }) => renderSnippet(dateCell, row.original) },
+    { id: 'date', accessorFn: e => e.date, header: $t.budget.date, meta: { cellClass: 'whitespace-nowrap max-mid:basis-full' }, cell: ({ row }) => renderSnippet(dateCell, row.original) },
     { id: 'kind', accessorFn: e => e.kind, header: $t.budget.cols.kind, enableSorting: false, cell: ({ row }) => renderSnippet(kindCell, row.original) },
     { id: 'who', accessorFn: who, header: $t.budget.cols.who, enableSorting: false, cell: ({ row }) => renderSnippet(whoCell, row.original) },
-    { id: 'what', accessorFn: e => (e.kind === 'expense' ? e.description : '') ?? '', header: $t.budget.cols.what, enableSorting: false, meta: { cellClass: 'whitespace-normal max-[700px]:basis-full' }, cell: ({ row }) => renderSnippet(whatCell, row.original) },
+    { id: 'what', accessorFn: e => (e.kind === 'expense' ? e.description : '') ?? '', header: $t.budget.cols.what, enableSorting: false, meta: { cellClass: 'whitespace-normal max-mid:basis-full' }, cell: ({ row }) => renderSnippet(whatCell, row.original) },
     { id: 'method', accessorFn: e => (e.kind === 'debt' ? '' : e.method), header: $t.budget.method, enableSorting: false, cell: ({ row }) => renderSnippet(methodCell, row.original) },
     { id: 'amount', accessorFn: e => e.amount, header: $t.budget.amount, meta: { cellClass: 'text-right' }, cell: ({ row }) => renderSnippet(amountCell, row.original) },
     { id: 'paid', accessorFn: e => (e.kind === 'debt' ? e.paid : false) ?? false, header: $t.budget.cols.paid, enableSorting: false, cell: ({ row }) => renderSnippet(paidCell, row.original) },
-    { id: 'actions', header: '', enableSorting: false, meta: { cellClass: 'w-16 max-[700px]:ml-auto' }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
+    { id: 'actions', header: '', enableSorting: false, meta: { cellClass: 'w-16 max-mid:ml-auto' }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
   ]);
   const table = createSvelteTable<BudgetEntry>({
     get data() { return entries; },
@@ -118,7 +118,7 @@
 </script>
 
 {#snippet stat(label: string, value: string, accent = false, neg = false)}
-  <Card class="card min-w-0 flex-[1_1_110px] gap-1 rounded-[10px] p-3 {accent ? 'accent border-primary bg-secondary' : ''}">
+  <Card class="card min-w-0 flex-[1_1_110px] gap-1 rounded-[10px] p-3 {accent ? 'accent border-primary bg-(--secondary-soft)' : ''}">
     <span class="card-lbl text-[0.78rem] text-muted-foreground">{label}</span>
     <span class="card-val text-[1.1rem] font-bold {neg ? 'neg text-danger-ink' : ''}">{value}</span>
   </Card>
@@ -156,7 +156,7 @@
       </Empty.Root>
     {:else}
       <div class="mb-7">
-        <Table.Root class="rows max-[700px]:[&_tbody]:grid max-[700px]:[&_tbody]:gap-[3px] max-[700px]:[&_thead]:hidden">
+        <Table.Root class="rows max-mid:[&_tbody]:grid max-mid:[&_tbody]:gap-[3px] max-mid:[&_thead]:hidden">
           <Table.Header>
             {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
               <Table.Row>
@@ -178,9 +178,9 @@
           <Table.Body>
             {#each table.getRowModel().rows as row (row.id)}
               {@const e = row.original}
-              <Table.Row class="row max-[700px]:flex max-[700px]:flex-wrap max-[700px]:items-center max-[700px]:gap-x-3 max-[700px]:px-3 max-[700px]:py-2 {e.kind === 'debt' && e.paid ? 'paid opacity-55' : ''}">
+              <Table.Row class="row max-mid:flex max-mid:flex-wrap max-mid:items-center max-mid:gap-x-3 max-mid:px-3 max-mid:py-2 {e.kind === 'debt' && e.paid ? 'paid opacity-55' : ''}">
                 {#each row.getVisibleCells() as cell (cell.id)}
-                  <Table.Cell class="max-[700px]:not-last:border-r-0 max-[700px]:p-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
+                  <Table.Cell class="max-mid:not-last:border-r-0 max-mid:p-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
                     <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
                   </Table.Cell>
                 {/each}

@@ -17,6 +17,7 @@
   import LinkifiedText from '$components/shared/LinkifiedText.svelte';
   import Note from '$components/shared/Note.svelte';
   import SongEntryRow from '../SongEntryRow.svelte';
+  import { below } from '$lib/breakpoints';
   import CommentInput from '../CommentInput.svelte';
   import { onDestroy, onMount } from 'svelte';
   import type { SetlistEntry, SetlistSubset } from '$lib/types';
@@ -73,7 +74,7 @@
   const subsetCount = () => subsetTotal(data.entries, data.subsets);
 
   function handleSubsetHeaderClick(subset: SetlistSubset) {
-    if ($activeSubsetId !== subset.id && window.matchMedia('(max-width: 700px)').matches) actions.openSubsetEdit(subset);
+    if ($activeSubsetId !== subset.id && below('mid').matches) actions.openSubsetEdit(subset);
   }
 
   function handleRowClick(e: MouseEvent, entry: SetlistEntry) {
@@ -155,7 +156,7 @@
   // Columns actually rendered (visibility state minus what CSS hides at this width): what full-width rows must span.
   const tier = sel(s => s.tier);
   $effect(() => {
-    const mobile = matchMedia('(max-width: 1101px)'), mid = mobile;
+    const mobile = below('mid'), mid = mobile;
     const update = () => actions.patch({ tier: mobile.matches ? 'mobile' : mid.matches ? 'mid' : 'wide' });
     update();
     mobile.addEventListener('change', update); mid.addEventListener('change', update);
@@ -292,7 +293,7 @@
   }
 
   function onSubsetDragStart(e: DragEvent, subsetId: string) {
-    if (!$canWrite || data.isFiltered || window.matchMedia('(max-width: 700px)').matches) {
+    if (!$canWrite || data.isFiltered || below('mid').matches) {
       e.preventDefault();
       return;
     }
@@ -447,13 +448,15 @@
 
 {#snippet numHeader()}
   <span class="flex items-center justify-start gap-1.5">#
-    <VibeBadge vibe={data.meta.vibe} class="px-1.5 text-[0.65rem]" />
+    <VibeBadge vibe={data.meta.vibe} class="h-4 px-1.5 py-0 text-[0.65rem]" />
   </span>
 {/snippet}
 
 {#snippet songHeader()}
-  <span class="tracking-normal normal-case">{$t.editor.songs(data.songCount)} ({formatDuration(data.totalMinutes, $lang)})</span>
-  {#if data.songCount > 0}<span class="ml-2 tracking-normal text-success-ink normal-case">{$t.progress.readyCount(data.readyCount, data.songCount)}</span>{/if}
+  <span class="flex min-w-0 items-baseline gap-x-3 tracking-normal normal-case">
+    <span class="shrink-0">{$t.editor.songs(data.songCount)} ({formatDuration(data.totalMinutes, $lang)})</span>
+    {#if data.songCount > 0}<span class="shrink-0 text-success-ink">{$t.progress.readyCount(data.readyCount, data.songCount)}</span>{/if}
+  </span>
 {/snippet}
 
 
@@ -491,7 +494,7 @@
               {@const active = $activeSubsetId === item.subset.id}
               {@const canDragHeader = $canWrite && !data.isFiltered && $dragEnabled && !active}
               <Table.Row
-                class="group/sh border-0 select-none hover:bg-transparent [&[draggable=true]]:cursor-grab max-[700px]:cursor-pointer"
+                class="group/sh border-0 select-none hover:bg-transparent [&[draggable=true]]:cursor-grab max-mid:cursor-pointer"
                 draggable={canDragHeader}
                 data-subset-header
                 data-subset-block-id={item.subset.id}
@@ -505,16 +508,16 @@
                   colspan={totalCols}
                   class={cn(
                     'w-full border-t border-border p-0',
-                    active ? 'bg-[color-mix(in_srgb,var(--accent)_75%,var(--card))]' : 'bg-[color-mix(in_srgb,var(--accent)_45%,var(--card))] min-[701px]:group-hover/sh:bg-[color-mix(in_srgb,var(--accent)_60%,var(--card))]',
+                    active ? 'bg-[color-mix(in_srgb,var(--accent)_75%,var(--card))]' : 'bg-(--set-row) min-mid:group-hover/sh:bg-[color-mix(in_srgb,var(--set-row),var(--text)_6%)]',
                     $draggedSubsetId === item.subset.id && 'opacity-40',
                     $overSubsetId === item.subset.id && $draggedSubsetId !== item.subset.id && 'bg-muted ring-1 ring-inset ring-border',
                   )}
                 >
-                  <Item.Root class="min-h-14 flex-nowrap gap-2 rounded-none border-0 py-2 pr-2 pl-2.5 text-[0.86rem] max-[700px]:flex-wrap">
-                    {#if $canWrite && $dragEnabled}<span class="text-base text-muted-foreground opacity-60 max-[700px]:hidden">⠿</span>{/if}
+                  <Item.Root class="min-h-10 flex-nowrap gap-2 rounded-none border-0 py-1 pr-2 pl-2.5 text-[0.86rem] max-mid:min-h-8 max-mid:flex-wrap max-mid:gap-x-2 max-mid:gap-y-0">
+                    {#if $canWrite && $dragEnabled}<span class="text-base text-muted-foreground opacity-60 max-mid:hidden">⠿</span>{/if}
                     {#if $canWrite && active}
                       <Input
-                        class="w-auto min-w-[180px] border-border bg-card font-bold aria-invalid:border-danger-solid max-[700px]:min-w-0 max-[700px]:flex-1"
+                        class="w-auto min-w-[180px] border-border bg-card font-bold aria-invalid:border-danger-solid max-mid:min-w-0 max-mid:flex-1"
                         value={$draftSubsetName}
                         oninput={(e) => actions.patch({ draftSubsetName: e.currentTarget.value })}
                         required
@@ -524,13 +527,13 @@
                         onkeydown={(e) => { if (e.key === 'Enter') actions.finishSubsetEdit(); }}
                       />
                     {:else}
-                      <Item.Title class="font-bold text-foreground">⏭ {item.subset.name}</Item.Title>
+                      <Item.Title class="text-[0.95rem] font-black text-foreground"><span class="no-tint" aria-hidden="true">⏭</span> {item.subset.name}</Item.Title>
                     {/if}
-                    <Badge variant="secondary" class="px-2 text-[0.8rem] font-normal text-muted-foreground max-[700px]:mr-auto">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</Badge>
-                    {#if $canWrite && !active}<span class="hidden w-full text-[0.76rem] text-muted-foreground max-[700px]:inline">{$t.editor.subsetTapEdit}</span>{/if}
+                    <Badge variant="secondary" class="bg-card/60 px-2 text-[0.8rem] font-normal text-foreground/80 max-mid:mr-auto">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</Badge>
                     {#if $canWrite && !active}
-                      <Item.Actions class="ml-auto max-[700px]:hidden">
-                        <RowActions actions={[
+                      <!-- Full height of the header bar (cancels its padding), square, no outline. -->
+                      <Item.Actions class="-my-1 -mr-2 ml-auto self-stretch max-mid:hidden">
+                        <RowActions class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
                           { icon: '✏️', label: $t.editor.subsetEdit, onselect: () => actions.openSubsetEdit(item.subset) },
                           { icon: '🗑', label: $t.editor.subsetDissolve, destructive: true, separatorBefore: true, onselect: () => actions.dissolveSubset(item.subset.id) },
                         ]} />
@@ -542,13 +545,13 @@
             {:else if item.kind === 'hint'}
               <Table.Row class="border-0 hover:bg-transparent">
                 <Table.Cell colspan={totalCols} class="w-full bg-card p-0">
-                  <Item.Root class="rounded-none border-0 px-2.5 py-2 text-[0.8rem] text-muted-foreground max-[700px]:flex-wrap">
-                    <Item.Content class="max-[700px]:basis-full"><span class="whitespace-normal">{$t.editor.subsetHint}</span></Item.Content>
-                    <Item.Actions class="hidden max-[700px]:flex">
+                  <Item.Root class="rounded-none border-0 px-2.5 py-2 text-[0.8rem] text-muted-foreground max-mid:flex-wrap">
+                    <Item.Content class="max-mid:basis-full"><span class="whitespace-normal">{$t.editor.subsetHint}</span></Item.Content>
+                    <Item.Actions class="hidden max-mid:flex">
                       <Button variant="outline" onclick={() => actions.moveSubsetBy(item.subset.id, -1)} disabled={subsetPos(item.subset.id) <= 0}>{$t.editor.subsetUp}</Button>
                       <Button variant="outline" onclick={() => actions.moveSubsetBy(item.subset.id, 1)} disabled={subsetPos(item.subset.id) >= subsetCount() - 1}>{$t.editor.subsetDown}</Button>
                     </Item.Actions>
-                    <Item.Actions class="max-[700px]:ml-auto">
+                    <Item.Actions class="max-mid:ml-auto">
                       <Button variant="ghost" onclick={() => actions.dissolveSubset(item.subset.id)}>{$t.editor.subsetDissolve}</Button>
                       <Button onclick={() => actions.finishSubsetEdit()} disabled={!$draftSubsetName.trim()}>{$t.editor.subsetDone}</Button>
                     </Item.Actions>
@@ -609,7 +612,7 @@
                         {#if $activeSubsetId !== null}
                           <span class="block text-center text-base font-bold text-primary-ink">{entry.subsetId === $activeSubsetId ? '✓' : (entry.subsetId ? '' : '+')}</span>
                         {:else if $dragEnabled}
-                          <span class="drag-handle block opacity-40 min-[701px]:group-hover/row:opacity-100">⠿</span>
+                          <span class="drag-handle block opacity-40 min-mid:group-hover/row:opacity-100">⠿</span>
                         {/if}
                       {/if}
                     {/snippet}
@@ -620,14 +623,14 @@
                           onsave={(v) => saveEntryComment(entry.order, v)}
                         />
                       {:else if entry.comment}
-                        <span class="block truncate text-[0.94rem] text-muted-foreground italic max-[700px]:whitespace-normal" title={entry.comment}><LinkifiedText text={entry.comment} /></span>
+                        <span class="block truncate text-[0.94rem] text-muted-foreground italic max-mid:whitespace-normal" title={entry.comment}><LinkifiedText text={entry.comment} /></span>
                       {/if}
                     {/snippet}
                   </SongEntryRow>
                 {/if}
               {:else}
                 {@const breakCell = cn(
-                  'py-2 not-last:border-r-0 border-y border-dashed border-border bg-info first:border-l last:border-r last:pr-[7px] min-[701px]:group-hover/br:border-primary',
+                  'py-2 not-last:border-r-0 border-y border-dashed border-border bg-info first:border-l last:border-r last:pr-[7px] min-mid:group-hover/br:border-primary',
                   isDragging && 'opacity-35',
                   isOver && 'outline-2 -outline-offset-1 outline-dotted outline-primary',
                 )}
@@ -639,13 +642,14 @@
                   ondragover={canDrag ? (e => onEntryDragOver(e, key)) : undefined}
                   ondragend={canDrag ? () => actions.clearEntryDrag() : undefined}
                 >
-                  {#if dragCol}<Table.Cell class={cn(breakCell, 'w-6 touch-none py-2 text-center text-base text-muted-foreground select-none')} onpointerdown={$dragEnabled ? (e => startTouchReorder(e, key)) : undefined}>{#if $canWrite && $dragEnabled}<span class="drag-handle block opacity-40 min-[701px]:group-hover/br:opacity-100">⠿</span>{/if}</Table.Cell>{/if}
+                  {#if dragCol}<Table.Cell class={cn(breakCell, 'w-6 touch-none py-2 text-center text-base text-muted-foreground select-none')} onpointerdown={$dragEnabled ? (e => startTouchReorder(e, key)) : undefined}>{#if $canWrite && $dragEnabled}<span class="drag-handle block opacity-40 min-mid:group-hover/br:opacity-100">⠿</span>{/if}</Table.Cell>{/if}
                   <Table.Cell class={cn(breakCell, 'w-7 py-2')}></Table.Cell>
                   {#if timeCol}<Table.Cell class={cn(breakCell, 'w-[42px] py-2 text-right text-[0.72rem] text-muted-foreground')}>{entryTimes.get(entryKey(entry)) ?? ''}</Table.Cell>{/if}
-                  <Table.Cell colspan={totalCols - 1 - (dragCol ? 1 : 0) - (timeCol ? 1 : 0)} class={cn(breakCell, 'py-2 text-[0.82rem] whitespace-normal text-muted-foreground')}>
-                    <Item.Root class="flex-nowrap items-center gap-1.5 border-0 p-0">
-                      <Item.Media class="mt-0.5 leading-none">⏸</Item.Media>
-                      <Item.Content class="min-w-0 flex-row items-center gap-x-2 gap-y-0">
+                  <Table.Cell colspan={totalCols - 1 - (dragCol ? 1 : 0) - (timeCol ? 1 : 0)} class={cn(breakCell, 'py-0 pr-0 text-[0.82rem] whitespace-normal text-muted-foreground last:border-r-0 last:pr-0')}>
+                    <Item.Root class="flex-nowrap items-stretch gap-1.5 border-0 p-0">
+                      <Item.Media class="self-center leading-none">⏸</Item.Media>
+                      <!-- Two lines: the break length, then its comment. -->
+                      <Item.Content class="min-w-0 flex-col items-start gap-y-0 py-2">
                         {#if $canWrite && $editingBreakOrder === entry.order}
                           <div class="flex flex-wrap items-center gap-2">
                             {#each [5, 10, 20, 30] as min}
@@ -657,7 +661,7 @@
                             <Button variant="ghost" aria-label={$t.editor.cancel} onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: null }); }}>✕</Button>
                           </div>
                         {:else if $canWrite}
-                          <Button variant="ghost" class="w-fit text-[0.82rem] font-normal text-muted-foreground italic" onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: entry.order }); }}>{$t.editor.breakLabel(entry.breakMinutes!)}</Button>
+                          <Button variant="ghost" class="h-auto w-fit px-0 py-0 text-[0.82rem] font-normal text-muted-foreground italic hover:bg-transparent" onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: entry.order }); }}>{$t.editor.breakLabel(entry.breakMinutes!)}</Button>
                         {:else}
                           <span class="text-[0.82rem] text-muted-foreground italic">{$t.editor.breakLabel(entry.breakMinutes!)}</span>
                         {/if}
@@ -665,14 +669,16 @@
                           <CommentInput
                             value={entry.comment ?? ''}
                             onsave={(v) => saveEntryComment(entry.order, v)}
+                            class="font-semibold text-foreground not-italic"
                           />
                         {:else}
-                          <span class="block truncate text-[0.94rem] text-muted-foreground italic" title={entry.comment}><LinkifiedText text={entry.comment ?? ''} /></span>
+                          <span class="block truncate text-[0.94rem] font-semibold text-foreground" title={entry.comment}><LinkifiedText text={entry.comment ?? ''} /></span>
                         {/if}
                       </Item.Content>
                       {#if $canWrite}
-                        <Item.Actions class="self-center">
-                          <RowActions actions={[
+                        <!-- Full height of the break row, the same size and style as the ⋯ of the song rows. -->
+                        <Item.Actions class="self-stretch">
+                          <RowActions class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
                             { icon: '✏️', label: $t.common.edit, onselect: () => actions.patch({ editingBreakOrder: entry.order }) },
                             { icon: '🗑', label: $t.editor.remove, destructive: true, separatorBefore: true, onselect: () => handleRemoveBreak(entry.order) },
                           ]} />
@@ -687,7 +693,7 @@
           {#if $draggedEntryKey !== null}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <Table.Row
-              class="border-0 hover:bg-transparent max-[700px]:hidden"
+              class="border-0 hover:bg-transparent max-mid:hidden"
               ondragover={e => { e.preventDefault(); actions.setOverEntry('end'); }}
             >
               <Table.Cell colspan={totalCols} class={cn('h-10 bg-card', $overEntryKey === 'end' && 'outline-2 outline-dashed outline-primary')}></Table.Cell>

@@ -2,11 +2,14 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
+  import { below } from '$lib/breakpoints';
   import LearningProgress from '$components/shared/LearningProgress.svelte';
   import { t } from '$lib/i18n';
   import { useStore } from '$lib/store/bridge';
   import { songEditStore } from '$lib/store/backlog';
   import * as Dialog from '$components/ui/dialog';
+  import * as Tooltip from '$components/ui/tooltip';
+  import IconButton from '$components/shared/IconButton.svelte';
   import * as AlertDialog from '$components/ui/alert-dialog';
   import * as Tabs from '$components/ui/tabs';
   import { Button } from '$components/ui/button';
@@ -131,7 +134,7 @@
   }
 
   onMount(() => {
-    if (!browser || window.innerWidth > 700) return;
+    if (!browser || !below('mid').matches) return;
     history.pushState({ kittenModal: true }, '');
     historyPushed = true;
     window.addEventListener('popstate', handlePopstate);
@@ -194,7 +197,14 @@
     {#if g?.name.trim()}
       <div class="flex items-center gap-2">
         {#if g.instruments.length > 0}<LearningProgress name={g.name} value={g.progress} onchange={stage => actions.setGuestProgress(r.id, stage)} />{/if}
-        <Button variant="ghost" size="icon-xs" class="ml-auto shrink-0 text-muted-foreground opacity-60 hover:text-destructive hover:opacity-100" aria-label={$t.song.remove} onclick={() => actions.removeGuest(r.id)}>✕</Button>
+        <Tooltip.Root>
+          <Tooltip.Trigger>
+            {#snippet child({ props })}
+              <Button {...props} variant="ghost" size="icon-xs" class="ml-auto shrink-0 text-muted-foreground opacity-60 hover:text-destructive hover:opacity-100" aria-label={$t.song.remove} onclick={() => actions.removeGuest(r.id)}>✕</Button>
+            {/snippet}
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$t.song.remove}</Tooltip.Content>
+        </Tooltip.Root>
       </div>
     {/if}
   {/if}
@@ -210,7 +220,14 @@
     onValueChange={v => onchange(v as Instrument[])}
   >
     {#each allInstruments as inst}
-      <ToggleGroupItem value={inst} class={instClass} title={$t.instrument[inst]} aria-label={$t.instrument[inst]}>{instrumentIcons[inst]}</ToggleGroupItem>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <ToggleGroupItem {...props} value={inst} class={instClass} aria-label={$t.instrument[inst]}>{instrumentIcons[inst]}</ToggleGroupItem>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content>{$t.instrument[inst]}</Tooltip.Content>
+      </Tooltip.Root>
     {/each}
   </ToggleGroup>
 {/snippet}
@@ -330,13 +347,13 @@
     <Dialog.Footer class="shrink-0 flex-row items-center justify-between">
       <div class="flex gap-2">
         {#if ondelete}
-          <Button variant="outline" size="icon-lg" class="text-[1.1rem] text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('delete')} title={$t.song.remove} aria-label={$t.song.remove}>🗑</Button>
+          <IconButton icon="🗑" label={$t.song.remove} class="text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('delete')} />
         {/if}
         {#if onaddtosetlist}
-          <Button variant="outline" size="icon-lg" class="text-[1.1rem]" onclick={() => { onaddtosetlist!(); closeModal(); }} title={$t.addToSetlist.title} aria-label={$t.addToSetlist.title}>📋</Button>
+          <IconButton icon="📋" label={$t.addToSetlist.title} onclick={() => { onaddtosetlist!(); closeModal(); }} />
         {/if}
         {#if !personalOnly && mode === 'backlog' && song?.id}
-          <Button variant="outline" size="icon-lg" class="text-[1.1rem]" onclick={toggleArchive} title={$draftStore.archived ? $t.song.unarchive : $t.song.archive} aria-label={$draftStore.archived ? $t.song.unarchive : $t.song.archive}>{$draftStore.archived ? '📤' : '📦'}</Button>
+          <IconButton icon={$draftStore.archived ? '📤' : '📦'} label={$draftStore.archived ? $t.song.unarchive : $t.song.archive} onclick={toggleArchive} />
         {/if}
         {#if onremove}
           <Button variant="outline" size="lg" class="text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('remove')} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</Button>

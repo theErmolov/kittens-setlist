@@ -70,10 +70,9 @@
 
 <Dialog.Root open={true} onOpenChange={value => { if (!value && !$busy) onclose(); }}>
   <Dialog.Content
-    showCloseButton={false}
     aria-describedby={undefined}
     onOpenAutoFocus={event => event.preventDefault()}
-    class="rehearsal-dialog flex h-[min(820px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden rounded-2xl bg-card p-[22px] sm:max-w-[min(1100px,calc(100%-2rem))] max-[700px]:top-0 max-[700px]:left-0 max-[700px]:h-dvh max-[700px]:max-h-none max-[700px]:w-dvw max-[700px]:max-w-none! max-[700px]:translate-x-0 max-[700px]:translate-y-0 max-[700px]:rounded-none max-[700px]:p-4"
+    class="rehearsal-dialog flex h-[min(820px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden rounded-2xl bg-card p-[22px] sm:max-w-[min(1100px,calc(100%-2rem))] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-dvw max-mid:max-w-none! max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:p-4"
   >
     <Dialog.Title class="mb-5 shrink-0 text-[1.2rem] font-bold leading-normal">{title ?? $rt.new}</Dialog.Title>
     <form onsubmit={save} class="flex min-h-0 flex-1 flex-col">
@@ -122,11 +121,11 @@
             </Field.Field>
             <Field.Field class="gap-1.5">
               <Field.Label for="rehearsal-note" class={labelClass}>{$rt.note}</Field.Label>
-              <Textarea id="rehearsal-note" value={$note} oninput={event => patch({ note: event.currentTarget.value })} rows={3} maxlength={4000} class="{field} min-h-0 py-[9px]" />
+              <Textarea id="rehearsal-note" value={$note} oninput={event => patch({ note: event.currentTarget.value })} rows={6} maxlength={4000} class="{field} field-sizing-fixed min-h-36 resize-none py-[9px]" />
             </Field.Field>
           </Field.Group>
         {/snippet}
-      <Field.Set class="m-0 min-h-0 min-w-0 flex-1 gap-0 overflow-hidden border-0 p-0 [@media(max-height:550px)]:overflow-y-auto max-[700px]:overflow-y-auto max-[700px]:overscroll-contain" disabled={$busy}>
+      <Field.Set class="m-0 min-h-0 min-w-0 flex-1 gap-0 overflow-hidden border-0 p-0 [@media(max-height:550px)]:overflow-y-auto max-mid:overflow-y-auto max-mid:overscroll-contain" disabled={$busy}>
         <RehearsalSelection {details} />
       </Field.Set>
       <Dialog.Footer class="m-0 mt-3 shrink-0 flex-col gap-2 rounded-none border-t bg-transparent p-0 pt-3 sm:flex-col">

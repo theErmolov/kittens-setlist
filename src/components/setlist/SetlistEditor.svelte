@@ -88,7 +88,7 @@
 {:else if !data.loaded || !data.ready}
   <LoadingCat />
 {:else}
-  <div class="editor flex h-[calc(100dvh-56px)] flex-col max-[700px]:h-[calc(100dvh-56px-64px)]" class:read-only={!$canWrite}>
+  <div class="editor flex h-[calc(100dvh-56px)] flex-col max-mid:h-[calc(100dvh-56px-64px)]" class:read-only={!$canWrite}>
     <EditorHeader />
     <EditorFilters />
 

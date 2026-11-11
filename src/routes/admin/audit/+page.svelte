@@ -81,7 +81,7 @@
       {:else if auditItems.length === 0}<Empty.Root class="hint border"><Empty.Header><Empty.Description>{$t.admin.auditEmpty}</Empty.Description></Empty.Header></Empty.Root>
       {:else}
         <div class="audit-table">
-          <Table.Root class="max-[700px]:[&_tbody]:grid max-[700px]:[&_tbody]:gap-[3px] max-[700px]:[&_thead]:hidden">
+          <Table.Root class="max-mid:[&_tbody]:grid max-mid:[&_tbody]:gap-[3px] max-mid:[&_thead]:hidden">
             <Table.Header>
               {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
                 <Table.Row>
@@ -95,9 +95,9 @@
             </Table.Header>
             <Table.Body>
               {#each table.getRowModel().rows as row (row.id)}
-                <Table.Row class="max-[700px]:grid max-[700px]:grid-cols-2 max-[700px]:gap-x-2">
+                <Table.Row class="max-mid:grid max-mid:grid-cols-2 max-mid:gap-x-2">
                   {#each row.getVisibleCells() as cell (cell.id)}
-                    <Table.Cell class="max-[700px]:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
+                    <Table.Cell class="max-mid:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
                       <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
                     </Table.Cell>
                   {/each}

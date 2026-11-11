@@ -10,8 +10,7 @@
   import { Button } from '$components/ui/button';
   import * as NavigationMenu from '$components/ui/navigation-menu';
   import * as Tooltip from '$components/ui/tooltip';
-  import IconButton from '$components/shared/IconButton.svelte';
-  import ButtonRow from '$components/shared/ButtonRow.svelte';
+  import RowActions from '$components/shared/RowActions.svelte';
   import { Alert } from '$components/ui/alert';
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading, canAccessRehearsals, initAuth, setCachedNavFlags } from '$lib/auth';
@@ -122,7 +121,7 @@
     <NavigationMenu.Link
       {href}
       active={active}
-      class="h-full gap-[5px] rounded-none px-3.5 text-[0.95rem] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground focus:bg-transparent focus-visible:ring-inset data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground data-active:focus:bg-primary max-[900px]:w-full max-[900px]:justify-center max-[900px]:p-0 max-[900px]:text-[1.2rem]"
+      class="h-full gap-[5px] rounded-none px-3.5 text-[0.95rem] font-medium text-muted-foreground hover:bg-(--secondary-soft) hover:text-foreground focus:bg-transparent focus-visible:ring-inset data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground data-active:focus:bg-primary max-[900px]:w-full max-[900px]:justify-center max-[900px]:p-0 max-[900px]:text-[1.2rem]"
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
     >
       <span class="link-icon relative shrink-0 text-base leading-none max-[900px]:text-[1.25rem]">{icon}{@render inIcon?.()}</span>
@@ -159,9 +158,29 @@
     <feComposite in="duo" in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.25" k3="0.75" k4="0" result="mixed" />
     <feComposite in="mixed" in2="SourceAlpha" operator="in" />
   </filter>
+  <!-- Icons on a solid accent fill (selected tab, primary buttons): the same duotone mapped to light colours, so they read as a lighter tint with their detail intact. -->
+  <filter id="tint-on-primary" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+    <feColorMatrix type="saturate" values="0" result="gray" />
+    <feFlood style="flood-color: var(--tint-on-hi)" result="hi" />
+    <feFlood style="flood-color: var(--tint-on-lo)" result="lo" />
+    <feBlend in="gray" in2="hi" mode="multiply" result="light" />
+    <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
+    <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
+    <feComposite in="duo" in2="SourceAlpha" operator="in" />
+  </filter>
+  <!-- A medium-light violet duotone (lighter than the standard tint, not as white as the on-fill one): the wrench on the secondary buttons. -->
+  <filter id="tint-light" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+    <feColorMatrix type="saturate" values="0" result="gray" />
+    <feFlood style="flood-color: var(--tint-light-hi)" result="hi" />
+    <feFlood style="flood-color: var(--tint-light-lo)" result="lo" />
+    <feBlend in="gray" in2="hi" mode="multiply" result="light" />
+    <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
+    <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
+    <feComposite in="duo" in2="SourceAlpha" operator="in" />
+  </filter>
 </svg>
 <Tooltip.Provider delayDuration={150}>
-<header class="nav sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-card pr-3 pl-4 transition-colors max-[900px]:gap-0 max-[900px]:pl-2.5">
+<header class="nav sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-card pr-3 pl-4 transition-colors max-mid:gap-2.5 max-mid:pl-2.5">
   <Tooltip.Root>
     <Tooltip.Trigger>
       {#snippet child({ props })}
@@ -191,17 +210,16 @@
       {@render navItem('https://media.kittens.band', false, '📷', $t.nav.media, undefined, undefined, true)}
     </NavigationMenu.List>
   </NavigationMenu.Root>
-  <ButtonRow>
-    <IconButton icon={$lang.toUpperCase()} label={$lang === 'ru' ? 'English' : 'Русский'} class="lang-toggle text-[0.78rem] font-bold tracking-wider text-muted-foreground hover:border-primary hover:text-primary-ink" onclick={toggleLang} />
-    <IconButton icon={dark ? '☀️' : '🌙'} label={$t.common.themeToggle} class="theme-toggle text-base hover:border-primary" onclick={toggleTheme} />
-    {#if $navLoggedIn}
-      <IconButton icon="🚪" label={$t.common.logout} class="logout-btn text-base text-muted-foreground hover:border-destructive hover:text-destructive" onclick={handleLogout} />
-    {/if}
-  </ButtonRow>
+  <!-- Language, theme and logout behind one settings button (opens a bottom drawer). -->
+  <RowActions drawer variant="outline" icon="⚙️" label={$t.common.settings} actions={[
+    { icon: '🌐', label: $lang === 'ru' ? 'English' : 'Русский', onselect: toggleLang },
+    { icon: dark ? '☀️' : '🌙', label: $t.common.themeToggle, onselect: toggleTheme },
+    ...($navLoggedIn ? [{ icon: '🚪', label: $t.common.logout, destructive: true, separatorBefore: true, onselect: handleLogout }] : []),
+  ]} />
 </header>
 
 {#if $accessDenied && path.startsWith('/admin')}
-  <Alert class="access-denied rounded-none border-x-0 border-t-0 bg-secondary px-4 py-2.5 text-center text-[0.88rem] font-semibold text-muted-foreground">{$t.common.accessDenied}</Alert>
+  <Alert class="access-denied rounded-none border-x-0 border-t-0 bg-(--secondary-soft) px-4 py-2.5 text-center text-[0.88rem] font-semibold text-muted-foreground">{$t.common.accessDenied}</Alert>
 {/if}
 {@render children()}
 </Tooltip.Provider>

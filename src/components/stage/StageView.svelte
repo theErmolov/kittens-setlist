@@ -275,7 +275,7 @@
           {/if}
         </span>
       {/if}
-      <Badge variant="secondary" class="h-auto min-h-5 max-w-full flex-wrap gap-x-1 gap-y-0.5 py-0.5 whitespace-normal px-2 text-[0.88rem] font-normal text-muted-foreground max-[700px]:order-last max-[700px]:w-full max-[700px]:justify-center">
+      <Badge variant="secondary" class="h-auto min-h-5 max-w-full flex-wrap gap-x-1 gap-y-0.5 py-0.5 whitespace-normal px-2 bg-(--chip-bg) text-[0.88rem] font-normal text-muted-foreground max-mid:order-last max-mid:w-full max-mid:justify-center">
         {playedCount}/{totalCount} ({formatDuration(totalMinutes, $lang)})
         {#if timingInfo()}
           {@const info = timingInfo()!}
@@ -283,13 +283,13 @@
         {/if}
         {#if visibleCount !== totalCount}<span class="text-[0.78rem] opacity-75">{$t.stage.shown(visibleCount)}</span>{/if}
       </Badge>
-      <IconButton icon="🎛️" label={$t.stage.filters} class="hidden shrink-0 min-[701px]:inline-flex {pressedOn}" pressed={$filterOpen || isFiltered} onpressedchange={() => toggleFilterOpen()} />
+      <IconButton icon="🎛️" label={$t.stage.filters} class="no-tint hidden shrink-0 min-mid:inline-flex {pressedOn}" pressed={$filterOpen || isFiltered} onpressedchange={() => toggleFilterOpen()} />
     </div>
     {#if !$canMark && !$currentUser}
       <a href="{base}/login" class="text-center text-[0.8rem] text-muted-foreground no-underline hover:text-primary-ink">{$t.login.stageHint}</a>
     {/if}
     {#if $filterOpen}
-    <div class="flex flex-col gap-1.5 max-[700px]:hidden">
+    <div class="flex flex-col gap-1.5 max-mid:hidden">
       <FilterChips selected={$categoryFilter} onchange={setCategoryFilter} counts={categoryCounts()} />
       {#if musicians.length > 0 || guestNames().length > 0}
         <div class="flex flex-wrap gap-1.5">
@@ -304,7 +304,7 @@
     {/if}
   </div>
 
-  <div class="song-list flex flex-col gap-2 py-2.5 max-[700px]:gap-0 max-[700px]:pt-0 max-[700px]:pb-16">
+  <div class="song-list flex flex-col gap-2 py-2.5 max-mid:gap-0 max-mid:pt-0 max-mid:pb-16">
     {#each sortedEntries() as item, i (item.entry.songId ?? `break-${item.entry.order}`)}
       {@const subsetId = $sortKey === 'default' && item.kind === 'song' ? item.entry.subsetId : undefined}
       {@const prevItem = i > 0 ? sortedEntries()[i - 1] : undefined}
@@ -312,7 +312,7 @@
       {#if subsetId && subsetId !== prevSubsetId}
         {@const subset = localSubsets.find(s => s.id === subsetId)}
         {#if subset}
-          <Item.Title class="mt-1 px-2 py-1 text-[0.8rem] font-bold text-primary-ink">⏭ {subset.name}</Item.Title>
+          <Item.Title class="mt-1 px-2 py-1 text-[0.8rem] font-black text-primary-ink"><span class="no-tint" aria-hidden="true">⏭</span> {subset.name}</Item.Title>
         {/if}
       {/if}
       <div class={subsetId ? 'border-l-[3px] border-primary-ink pl-1' : ''}>
@@ -323,8 +323,8 @@
           <Item.Root
             variant="outline"
             class={cn(
-              'min-h-12 flex-nowrap gap-2 border-dashed bg-info px-3.5 py-3 text-[0.82rem] tracking-[0.03em] text-muted-foreground transition-opacity min-[701px]:px-3 min-[701px]:py-2 min-[701px]:text-base',
-              'max-[700px]:rounded-none max-[700px]:border-x-0',
+              'min-h-12 flex-nowrap gap-2 border-dashed bg-info px-3.5 py-3 text-[0.82rem] tracking-[0.03em] text-muted-foreground transition-opacity min-mid:px-3 min-mid:py-2 min-mid:text-base',
+              'max-mid:rounded-none max-mid:border-x-0',
               item.entry.played && 'opacity-45',
               $canMark && 'cursor-pointer touch-manipulation select-none hover:bg-info/70',
             )}
@@ -338,7 +338,7 @@
             <Item.Content class={cn('flex-row items-baseline gap-1.5', item.entry.played && 'line-through')}>
               <span>{$t.stage.breakMinutes(item.entry.breakMinutes!)}</span>{#if item.entry.comment}<span>—</span><span class="italic opacity-85">{item.entry.comment}</span>{/if}
             </Item.Content>
-            {#if setlist.startTime}<Item.Actions class="text-[0.82rem] font-semibold whitespace-nowrap text-primary-ink min-[701px]:text-[0.9rem] min-[701px]:font-bold">{entryTimes().get(item.entry.order)}</Item.Actions>{/if}
+            {#if setlist.startTime}<Item.Actions class="text-[0.82rem] font-semibold whitespace-nowrap text-primary-ink min-mid:text-[0.9rem] min-mid:font-bold">{entryTimes().get(item.entry.order)}</Item.Actions>{/if}
           </Item.Root>
         {/if}
       </div>
@@ -388,7 +388,7 @@
   {/if}
 
   <!-- Mobile bottom bar -->
-  <div class="fixed right-0 bottom-0 left-0 z-[21] hidden h-16 items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
+  <div class="fixed right-0 bottom-0 left-0 z-[21] hidden h-16 items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
     <IconButton icon="🎛️" label={$t.stage.filters} class={pressedOn} pressed={$filterOpen || isFiltered} onpressedchange={() => toggleFilterOpen()} />
     {#if setlist.vibe}
       <IconButton icon="🔁" label={$t.stage.unplayedToBottom} class={pressedOn} pressed={$unplayedToBottom} onpressedchange={() => toggleUnplayedToBottom()} />

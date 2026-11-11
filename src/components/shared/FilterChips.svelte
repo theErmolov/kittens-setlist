@@ -6,11 +6,14 @@
   let {
     selected,
     onchange,
-    counts
+    counts,
+    chipClass: extra = ''
   }: {
     selected: Set<Category>;
     onchange: (v: Set<Category>) => void;
     counts?: Record<Category, number>;
+    /** Extra classes for every chip (e.g. a denser size). */
+    chipClass?: string;
   } = $props();
 
   function toggle(cat: Category) {
@@ -41,7 +44,7 @@
   <Toggle
     type="button"
     variant="outline"
-    class="{chipClass} chip-all data-[state=on]:border-primary-ink data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:text-primary-foreground data-[state=on]:hover:bg-primary/90"
+    class="{chipClass} {extra} chip-all data-[state=on]:border-primary-ink data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:text-primary-foreground data-[state=on]:hover:bg-primary/90"
     pressed={selected.size === 0}
     onPressedChange={selectAll}
   >
@@ -53,7 +56,7 @@
     <Toggle
       type="button"
       variant="outline"
-      class="{chipClass} chip-{cat} {activeColors[cat]}"
+      class="{chipClass} {extra} chip-{cat} {activeColors[cat]}"
       pressed={selected.has(cat)}
       onPressedChange={() => toggle(cat)}
     >

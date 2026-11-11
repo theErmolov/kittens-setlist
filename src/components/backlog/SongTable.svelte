@@ -1,12 +1,13 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { below } from '$lib/breakpoints';
+  import BacklogMidBars from './BacklogMidBars.svelte';
+  import SongCardRow from './SongCardRow.svelte';
+  import BacklogFilterPanel from './BacklogFilterPanel.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import type { Song, Setlist, Category, Instrument, LearningStage } from '$lib/types';
   import SongEditModal from './SongEditModal.svelte';
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
-  import BacklogFilter from './BacklogFilter.svelte';
-  import ActiveFilters from './ActiveFilters.svelte';
-  import * as Popover from '$components/ui/popover';
   import { createQuery } from '@tanstack/svelte-query';
   import { setlistsQuery, musiciansQuery } from '$lib/query/queries';
   import { backlogSongsQuery, useSaveBacklogSong, useDeleteBacklogSong, patchBacklogSong } from '$lib/query/backlog';
@@ -23,10 +24,6 @@
   import { Button } from '$components/ui/button';
   import { ButtonGroup } from '$components/ui/button-group';
   import IconButton from '$components/shared/IconButton.svelte';
-  import PageControlsDivider from '$components/shared/PageControlsDivider.svelte';
-  import PageControls from '$components/shared/PageControls.svelte';
-  import * as NavigationMenu from '$components/ui/navigation-menu';
-  import * as Breadcrumb from '$components/ui/breadcrumb';
   import * as Table from '$components/ui/table';
   import { createSvelteTable, FlexRender, renderComponent } from '$components/ui/data-table';
   import { getCoreRowModel, getSortedRowModel, type ColumnDef, type Row, type SortingState } from '@tanstack/table-core';
@@ -53,7 +50,7 @@
   let songs = $derived(songsQ.data ?? []);
   let setlists = $derived(setlistsQ.data ?? []);
   let musicians = $derived(musiciansQ.data ?? []);
-  let loading = $derived(songsQ.isPending || setlistsQ.isPending || musiciansQ.isPending);
+  let loading = $derived(!browser || songsQ.isPending || setlistsQ.isPending || musiciansQ.isPending);
 
   const search = useStore(backlogStore, s => s.search);
   const categoryFilter = useStore(backlogStore, s => s.categoryFilter);
@@ -62,7 +59,7 @@
   const showProgress = useStore(backlogStore, s => s.showProgress);
   const showArchived = useStore(backlogStore, s => s.showArchived);
   const filterOpen = useStore(backlogStore, s => s.filterOpen);
-  const filterPopoverOpen = useStore(backlogStore, s => s.filterPopoverOpen);
+  const barOpen = useStore(backlogStore, s => s.barOpen);
   const additionMode = useStore(backlogStore, s => s.additionMode);
   const sorting = useStore(backlogStore, s => s.sorting);
   const editingSongId = useStore(backlogStore, s => s.editingSongId);
@@ -79,8 +76,6 @@
 
   // Setlists still relevant for adding: not more than 24h past their start time
   let openSetlists = $derived(setlists.filter(sl => isSetlistOpen(sl)));
-  // eslint-disable-next-line prefer-const
-  let filterAnchor: HTMLElement | undefined;
   let activeFilterCount = $derived(($search.trim() ? 1 : 0) + ($showArchived ? 1 : 0) + $categoryFilter.size + $selectedMusicians.size + $selectedInstruments.size);
   let hasActiveFilters = $derived(
     $search.length > 0 || $categoryFilter.size > 0 || $selectedMusicians.size > 0 || $selectedInstruments.size > 0
@@ -124,7 +119,7 @@
   // ── Data Table (TanStack): column defs, sorting state lives in backlogStore ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rc = (component: any, props?: Record<string, unknown>) => renderComponent(component, (props ?? {}) as never);
-  interface ColMeta { compact?: string; minWidth?: string; head?: string; cell?: string; width?: string; cellStyle?: (song: Song) => string }
+  interface ColMeta { people?: boolean; minWidth?: string; head?: string; cell?: string; width?: string; cellStyle?: (song: Song) => string }
   const isCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s.trimStart().charAt(0)) ? 1 : 0;
   const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   // Artist: English artists before Russian, then alphabetical, then title.
@@ -140,38 +135,40 @@
       enableSorting: false,
       cell: ({ row }) => rc(MusicianCell, { song: row.original, name }),
       meta: {
-        head: 'w-px',
-        cell: '',
-        compact: 'order-3 min-w-0 flex-1 basis-0',
+        // Mid and small: equal fixed-width columns; big: as narrow as the content, at least wide enough for the most instruments.
+        head: 'w-[3.75rem] min-w-[3.75rem] px-1 text-[0.66rem] tracking-normal',
+        cell: 'px-1',
+        people: true,
         // Wide enough for the most instruments any shown row has in this column (icons keep full size).
-        minWidth: `calc(${Math.max(1, ...filtered().map(song => song.musicians[name]?.instruments?.length ?? 0))} * 1.6rem + 1.5rem)`,
+        minWidth: `--mw: calc(${Math.max(1, ...filtered().map(song => song.musicians[name]?.instruments?.length ?? 0))} * 1.6rem + 1.5rem)`,
         cellStyle: (song: Song) => {
           const role = song.musicians[name];
-          return role?.instruments?.length ? `background: ${stageBg((song.progress?.[name] ?? 'queue') as LearningStage)}` : '';
+          // Stage colours only in progress mode.
+          return $showProgress && role?.instruments?.length ? `background: ${stageBg((song.progress?.[name] ?? 'queue') as LearningStage)}` : '';
         },
       } satisfies ColMeta,
     }));
     return [
       { id: 'category', header: () => rc(CatHead), enableSorting: false,
         cell: ({ row }) => rc(CatCell, { song: row.original, names }),
-        meta: { head: 'w-px', cell: 'text-center', compact: 'w-12 shrink-0' } satisfies ColMeta },
+        meta: { head: 'w-[4.5rem] min-w-[4.5rem] max-w-[4.5rem]', cell: 'px-0 text-center' } satisfies ColMeta },
       { id: 'artist', accessorKey: 'artist', sortingFn: artistSort,
         header: () => rc(SortHead, { id: 'artist', label: $t.backlog.cols.artist }),
         cell: ({ row }) => row.original.artist,
-        meta: { cell: 'max-w-0 truncate font-medium', width: '22%', compact: 'max-w-full! min-w-0 flex-1 basis-0' } satisfies ColMeta },
+        meta: { cell: 'max-w-0 truncate text-[0.95rem] font-normal', width: '22%' } satisfies ColMeta },
       { id: 'title', accessorKey: 'title', sortingFn: titleSort,
         header: () => rc(SortHead, { id: 'title', label: $t.backlog.cols.title }),
         cell: ({ row }) => rc(TitleCell, { song: row.original }),
-        meta: { cell: 'whitespace-normal', width: '32%', compact: 'min-w-0 flex-[1.4] basis-0' } satisfies ColMeta },
+        meta: { cell: 'max-w-0 text-[0.95rem] font-semibold', width: '32%' } satisfies ColMeta },
       ...musicianCols,
       { id: 'guests', enableSorting: false,
         header: () => $t.backlog.cols.guests,
         cell: ({ row }) => rc(GuestsCell, { song: row.original, names }),
-        meta: { cell: 'whitespace-normal', width: '14%', compact: 'order-3 min-w-0 flex-[1.5] basis-0' } satisfies ColMeta },
+        meta: { cell: 'max-w-0 overflow-hidden', width: '14%', people: true } satisfies ColMeta },
       { id: 'actions', enableSorting: false,
         header: () => $t.song.editTitle,
         cell: ({ row }) => rc(ActionsCell, { song: row.original }),
-        meta: { head: 'w-px', last: true, compact: 'w-16 shrink-0' } as ColMeta },
+        meta: { head: 'w-px min-mid:px-0', cell: 'min-mid:h-px min-mid:p-0', last: true } as ColMeta },
     ];
   });
 
@@ -190,23 +187,21 @@
   let rows = $derived(table.getRowModel().rows);
   const meta = (c: { columnDef: { meta?: unknown } }) => (c.columnDef.meta ?? {}) as ColMeta & { last?: boolean };
   const ariaSort = (dir: false | 'asc' | 'desc') => dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined;
-  /** Compact view: each row is a flex-wrap line; the `before` item forces the people cells (order-3) onto a second line. */
-  const isPeople = (m: ColMeta) => !!m.compact?.includes('order-3');
-  /** Compact view: the song-info line of a row has a light violet fill. */
-  const tint = 'bg-[color-mix(in_srgb,var(--accent)_7%,var(--card))]';
-  const topTint = `content-center ${tint}`;
-  const rowCompact = 'overflow-hidden rounded-[4px] border! border-[color-mix(in_srgb,var(--text)_28%,var(--card))] flex flex-wrap before:order-2 before:h-0 before:basis-full before:content-[\'\']';
-  // Switch to the two-line layout when the full table would no longer fit the viewport (grows with the number of people).
+  /** Musician / guest columns (the song-info cells get the table colour `--table-selected`). */
+  const isPeople = (m: ColMeta) => !!m.people;
+  const tint = 'bg-(--table-selected)';
+  // Small tier: song rows laid out like the setlist's instead of the table.
   $effect(() => {
     if (!browser) return;
-    const mq = matchMedia(`(max-width: ${Math.max(700, 380 + 105 * permanentNames.length + (hasGuests ? 170 : 0))}px)`);
+    const mq = below('mid');
     const update = () => actions.setCompact(mq.matches);
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   });
+  // The 📋 add-to-setlist mode exists in the small view only; from mid up a row click always opens the editor.
   const onRowClick = (song: Song) =>
-    $currentUser?.status === 'approved' ? ($canWrite && $additionMode ? actions.requestAdd(song.id) : actions.setEditingSong(song.id)) : undefined;
+    $currentUser?.status === 'approved' ? ($canWrite && $additionMode && $compact ? actions.requestAdd(song.id) : actions.setEditingSong(song.id)) : undefined;
 
   async function handleSave(updated: Song) {
     await saveSong.mutateAsync({ song: updated, canWrite: $canWrite });
@@ -220,7 +215,7 @@
     if (id) deleteSongM.mutate(id);
   }
 
-  const onClass = 'data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90';
+  const onClass = 'data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
 
   // Add a song to a setlist, skipping if it's already there. Always shows green feedback.
   function addSongToSetlist(sl: Setlist, song: Song) {
@@ -247,57 +242,36 @@
   }
 </script>
 
-{#snippet filterPalette(autofocus = false)}
-  <BacklogFilter
-    {autofocus}
-    names={permanentNames}
-    categoryCounts={categoryCounts()}
-    musicianCounts={musicianCounts()}
-    result="{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})"
-  />
-{/snippet}
 
 <Tooltip.Provider>
 <!-- Sticky controls bar (desktop): breadcrumb + search on the left, mode toggles + add on the right. Mobile keeps its bottom bar + drawer. -->
-<div class="contents max-[700px]:hidden">
-  <PageControls label={$t.nav.backlog}>
-    {#snippet start()}
-      <NavigationMenu.Item class="min-w-0"><Breadcrumb.Root><Breadcrumb.List class="flex-nowrap"><Breadcrumb.Item><Breadcrumb.Page class="inline-flex min-h-10 items-center whitespace-nowrap">{$t.nav.backlog}</Breadcrumb.Page></Breadcrumb.Item></Breadcrumb.List></Breadcrumb.Root></NavigationMenu.Item>
-      <PageControlsDivider />
-      <NavigationMenu.Item>
-        <span bind:this={filterAnchor} class="inline-flex">
-          <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterPopoverOpen} expanded={$filterPopoverOpen} onpressedchange={v => actions.setFilterPopoverOpen(v)}>
-            {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
-          </IconButton>
-        </span>
-        <Popover.Root open={$filterPopoverOpen} onOpenChange={v => actions.setFilterPopoverOpen(v)}>
-          <Popover.Content customAnchor={filterAnchor} align="start" class="w-[340px] p-1" onInteractOutside={(e) => { if (filterAnchor?.contains(e.target as Node)) e.preventDefault(); }}>
-            {@render filterPalette()}
-          </Popover.Content>
-        </Popover.Root>
-      </NavigationMenu.Item>
-      <NavigationMenu.Item class="min-w-0"><ActiveFilters class="flex-nowrap overflow-hidden" /></NavigationMenu.Item>
-    {/snippet}
-    {#snippet end()}
-      {#if $canWrite}<NavigationMenu.Item><IconButton variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} /></NavigationMenu.Item>{/if}
-    {/snippet}
-  </PageControls>
+<!-- Mid and big: two bars (search + categories, then musicians / instruments / view toggles). Small screens use the bottom bar + drawer. -->
+<div class="hidden min-mid:block">
+  {#if !loading}<BacklogMidBars names={permanentNames} categoryCounts={categoryCounts()} musicianCounts={musicianCounts()} result="{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})" />{/if}
 </div>
-<div class="flex h-[calc(100dvh-56px)] flex-col min-[701px]:h-[calc(100dvh-112px)] max-[700px]:h-[calc(100dvh-56px-52px)]">
-  <div class="flex-1 overflow-auto px-4 pt-3 pb-4 max-[700px]:px-0 max-[700px]:py-0 **:data-[slot=table-container]:overflow-visible">
+<div class="flex h-[calc(100dvh-56px)] flex-col {$barOpen ? 'min-mid:h-[calc(100dvh-217px)]' : 'min-mid:h-[calc(100dvh-112px)]'} max-mid:h-[calc(100dvh-56px-52px)]">
+  <div class="flex-1 overflow-auto p-0 **:data-[slot=table-container]:overflow-visible">
     {#if loading}
       <LoadingCat />
     {:else}
-      <!-- shadcn Table; two-line rows when it would not fit (see `compact`) -->
-      <Table.Root class={$compact ? 'block' : ''}>
-        <Table.Header class={$compact ? 'sticky top-0 z-[2] block bg-card shadow-[0_2px_0_var(--border)]' : ''}>
+      {#if $compact}
+        <!-- Small view: setlist-style song rows (type | artist – title, comment, musician chips | actions). -->
+        <div>
+          {#each rows as row (row.id)}
+            <SongCardRow song={row.original} names={permanentNames} onrowclick={() => onRowClick(row.original)} />
+          {/each}
+        </div>
+      {:else}
+      <!-- shadcn Table (mid and big): one thin header row, fixed-height rows. -->
+      <Table.Root>
+        <Table.Header>
           {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-            <Table.Row class="hover:bg-transparent {$compact ? rowCompact : ''}">
+            <Table.Row class="hover:bg-transparent">
               {#each headerGroup.headers as header (header.id)}
                 {@const m = meta(header.column)}
                 <Table.Head
-                  class="{m.head ?? ''} {$compact ? `static block ${m.compact ?? ''} ${isPeople(m) ? 'content-center' : 'content-center border-b'}` : ''}"
-                  style={$compact ? '' : `${m.width ? `width: ${m.width};` : ''}${m.minWidth ? `min-width: ${m.minWidth}` : ''}`}
+                  class={m.head ?? ''}
+                  style="{m.width ? `width: ${m.width};` : ''}{m.minWidth ?? ''}"
                   aria-sort={ariaSort(header.column.getIsSorted())}
                 >
                   {#if m.last}<span class="sr-only"><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></span>
@@ -307,12 +281,12 @@
             </Table.Row>
           {/each}
         </Table.Header>
-        <Table.Body class={$compact ? 'block' : ''}>
+        <Table.Body>
           {#each rows as row (row.id)}
-            <Table.Row class="group/row relative cursor-pointer border-0 hover:bg-transparent {$compact ? `${rowCompact} not-first:-mt-px` : ''}" onclick={() => onRowClick(row.original)}>
+            <Table.Row class="group/row relative h-11 cursor-pointer border-0 hover:bg-transparent" onclick={() => onRowClick(row.original)}>
               {#each row.getVisibleCells() as cell (cell.id)}
                 {@const m = meta(cell.column)}
-                <Table.Cell class="bg-card py-0.5 min-[701px]:group-hover/row:bg-(--row-hover) {m.cell ?? ''} {$compact ? `block ${m.compact ?? ''} ${isPeople(m) ? 'min-h-10 content-center border-t' : topTint}` : isPeople(m) ? '' : tint}" style={m.cellStyle?.(row.original) ?? ''}>
+                <Table.Cell class="bg-card py-0 text-(--table-text) group-hover/row:bg-(--row-hover) {m.cell ?? ''} {isPeople(m) ? '' : tint}" style={m.cellStyle?.(row.original) ?? ''}>
                   <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
                 </Table.Cell>
               {/each}
@@ -320,6 +294,7 @@
           {/each}
         </Table.Body>
       </Table.Root>
+      {/if}
 
       {#if filtered().length === 0}
         <Empty.Root class="p-10">
@@ -332,30 +307,39 @@
     {/if}
   </div>
 
+  {#if !loading}
   <!-- Mobile filter drawer -->
   <Drawer.Root open={$filterOpen} onOpenChange={v => actions.setFilterOpen(v)} shouldScaleBackground={false}>
-    <Drawer.Content class="min-[701px]:hidden">
-      <Drawer.Header>
-        <Drawer.Title>{$t.backlog.filterBtn}</Drawer.Title>
+    <Drawer.Content class="after:hidden min-mid:hidden" style="bottom: 52px" onInteractOutside={(e) => { if ((e.target as HTMLElement | null)?.closest('[data-backlog-bar]')) e.preventDefault(); }}>
+      <Drawer.Header class="p-2">
+        <Drawer.Title class="text-sm">{$t.backlog.filterBtn}</Drawer.Title>
         <Drawer.Description class="sr-only">{$t.backlog.search}</Drawer.Description>
       </Drawer.Header>
-      <div class="flex flex-col gap-3 px-4 pb-6">
-        <ActiveFilters />
-        {@render filterPalette(true)}
+      <!-- The drawer ends above the bottom bar (52px), which stays clickable: its filter button closes the drawer. -->
+      <div class="max-h-[70dvh] overflow-y-auto px-3 pb-3">
+        <BacklogFilterPanel
+          names={permanentNames}
+          categoryCounts={categoryCounts()}
+          musicianCounts={musicianCounts()}
+          result="{$t.backlog.shown(filtered().length, scoped().length)} ({formatDuration(filtered().reduce((s, song) => s + (song.lengthMinutes ?? 5), 0), $lang)})"
+        />
       </div>
     </Drawer.Content>
   </Drawer.Root>
 
   <!-- Mobile bottom bar -->
-  <div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-[700px]:flex">
-    <ButtonGroup>
-      <IconButton class="relative {onClass}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpen || hasActiveFilters} onpressedchange={() => actions.toggleFilterOpen()}>
-        {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
-      </IconButton>
-      {#if $canWrite}<IconButton class={onClass} icon="📋" label={$t.backlog.addMode} pressed={$additionMode} onpressedchange={() => actions.toggleAdditionMode()} />{/if}
-    </ButtonGroup>
-    {#if $canWrite}<IconButton class="ml-auto" variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} />{/if}
+  <!-- Above the filter drawer (z-50) so it stays visible and clickable while that drawer opens and closes; row-action drawers (z-70) cover it. -->
+  <div data-backlog-bar class="fixed inset-x-0 bottom-0 z-[60] hidden h-[52px] items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
+    <!-- Centred: filter | add (centre) | add-to-setlist mode. -->
+    <IconButton class="no-tint relative {onClass}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpen || hasActiveFilters} onpressedchange={() => actions.toggleFilterOpen()}>
+      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
+    </IconButton>
+    {#if $canWrite}
+      <IconButton variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} />
+      <IconButton class={onClass} icon="📋" label={$t.backlog.addMode} pressed={$additionMode} onpressedchange={() => actions.toggleAdditionMode()} />
+    {/if}
   </div>
+  {/if}
 </div>
 </Tooltip.Provider>
 

@@ -29,7 +29,7 @@ import {
 /** Poll results are deferred for this long after a drag ends. */
 export const DRAG_GRACE_MS = 3000;
 
-export interface SetlistMeta { name: string; date: string; startTime: string; vibe: boolean }
+export interface SetlistMeta { name: string; date: string; startTime: string; vibe: boolean; comment: string }
 
 export interface EditorDeps {
   /** The cached server copy of the setlist being edited. */
@@ -58,9 +58,6 @@ interface EditorUi {
   showAddModal: boolean;
   showSetlistOnlyModal: boolean;
   showBreakPicker: boolean;
-  /** Setlist comment editor dialog. */
-  editingComment: boolean;
-  draftComment: string;
   editingBreakOrder: number | null;
   /** songId of the entry being edited / whose lyrics are open (the entry comes from the setlist query). */
   editingEntryId: string | null;
@@ -79,7 +76,7 @@ interface EditorUi {
   overSubsetId: string | null;
   overSubsetSide: DropSide;
   dragEndedAt: number;
-  /** Viewport tier of the table (CSS hides time ≤1101px and musician/guest columns ≤700px); decides how many columns full-width rows span. */
+  /** Viewport tier of the table (CSS hides the time and musician/guest columns below the big tier); decides how many columns full-width rows span. */
   tier: 'mobile' | 'mid' | 'wide';
 }
 
@@ -223,11 +220,11 @@ export function effectiveLayout(server: Setlist | undefined, local: LocalLayout 
   return local;
 }
 
-export const metaOf = (s: Setlist): SetlistMeta => ({ name: s.name, date: s.date ?? '', startTime: s.startTime ?? '', vibe: s.vibe ?? false });
-const emptyMeta = (): SetlistMeta => ({ name: '', date: '', startTime: '', vibe: false });
+export const metaOf = (s: Setlist): SetlistMeta => ({ name: s.name, date: s.date ?? '', startTime: s.startTime ?? '', vibe: s.vibe ?? false, comment: s.comment ?? '' });
+const emptyMeta = (): SetlistMeta => ({ name: '', date: '', startTime: '', vibe: false, comment: '' });
 
 const initialUi = (): EditorUi => ({
-  showAddModal: false, showSetlistOnlyModal: false, showBreakPicker: false, editingComment: false, draftComment: '',
+  showAddModal: false, showSetlistOnlyModal: false, showBreakPicker: false,
   editingBreakOrder: null, editingEntryId: null, lyricsViewEntryId: null,
   selectedMusician: null, filterNotReady: false, filterText: '', filterOpen: false,
   activeSubsetId: null, draftSubsetName: '',

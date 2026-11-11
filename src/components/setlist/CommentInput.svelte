@@ -8,10 +8,13 @@
 
   let {
     value: initial = '',
-    onsave
+    onsave,
+    class: className = ''
   }: {
     value?: string;
     onsave: (v: string) => void;
+    /** Extra classes for the text (e.g. to drop the italic style). */
+    class?: string;
   } = $props();
 
   const draft = createCommentDraftStore(initial);
@@ -29,7 +32,7 @@
 {#if showLinks}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div
-    class="block h-7 w-full cursor-text truncate border-b border-dashed text-base leading-7 italic sm:text-[0.94rem]"
+    class="block h-6 w-full cursor-text truncate border-b border-dashed text-base leading-6 italic sm:text-[0.94rem] {className}"
     draggable="false"
     onmousedown={(e) => e.stopPropagation()}
     onclick={(e) => { e.stopPropagation(); setFocused(true); queueMicrotask(() => inputEl?.focus()); }}
@@ -37,7 +40,7 @@
 {/if}
 <Input
   bind:ref={inputEl}
-  class="{showLinks ? 'hidden' : 'block'} h-7 w-full rounded-none border-0 border-b border-dashed bg-transparent px-0 text-base italic shadow-none transition-colors placeholder:opacity-50 focus-visible:border-primary focus-visible:ring-0 dark:bg-transparent sm:text-[0.94rem]"
+  class="{showLinks ? 'hidden' : 'block'} h-6 w-full rounded-none border-0 border-b border-dashed bg-transparent px-0 text-base italic shadow-none transition-colors placeholder:opacity-50 focus-visible:border-primary focus-visible:ring-0 dark:bg-transparent sm:text-[0.94rem] {className}"
   value={$value}
   oninput={(e) => setValue(e.currentTarget.value)}
   placeholder={$t.common.commentPlaceholder}

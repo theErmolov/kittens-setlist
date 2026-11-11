@@ -14,6 +14,7 @@
   import { useBudgetMutations } from '$lib/query/shell';
   import { queryClient } from '$lib/query/client';
   import { useStore } from '$lib/store/bridge';
+  import { below } from '$lib/breakpoints';
   import { budgetStore } from '$lib/store/shell';
   import type { BudgetEntry, BudgetKind, Setlist, IncomeEntry, ExpenseEntry, DebtEntry } from '$lib/types';
 
@@ -160,7 +161,7 @@
 
   onMount(() => {
     if (!browser) return;
-    if (window.innerWidth <= 700) {
+    if (below('mid').matches) {
       history.pushState({ kittenModal: true }, '');
       window.addEventListener('popstate', handlePopstate);
     }
@@ -185,7 +186,7 @@
   <Dialog.Content
     showCloseButton={false}
     aria-describedby={undefined}
-    class="modal flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[480px] max-[700px]:top-0 max-[700px]:left-0 max-[700px]:h-dvh max-[700px]:max-h-none max-[700px]:w-full max-[700px]:max-w-none max-[700px]:translate-x-0 max-[700px]:translate-y-0 max-[700px]:rounded-none max-[700px]:ring-0"
+    class="modal flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[480px] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-full max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:ring-0"
   >
     <Dialog.Header class="modal-header flex-row items-center justify-between border-b px-5 py-4">
       <Dialog.Title class="text-[1.1rem] font-bold">{modalTitle}</Dialog.Title>
@@ -230,7 +231,7 @@
       <div class="field flex flex-col gap-1">
         <Label for="b-event" class="text-[0.8rem] font-normal text-muted-foreground">{$t.budget.event}</Label>
         <Select.Root type="single" value={$draft.setlistId || NO_EVENT} onValueChange={v => setDraft({ setlistId: v === NO_EVENT ? '' : v })}>
-          <Select.Trigger id="b-event" class="w-full bg-background text-[0.9rem] max-[700px]:text-base"><span class="truncate">{eventName}</span></Select.Trigger>
+          <Select.Trigger id="b-event" class="w-full bg-background text-[0.9rem] max-mid:text-base"><span class="truncate">{eventName}</span></Select.Trigger>
           <Select.Content>
             <Select.Item value={NO_EVENT} label={$t.budget.noEvent} />
             {#each sortedSetlists as s (s.id)}

@@ -56,6 +56,8 @@ interface DetailState {
   readinessFirst: boolean;
   /** Participants whose songs are shown (AND: every selected participant plays the song). */
   participantFilter: string[];
+  /** Title / artist search of the song rows. */
+  filterText: string;
   filterOpen: boolean;
   /** Data Table column visibility (unused musician columns hidden). */
   columnVisibility: Record<string, boolean>;
@@ -75,7 +77,7 @@ interface DetailState {
 }
 
 const detailInitial = {
-  busy: false, error: '', showForm: false, repeating: false, readinessFirst: false, participantFilter: [] as string[], filterOpen: false, columnVisibility: {}, levelPicker: null, lyricsKey: null, confirm: null,
+  busy: false, error: '', showForm: false, repeating: false, readinessFirst: false, participantFilter: [] as string[], filterText: '', filterOpen: false, columnVisibility: {}, levelPicker: null, lyricsKey: null, confirm: null,
   dragIndex: null, dropIndex: null, dragMoved: false,
 };
 
@@ -84,7 +86,7 @@ export const rehearsalDetailStore = createStore<DetailState>(set => ({
   reset: () => set({ ...detailInitial }),
   patch: p => set(p),
   toggleParticipant: name => set(s => ({ participantFilter: s.participantFilter.includes(name) ? s.participantFilter.filter(n => n !== name) : [...s.participantFilter, name] })),
-  resetFilters: () => set({ participantFilter: [], readinessFirst: false }),
+  resetFilters: () => set({ participantFilter: [], filterText: '', readinessFirst: false }),
 }));
 
 /* ---------- plan form (create/edit/repeat) ---------- */

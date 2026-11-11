@@ -78,6 +78,7 @@ export function clearNavCache(): void {
   localStorage.removeItem(NAV_ADMIN_KEY);
   localStorage.removeItem(NAV_LOGGED_IN_KEY);
   localStorage.removeItem(NAV_REHEARSALS_KEY);
+  localStorage.removeItem('kittens_can_write');
 }
 
 /** Re-run `/auth/me` (after login, or on app init). */
@@ -101,7 +102,16 @@ export function isAdmin(): boolean {
   return get(currentUser)?.isAdmin === true;
 }
 
-/** True for admins and writers; false for readers and unauthenticated users. */
-export const canWrite = derived(currentUser, $u =>
-  $u?.isAdmin === true || ($u?.status === 'approved' && $u?.role === 'writer')
-);
+const CAN_WRITE_KEY = 'kittens_can_write';
+const cachedCanWrite = browser && localStorage.getItem(CAN_WRITE_KEY) === '1';
+
+/**
+ * True for admins and writers; false for readers and unauthenticated users. Until `/auth/me` answers it falls back to the value of
+ * the last session (cached), so write controls (➕, row actions…) are in the first paint instead of popping in later.
+ */
+export const canWrite = derived([currentUser, authLoading], ([$u, $loading], set) => {
+  if ($u === null && $loading) { set(cachedCanWrite); return; }
+  const value = $u?.isAdmin === true || ($u?.status === 'approved' && $u?.role === 'writer');
+  if (browser) localStorage.setItem(CAN_WRITE_KEY, value ? '1' : '0');
+  set(value);
+}, cachedCanWrite);

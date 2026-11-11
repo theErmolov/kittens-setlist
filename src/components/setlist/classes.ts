@@ -6,12 +6,12 @@ export const chip =
   'hover:border-primary hover:bg-transparent hover:text-primary-ink ' +
   'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground ' +
   'data-[state=on]:hover:bg-primary data-[state=on]:hover:text-primary-foreground';
-/** Pressed colour for icon toggles (filled with the brand colour). */
+/** Pressed colour for icon toggles (filled with the secondary colour). */
 export const pressedOn =
-  'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90';
+  'data-[state=on]:border-secondary data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
 
 /* ── Song table (setlist editor + rehearsal page): shadcn Table + Tailwind ───────────── */
 
 /** Scroll container around the Table (the shadcn table-container must not become the scroller, or sticky headers break). */
 export const songTableWrap =
-  'min-h-0 flex-1 overflow-auto px-4 pb-4 max-[700px]:overflow-x-hidden max-[700px]:px-0 max-[700px]:pb-0 [&_[data-slot=table-container]]:overflow-visible';
+  'min-h-0 flex-1 overflow-auto p-0 max-mid:overflow-x-hidden [&_[data-slot=table-container]]:overflow-visible';

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import * as Empty from '$components/ui/empty';
   import { Button } from '$components/ui/button';
@@ -8,13 +9,18 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import StageView from '$components/stage/StageView.svelte';
   import { t } from '$lib/i18n';
-  import { currentUser } from '$lib/auth';
+  import { currentUser, authLoading } from '$lib/auth';
+  import { musiciansQuery } from '$lib/query/queries';
+  import { stageIsApproved } from '$lib/store/stage';
   import { keys } from '$lib/query/queries';
   import { stageSetlistQuery } from '$lib/query/stage';
 
   const qc = useQueryClient();
   let id = $derived(page.params.id ?? '');
   const setlistQ = createQuery(() => ({ ...stageSetlistQuery(id), enabled: !!id }));
+  const musiciansQ = createQuery(() => ({ ...musiciansQuery(), enabled: $stageIsApproved }));
+  // One version of the page: wait for the session and the band roster (the musician columns depend on both) before drawing anything.
+  const loading = $derived(!browser || setlistQ.isPending || $authLoading || ($stageIsApproved && musiciansQ.isPending));
 
   afterNavigate(() => { window.scrollTo(0, 0); });
 
@@ -29,7 +35,7 @@
   });
 </script>
 
-{#if setlistQ.isPending}
+{#if loading}
   <LoadingCat />
 {:else if setlistQ.data}
   <StageView setlistId={id} />

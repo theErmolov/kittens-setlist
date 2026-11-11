@@ -16,8 +16,8 @@ interface BacklogState {
   showProgress: boolean;
   showArchived: boolean;
   filterOpen: boolean;
-  /** Desktop filter popover (the mobile drawer uses `filterOpen`). */
-  filterPopoverOpen: boolean;
+  /** Mid and big: the category chips and the second filter bar are shown (the small drawer uses `filterOpen`). */
+  barOpen: boolean;
   additionMode: boolean;
   /** Song ids currently showing the green "added" flash. */
   flashing: Set<string>;
@@ -41,7 +41,7 @@ interface BacklogState {
   setSelectedMusicians: (v: string[]) => void;
   setSelectedInstruments: (v: Instrument[]) => void;
   setFilterOpen: (v: boolean) => void;
-  setFilterPopoverOpen: (v: boolean) => void;
+  toggleBarOpen: () => void;
   toggleCategory: (c: Category) => void;
   resetFilters: () => void;
   toggleInstrument: (inst: Instrument) => void;
@@ -68,7 +68,7 @@ export const backlogStore = createStore<BacklogState>((set, get) => ({
   showProgress: false,
   showArchived: false,
   filterOpen: false,
-  filterPopoverOpen: false,
+  barOpen: true,
   additionMode: false,
   flashing: new Set(),
   sorting: [{ id: 'artist', desc: false }],
@@ -86,13 +86,13 @@ export const backlogStore = createStore<BacklogState>((set, get) => ({
   setSelectedMusicians: v => set({ selectedMusicians: new Set(v) }),
   setSelectedInstruments: v => set({ selectedInstruments: new Set(v) }),
   setFilterOpen: filterOpen => set({ filterOpen }),
-  setFilterPopoverOpen: filterPopoverOpen => set({ filterPopoverOpen }),
   toggleCategory: c => set(s => ({ categoryFilter: toggled(s.categoryFilter, c) })),
   resetFilters: () => set({ search: '', showArchived: false, categoryFilter: new Set(), selectedMusicians: new Set(), selectedInstruments: new Set() }),
   toggleMusician: name => set(s => ({ selectedMusicians: toggled(s.selectedMusicians, name) })),
   toggleInstrument: inst => set(s => ({ selectedInstruments: toggled(s.selectedInstruments, inst) })),
   toggleShowProgress: () => set(s => ({ showProgress: !s.showProgress })),
   toggleShowArchived: () => set(s => ({ showArchived: !s.showArchived })),
+  toggleBarOpen: () => set(s => ({ barOpen: !s.barOpen })),
   toggleFilterOpen: () => set(s => ({ filterOpen: !s.filterOpen })),
   toggleAdditionMode: () => set(s => ({ additionMode: !s.additionMode })),
   toggleSort: id => set(s => ({ sorting: [{ id, desc: s.sorting[0]?.id === id ? !s.sorting[0].desc : false }] })),

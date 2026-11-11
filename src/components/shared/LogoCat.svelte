@@ -20,11 +20,11 @@
   <circle cx="20" cy="23" r="15" fill="var(--accent)"/>
   <!-- Left eye -->
   <ellipse cx="14.5" cy="20.5" rx="2.8" ry="2.2" fill="white"/>
-  <circle cx="15" cy="20.8" r="1.4" fill="var(--primary-foreground)"/>
+  <circle cx="15" cy="20.8" r="1.4" fill="#1a1d26"/>
   <circle cx="15.5" cy="20.2" r="0.5" fill="white"/>
   <!-- Right eye -->
   <ellipse cx="25.5" cy="20.5" rx="2.8" ry="2.2" fill="white"/>
-  <circle cx="26" cy="20.8" r="1.4" fill="var(--primary-foreground)"/>
+  <circle cx="26" cy="20.8" r="1.4" fill="#1a1d26"/>
   <circle cx="26.5" cy="20.2" r="0.5" fill="white"/>
   <!-- Nose -->
   <ellipse cx="20" cy="25.5" rx="1.6" ry="1.1" fill="var(--primary-foreground)"/>

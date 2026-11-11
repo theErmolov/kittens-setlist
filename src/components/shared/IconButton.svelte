@@ -32,7 +32,8 @@
     [key: `data-${string}`]: string | undefined;
   } = $props();
 
-  const size = 'size-10 min-w-10 p-0 text-lg leading-none';
+  // The filter button: its glyph is never tinted (it keeps its own colours on every fill) and it has no border.
+  const size = $derived(cn('size-10 min-w-10 p-0 text-lg leading-none', icon === '🎛️' && 'no-tint border-0', icon === '⠿' && 'border-0', variant === 'default' && 'border-0 bg-clip-border'));
 </script>
 
 <Tooltip.Root>

@@ -11,7 +11,7 @@
 </script>
 
 <div data-slot="table-container" class="relative w-full overflow-x-auto">
-	<table bind:this={ref} data-slot="table" class={cn("w-full caption-bottom border-separate border-spacing-y-[3px] bg-card text-base", className)} {...restProps}>
+	<table bind:this={ref} data-slot="table" class={cn("w-full caption-bottom border-separate border-spacing-y-0 bg-card text-base", className)} {...restProps}>
 		{@render children?.()}
 	</table>
 </div>

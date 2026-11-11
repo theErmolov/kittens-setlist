@@ -18,14 +18,14 @@
 {#snippet navLink(href: string, label: string, active: boolean, external = false)}
   <NavigationMenu.Item>
     <NavigationMenu.Link {href} {active} {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-      class="px-3 py-2 text-[0.85rem] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-secondary data-active:text-primary-ink data-active:hover:bg-secondary">
+      class="px-3 py-2 text-[0.85rem] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-(--secondary-soft) data-active:text-primary-ink data-active:hover:bg-(--secondary-soft)">
       {label}{#if external}&nbsp;<span aria-hidden="true">↗</span>{/if}
     </NavigationMenu.Link>
   </NavigationMenu.Item>
 {/snippet}
 
 {#if $currentUser?.isAdmin}
-  <div class="page-shell max-[700px]:px-0">
+  <div class="page-shell max-mid:px-0 [&_[data-slot=table-container]]:-mx-4 [&_[data-slot=table-container]]:w-[calc(100%+2rem)] max-mid:[&_[data-slot=table-container]]:mx-0 max-mid:[&_[data-slot=table-container]]:w-full">
     <header>
       <NavigationMenu.Root viewport={false} class="admin-nav max-w-none justify-start border-b pb-3" aria-label={$t.admin.title}>
         <NavigationMenu.List class="flex-wrap justify-start gap-1.5">

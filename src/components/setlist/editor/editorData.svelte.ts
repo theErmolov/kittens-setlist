@@ -26,7 +26,7 @@ export function useEditorData() {
   const layout = $derived(effectiveLayout(setlistQ.data, localS.current, draggingS.current));
   const entries = $derived(layout?.entries ?? []);
   const subsets = $derived(layout?.subsets ?? []);
-  const meta = $derived<SetlistMeta>(setlistQ.data ? metaOf(setlistQ.data) : { name: '', date: '', startTime: '', vibe: false });
+  const meta = $derived<SetlistMeta>(setlistQ.data ? metaOf(setlistQ.data) : { name: '', date: '', startTime: '', vibe: false, comment: '' });
 
   const musiciansQ = createQuery(() => musiciansQuery());
   const songsQ = createQuery(() => songsQuery());

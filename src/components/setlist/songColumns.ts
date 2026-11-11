@@ -33,17 +33,17 @@ export const iconColumnWidth = (maxIcons: number) => `--mw: calc(${Math.max(1, m
 export function songColumns(roster: string[], headers: SongHeaders, maxIcons: Record<string, number> = {}): ColumnDef<SongTableRow>[] {
   return [
     { id: 'drag', header: '', cell: cellOf('drag'), meta: { cls: 'w-6 touch-none text-center text-base text-muted-foreground select-none', headCls: 'w-6' } },
-    { id: 'num', header: headers.num ? () => renderSnippet(headers.num!, undefined) : '#', cell: cellOf('num'), meta: { cls: 'w-px text-left text-[0.82rem] text-muted-foreground max-[1101px]:text-center', headCls: 'w-px text-left max-[1101px]:text-center' } },
-    { id: 'time', header: headers.time ?? '', cell: cellOf('time'), meta: { cls: 'w-px text-left text-[0.72rem] text-muted-foreground max-[1101px]:hidden', headCls: 'w-px text-left max-[1101px]:hidden' } },
-    { id: 'song', header: headers.song ? () => renderSnippet(headers.song!, undefined) : '', cell: cellOf('song'), meta: { cls: 'w-full max-w-0 max-[1101px]:max-w-none max-[1101px]:whitespace-normal' } },
+    { id: 'num', header: headers.num ? () => renderSnippet(headers.num!, undefined) : '#', cell: cellOf('num'), meta: { cls: 'w-px text-left text-[0.82rem] text-muted-foreground max-mid:h-px max-mid:p-0 max-mid:text-center', headCls: 'w-px text-left max-mid:text-center' } },
+    { id: 'time', header: headers.time ?? '', cell: cellOf('time'), meta: { cls: 'w-px px-1.5 text-left text-[0.72rem] text-muted-foreground max-mid:hidden', headCls: 'w-px px-1.5 text-left text-[0.62rem] max-mid:hidden' } },
+    { id: 'song', header: headers.song ? () => renderSnippet(headers.song!, undefined) : '', cell: cellOf('song'), meta: { cls: 'w-full max-w-0 max-mid:max-w-none max-mid:whitespace-normal', headCls: 'w-full max-w-0 overflow-hidden' } },
     ...roster.map((name): ColumnDef<SongTableRow> => ({
       id: `m:${name}`,
       header: name,
       cell: (ctx) => renderSnippet((ctx as unknown as Ctx).snippets.m, name),
-      meta: { style: iconColumnWidth(maxIcons[name] ?? 1), cls: 'px-1.5 min-[1280px]:min-w-(--mw) text-left text-[1.17rem] max-[1101px]:hidden', headCls: 'px-1.5 min-[1280px]:min-w-(--mw) text-center max-[1101px]:hidden' },
+      meta: { style: iconColumnWidth(maxIcons[name] ?? 1), cls: 'px-1.5 min-[1280px]:min-w-(--mw) text-left text-[1.17rem] max-mid:hidden', headCls: 'px-1.5 min-[1280px]:min-w-(--mw) text-center max-mid:hidden' },
     })),
-    { id: 'guests', header: headers.guests ?? '', cell: cellOf('guests'), meta: { cls: 'w-[12%] min-w-[110px] max-[1101px]:hidden', headCls: 'w-[12%] min-w-[110px] max-[1101px]:hidden' } },
-    { id: 'actions', header: '', cell: cellOf('actions'), meta: { cls: 'w-px px-2 text-right max-[1101px]:align-top', headCls: 'w-px px-2 text-right' } },
+    { id: 'guests', header: headers.guests ?? '', cell: cellOf('guests'), meta: { cls: 'w-[12%] min-w-[110px] max-mid:hidden', headCls: 'w-[12%] min-w-[110px] max-mid:hidden' } },
+    { id: 'actions', header: '', cell: cellOf('actions'), meta: { cls: 'h-px w-px p-0 text-right max-mid:p-0', headCls: 'w-px px-2 text-right' } },
   ];
 }
 

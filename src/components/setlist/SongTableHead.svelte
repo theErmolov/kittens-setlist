@@ -9,7 +9,7 @@
   let { table, offNames = [] }: { table: TanTable<any>; offNames?: string[] } = $props();
 </script>
 
-<Table.Header class="max-[700px]:hidden">
+<Table.Header class="max-mid:hidden">
   {#each table.getHeaderGroups() as group (group.id)}
     <Table.Row class="border-0 hover:bg-transparent">
       {#each group.headers as header (header.id)}

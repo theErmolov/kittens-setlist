@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import ReminderPreferences from '$components/shared/ReminderPreferences.svelte';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { page } from '$app/state';
@@ -46,7 +47,7 @@
   const createMut = useCreateRehearsal();
   const queries = [rehearsalsQ, setlistsQ, musiciansQ, songsQ];
   const rehearsals = $derived(rehearsalsQ.data ?? []);
-  const loading = $derived(queries.some(q => q.isPending));
+  const loading = $derived(!browser || queries.some(q => q.isPending));
   const error = $derived(!loading && queries.some(q => q.isError) ? $rt.error : '');
   const upcoming = $derived(rehearsals.filter(r => isUpcoming(r)).sort((a,b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)));
   const daySessions = $derived(rehearsals.filter(r => r.date === $selectedDate).sort((a,b) => a.startTime.localeCompare(b.startTime)));
@@ -76,7 +77,8 @@
 </script>
 
 {#if $canAccessRehearsals}
-<div class="contents max-[1101px]:hidden">
+{#if !loading}
+<div class="contents max-mid:hidden">
 <PageControls label={$rt.title}>
   {#snippet start()}
     <NavigationMenu.Item class="min-w-0"><Breadcrumb.Root><Breadcrumb.List class="flex-nowrap"><Breadcrumb.Item><Breadcrumb.Page class="inline-flex min-h-10 items-center whitespace-nowrap">{$rt.title}</Breadcrumb.Page></Breadcrumb.Item></Breadcrumb.List></Breadcrumb.Root></NavigationMenu.Item>
@@ -86,16 +88,18 @@
     <NavigationMenu.Item class="min-w-0"><ReminderPreferences /></NavigationMenu.Item><NavigationMenu.Item><IconButton icon="➕" variant="default" label={$rt.new} onclick={plan} disabled={loading || !!error} /></NavigationMenu.Item>{/snippet}
 </PageControls>
 </div>
-<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-[1101px]:flex">
-  <ReminderPreferences />
-  <IconButton class="ml-auto" variant="default" icon="➕" label={$rt.new} onclick={plan} disabled={loading || !!error} />
+<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] grid-cols-[1fr_auto_1fr] items-center gap-2 border-t bg-card px-3 max-mid:grid">
+  <span></span>
+  <IconButton variant="default" icon="➕" label={$rt.new} onclick={plan} disabled={loading || !!error} />
+  <div class="flex justify-start"><ReminderPreferences /></div>
 </div>
-<div class="page-shell pt-3! max-[1101px]:pb-[52px]!">
+{/if}
+<div class="w-full px-3 pt-3 pb-4 max-mid:px-2.5 max-mid:pb-[52px]">
   {#if loading}<LoadingCat />
   {:else if error}
     <Alert variant="destructive" class="flex items-center justify-between gap-3"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={load}>{$rt.retry}</Button></Alert>
   {:else}
-    <div class="grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-6 max-[1101px]:grid-cols-1 max-[1101px]:gap-4">
+    <div class="grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-6 max-mid:grid-cols-1 max-mid:gap-4">
       <Card class="min-w-0 gap-3 p-4 max-[600px]:p-2" aria-label={monthLabel} role="region">
         <div class="relative [--cell-size:--spacing(12)] max-[600px]:[--cell-size:--spacing(11)]">
           <ButtonRow class="absolute top-[calc((var(--cell-size)-40px)/2)] right-[calc(var(--cell-size)+8px)] z-10">

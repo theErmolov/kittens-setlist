@@ -9,6 +9,7 @@
   let { song }: { song: Song } = $props();
 </script>
 
-<ButtonRow justify="end">
-  <RowActions actions={songActions(song, $t, $canWrite)} />
+<!-- Mid and up: the ⋯ button fills the whole cell height, so rows of any height leave no gaps between buttons. -->
+<ButtonRow justify="end" class="min-mid:h-full">
+  <RowActions drawer class="min-mid:h-full min-mid:rounded-none" actions={songActions(song, $t, $canWrite)} />
 </ButtonRow>

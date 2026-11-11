@@ -10,6 +10,6 @@
 	}: WithElementRef<HTMLThAttributes> = $props();
 </script>
 
-<th bind:this={ref} data-slot="table-head" class={cn("sticky top-0 z-[2] bg-card text-muted-foreground shadow-[0_2px_0_var(--border)] h-10 border-border px-3 max-[700px]:px-1 text-left align-middle text-[0.75rem] font-bold tracking-[0.05em] whitespace-nowrap uppercase not-last:border-r [&:has([role=checkbox])]:pr-0", className)} {...restProps}>
+<th bind:this={ref} data-slot="table-head" class={cn("sticky top-0 z-[2] bg-card text-muted-foreground shadow-[0_2px_0_var(--border)] h-auto py-0 leading-4 border-border px-3 max-mid:px-1 text-left align-middle text-[0.75rem] font-bold tracking-[0.05em] whitespace-nowrap uppercase not-last:border-r max-mid:not-last:border-r-0 [&:has([role=checkbox])]:pr-0", className)} {...restProps}>
 	{@render children?.()}
 </th>

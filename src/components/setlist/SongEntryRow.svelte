@@ -26,7 +26,7 @@
 
   let {
     row, song, number, pct, pctTitle, played = false, stageOf, permanentNames, bubbleMusicians,
-    time, rowClass, rowProps, dragCell, dragCellProps, onlyrics, ontitle, titleLabel, titleDisabled = false,
+    time, rowClass, rowProps, dragCell, dragCellProps, onlyrics, titleFirst = false, ontitle, titleLabel, titleDisabled = false,
     extras, comment, rowActions = [], below, colspan, disabledMusicians = [], oncell, cellLabel, personalNote, onpersonal,
   }: {
     /** The TanStack row of the song table (its visible cells render through the column defs). */
@@ -59,6 +59,8 @@
     dragCellProps?: HTMLAttributes<HTMLTableCellElement>;
     /** Shows the lyrics button when the song has lyrics. */
     onlyrics?: () => void;
+    /** Stage-view layout of the title cell: bold title, the artist below it (all tiers), instead of «artist – title». */
+    titleFirst?: boolean;
     /** When set, the song name becomes a button (rehearsal: toggle played). */
     ontitle?: () => void;
     titleLabel?: string;
@@ -92,13 +94,13 @@
   const cellBg = $derived(
     blockOver ? 'bg-muted'
     : flags.has('subset-active-member') ? 'bg-muted'
-        : 'bg-card min-[1102px]:group-hover/row:bg-(--row-hover)',
+        : 'bg-card min-mid:group-hover/row:bg-(--row-hover)',
   );
   const cellState = $derived(cn(
     flags.has('dragging') || flags.has('subset-block-dragging') ? 'opacity-35' : played ? 'opacity-45' : '',
     flags.has('drag-over') && 'bg-muted ring-1 ring-inset ring-border',
   ));
-  const cell = $derived(cn('py-0.5 max-[1101px]:px-2 max-[1101px]:py-[7px] max-[1101px]:border-t max-[1101px]:border-border', cellBg, cellState));
+  const cell = $derived(cn('border-t border-border py-0 max-mid:px-2 max-mid:py-[7px] [&:has(+td:last-child)]:border-r-0', cellBg, cellState));
   const strike = $derived(played ? 'line-through' : '');
 
   const guestTags = $derived(
@@ -129,45 +131,70 @@
   /** Index of a musician column among the visible musician columns (striped background). */
   const mIndex = (id: string) => row.getVisibleCells().filter(x => x.column.id.startsWith('m:')).findIndex(x => x.column.id === id);
 
+  /** Row buttons that stretch to the cell: share its height when stacked, full height in a row. */
+  const cellBtn = 'h-auto min-h-10 w-10 flex-1 basis-0 rounded-none border-0 border-primary/30 bg-clip-border min-mid:flex-none min-mid:basis-auto';
   const offCls = 'opacity-40 grayscale disabled:opacity-40';
   const tagCls = 'px-2.5 text-[0.89rem] font-medium';
-  const bubbleCls = 'min-w-0 gap-[3px] pr-1.5 pl-[3px] text-[0.82rem] font-normal text-muted-foreground max-[1101px]:flex max-[1101px]:w-full';
+  const bubbleCls = 'min-w-0 gap-[3px] pr-1.5 pl-[3px] text-[0.82rem] font-normal text-muted-foreground max-mid:flex max-mid:w-full';
 </script>
 
 {#snippet icons(insts: Instrument[])}{#each insts as inst (inst)}<span>{INSTRUMENT_ICONS[inst]}</span>{/each}{/snippet}
 
 {#snippet nameText()}
-  <!-- From 1102px: three lines per row (artist, title, comment below). Small view: "Artist – Title" on one wrapping line, then the comment. -->
-  <span class="min-w-0 truncate text-left max-[1101px]:overflow-visible max-[1101px]:whitespace-normal" title="{song.artist} – {song.title}">
-    <span class={cn('text-[1.08rem] font-normal min-[1102px]:block min-[1102px]:truncate', strike)}>{song.artist}</span>
-    <span class={cn('mx-1 text-muted-foreground min-[1102px]:hidden', strike)}>–</span>
-    <span class={cn('title text-[1.08rem] font-semibold min-[1102px]:block min-[1102px]:truncate', strike)}>{song.title}</span>
+  {#if titleFirst}
+    <span class="flex min-w-0 flex-col text-left leading-tight" title="{song.artist} – {song.title}">
+      <span class={cn('title truncate text-base leading-snug font-bold', strike)}>{song.title}</span>
+      <span class={cn('truncate text-[0.85rem] text-muted-foreground', strike)}>{song.artist}</span>
+    </span>
+  {:else}
+  <!-- From the mid tier up: three lines per row (artist, title, comment below). Small view: "Artist – Title" on one wrapping line, then the comment. -->
+  <span class="min-w-0 truncate text-left max-mid:overflow-visible max-mid:whitespace-normal" title="{song.artist} – {song.title}">
+    <span class={cn('text-[1.08rem] font-normal min-mid:block min-mid:text-base min-mid:leading-[1.2] min-mid:truncate', strike)}>{song.artist}</span>
+    <span class={cn('mx-1 text-muted-foreground min-mid:hidden', strike)}>–</span>
+    <span class={cn('title text-[1.08rem] font-semibold min-mid:block min-mid:text-base min-mid:leading-[1.2] min-mid:truncate', strike)}>{song.title}</span>
   </span>
+  {/if}
 {/snippet}
 
 {#snippet rowButton(label: string, icon: string, run: (el: HTMLElement) => void)}
-  <IconButton {icon} {label} onclick={(e) => { e.stopPropagation(); run(e.currentTarget as HTMLElement); }} />
+  <IconButton {icon} {label} variant="secondary" class={cn(cellBtn, 'no-tint border-b last:border-b-0 min-mid:hidden')} onclick={(e) => { e.stopPropagation(); run(e.currentTarget as HTMLElement); }} />
 {/snippet}
 
 
 {#snippet cDrag()}{@render dragCell?.()}{/snippet}
 {#snippet cNum()}
-    <div class="flex items-center justify-center gap-1.5 min-[1102px]:justify-start">
-      <span>{number}</span>
-      <PctBadge value={pct} class="min-w-[4.2em] text-[0.68rem]" title={pctTitle} />
+  <!-- The small view's cell has no padding of its own so that the lyrics button (titleFirst, as in the stage view) can fill the bottom of the column. -->
+  <div class="flex h-full flex-col">
+    <div class="max-mid:py-[7px] {titleFirst ? 'max-mid:px-1' : 'max-mid:px-2'} {titleFirst ? 'max-mid:flex max-mid:flex-col max-mid:items-center max-mid:gap-1' : ''}">
+      <div class="flex items-center justify-center gap-1.5 min-mid:justify-start {titleFirst ? 'max-mid:contents' : ''}">
+        <span class="max-mid:order-1">{number}</span>
+        <PctBadge value={pct} class="min-w-[4.2em] text-[0.68rem] {titleFirst ? 'max-mid:order-3' : ''}" title={pctTitle} />
+      </div>
+      <!-- In the small view the time column is hidden and the type badge leaves the title: both sit here, inline under the number. -->
+      <div class="mt-1.5 flex items-center justify-center gap-1.5 min-mid:justify-start min-mid:hidden {titleFirst ? 'max-mid:order-2 max-mid:mt-0' : ''}">
+        {#if time !== undefined}<span class="text-[0.85rem] whitespace-nowrap text-muted-foreground">{time}</span>{/if}
+        <span class="[&_[data-slot=badge]]:size-6 [&_[data-slot=badge]]:text-[0.9rem]"><CategoryBadge category={song.category} iconOnly /></span>
+      </div>
     </div>
-    <!-- Below 1102px the time column is hidden and the type badge leaves the title: both sit here, inline under the number. -->
-    <div class="mt-1.5 flex items-center justify-center gap-1.5 min-[1102px]:justify-start min-[1102px]:hidden">
-      {#if time !== undefined}<span class="text-[0.85rem] whitespace-nowrap text-muted-foreground">{time}</span>{/if}
-      <span class="[&_[data-slot=badge]]:size-6 [&_[data-slot=badge]]:text-[0.9rem]"><CategoryBadge category={song.category} iconOnly /></span>
-    </div>
+    {#if titleFirst && song.lyrics && onlyrics}
+      <IconButton variant="secondary" icon="📝" label={$t.common.lyrics} class={cn(cellBtn, 'no-tint w-full border-t min-mid:hidden')} onclick={(e) => { e.stopPropagation(); onlyrics(); }} />
+    {/if}
+  </div>
 {/snippet}
 {#snippet cTime()}{time}{/snippet}
 {#snippet cSong()}
-  <div class="relative">
+  {@const nBtn = (personalNote && onpersonal ? 1 : 0) + (song.lyrics && onlyrics ? 1 : 0)}
+  <div class="relative min-mid:pr-(--btn-pad)" style:--btn-pad={nBtn ? `${nBtn * 48}px` : undefined}>
+    <!-- Mid and up: the personal-note and lyrics buttons sit at the right of the title cell, vertically centred (as in the catalog). In the small view they stack in the actions column. -->
+    {#if nBtn}
+      <div class="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2 max-mid:hidden">
+        {#if personalNote && onpersonal}<IconButton class="no-tint" variant="secondary" icon="🤫" label={$t.common.personalComment} onclick={(e) => { e.stopPropagation(); onpersonal(e.currentTarget as HTMLElement); }} />{/if}
+        {#if song.lyrics && onlyrics}<IconButton class="no-tint" variant="secondary" icon="📝" label={$t.common.lyrics} onclick={(e) => { e.stopPropagation(); onlyrics(); }} />{/if}
+      </div>
+    {/if}
     <!-- Wide view: the type badge is vertically centred beside the artist / title lines; the comment starts right below the badge. -->
     <div class="flex items-center leading-tight">
-      <span class="mx-1.5 inline-block shrink-0 text-[0.98em] max-[1101px]:hidden [&_[data-slot=badge]]:h-6"><CategoryBadge category={song.category} iconOnly /></span>
+      <span class="mx-1.5 inline-block shrink-0 text-[0.98em] max-mid:hidden [&_[data-slot=badge]]:h-6"><CategoryBadge category={song.category} iconOnly /></span>
       {#if ontitle}
         <button type="button" class="group/title contents" aria-pressed={played} aria-label={titleLabel} disabled={titleDisabled} onclick={ontitle}>{@render nameText()}</button>
       {:else}
@@ -176,7 +203,7 @@
     </div>
     {#if comment}<div class="min-w-0">{@render comment()}</div>{/if}
     {#if bubbles.length > 0}
-      <div class="mt-1.5 hidden gap-1 max-[1101px]:grid max-[1101px]:grid-cols-3">
+      <div class="mt-1.5 hidden gap-1 max-mid:grid max-mid:grid-cols-3">
         {#each bubbles as b}
           {#snippet bubbleBody()}
             <span class="shrink-0 text-base">{@render icons(b.instruments)}</span>
@@ -220,13 +247,11 @@
     </div>
 {/snippet}
 {#snippet cActions()}
-  <div class="flex flex-col items-end gap-2 min-[1102px]:flex-row min-[1102px]:items-center min-[1102px]:justify-end">
-    <RowActions actions={rowActions} />
-    <!-- Note / lyrics buttons: under the ⋯ button in the small view, left of it from 701px up. -->
-    <div class="flex flex-col items-end gap-2 min-[1102px]:order-first min-[1102px]:flex-row">
-      {#if personalNote && onpersonal}{@render rowButton($t.common.personalComment, '🤫', onpersonal)}{/if}
-      {#if song.lyrics && onlyrics}{@render rowButton($t.common.lyrics, '📝', () => onlyrics())}{/if}
-    </div>
+  <!-- Closed at the bottom only when it is the last row (the next row or header always brings its own top border). The buttons fill the whole cell, all the same size, with a thin border between them: stacked (⋯, note, lyrics) in the small view; from the mid tier up only the ⋯ is here (note and lyrics sit in the title cell). -->
+  <div class="flex h-full flex-col border-t border-border max-mid:border-primary/30 min-mid:flex-row min-mid:justify-end">
+    <RowActions class={cn(cellBtn, 'border-b last:border-b-0 min-mid:order-last min-mid:border-b-0')} actions={rowActions} />
+    {#if personalNote && onpersonal}{@render rowButton($t.common.personalComment, '🤫', onpersonal)}{/if}
+    {#if song.lyrics && onlyrics && !titleFirst}{@render rowButton($t.common.lyrics, '📝', () => onlyrics())}{/if}
   </div>
 {/snippet}
 
@@ -241,11 +266,12 @@
       {@const role = song.musicians[name]}
       {@const progBg = (role?.instruments?.length ?? 0) > 0 ? toneBg(tone(stageOf(name))) : null}
       <Table.Cell
-        class={cn(cell, colMeta(c.column).cls, progBg && 'min-[1102px]:group-hover/row:bg-inherit', off.has(name) && 'opacity-40 grayscale')}
+        class={cn(cell, colMeta(c.column).cls, progBg && 'min-mid:group-hover/row:bg-inherit', off.has(name) && 'opacity-40 grayscale')}
         style={`${colMeta(c.column).style ?? ''};${progBg ? `background: ${progBg}` : ''}`}
       ><FlexRender content={c.column.columnDef.cell} context={{ ...c.getContext(), snippets }} /></Table.Cell>
     {:else}
-      <Table.Cell class={cn(cell, colMeta(c.column).cls)} {...(id === 'drag' ? dragCellProps : {})}><FlexRender content={c.column.columnDef.cell} context={{ ...c.getContext(), snippets }} /></Table.Cell>
+      <!-- The buttons column has no line between rows (the buttons have their own borders); every other column does. -->
+      <Table.Cell class={cn(cell, colMeta(c.column).cls, id === 'actions' && 'border-t-0')} {...(id === 'drag' ? dragCellProps : {})}><FlexRender content={c.column.columnDef.cell} context={{ ...c.getContext(), snippets }} /></Table.Cell>
     {/if}
   {/each}
 </Table.Row>

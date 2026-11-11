@@ -14,7 +14,8 @@
 {#if flashAdded}
   <span transition:fade={{ duration: 250 }} class="pointer-events-none absolute inset-0 z-5 flex items-center justify-center bg-success/80 text-[1.7rem] font-extrabold text-success-ink" aria-hidden="true">✓</span>
 {/if}
-<div class="flex items-center justify-between gap-2">
-  <span>{song.title}</span>
-  {#if song.lyrics}<IconButton class="shrink-0" icon="📝" label={$t.common.lyrics} onclick={(e) => { e.stopPropagation(); backlogStore.getState().setLyricsViewSong(song.id); }} />{/if}
+<!-- The lyrics button sits at the right end of the cell, vertically centred (the same place as in the setlist editor). -->
+<div class="relative flex min-h-10 items-center {song.lyrics ? 'pr-12' : ''}">
+  <span class="min-w-0 min-mid:truncate">{song.title}</span>
+  {#if song.lyrics}<IconButton class="no-tint absolute top-1/2 right-0 -translate-y-1/2" variant="secondary" icon="📝" label={$t.common.lyrics} onclick={(e) => { e.stopPropagation(); backlogStore.getState().setLyricsViewSong(song.id); }} />{/if}
 </div>

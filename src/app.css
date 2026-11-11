@@ -25,10 +25,17 @@
   --popover: var(--surface);
   --popover-foreground: var(--text);
   --primary: var(--accent);
-  --primary-foreground: #342440; /* primary text colour; also the ink on the pastel accent fill (both themes) */
+  --primary-foreground: #ffffff; /* ink on the accent fill (both themes) */
   --primary-ink: var(--t-accent-ink); /* accent used as TEXT/borders on cards (pastel is only a fill) */
-  --secondary: var(--chip-bg);
-  --secondary-foreground: var(--text);
+  --secondary: #6c63ffc0; /* fill of the secondary buttons (📝 🤫 …) */
+  --secondary-soft: color-mix(in srgb, var(--accent) 45%, var(--surface)); /* the soft accent wash for hovers, badges and highlights */
+  --set-row: #f6f2fc; /* the setlist's set rows (dark theme: below) */
+  --person-bg: #fdf1d6; /* stage view: a musician playing the song */
+  --person-hi: #f6a623; /* … the one selected in the filter */
+  --item-bg: #ffffff; /* stage-view song rows (dark theme: the card colour) */
+  --table-text: #1f1d3a; /* text of the catalog table (dark theme: the normal text colour) */
+  --table-selected: #f3f3ff; /* selected table rows (rehearsal song picker; dark theme: below) */
+  --secondary-foreground: #ffffff;
   --muted: var(--chip-bg);
   --muted-foreground: var(--text-muted);
   --shadcn-accent: var(--row-hover);
@@ -36,6 +43,29 @@
   --destructive: #ef4444;
   --input: var(--border);
   --ring: color-mix(in srgb, var(--t-accent-ink) 45%, var(--accent)); /* soft accent focus ring */
+}
+
+/*
+ * Screen tiers (single source of truth; Tailwind variants `max-mid:` / `mid:` / `max-big:` / `big:` and JS via $lib/breakpoints):
+ *   small  < mid   (phones, iPads in portrait)
+ *   mid    mid .. < big  (iPads in landscape, small laptops)
+ *   big    >= big  (desktop)
+ */
+@theme static {
+  --breakpoint-mid: 1025px;
+  --breakpoint-big: 1367px;
+}
+
+/* Small screens, or very short ones (landscape phones): used by dialogs that stack their columns. */
+@custom-variant compact {
+  @media (width < theme(--breakpoint-mid)), (height < 550px) {
+    @slot;
+  }
+}
+
+/* Note text is clamped to one line on small screens. */
+@media (width < theme(--breakpoint-mid)) {
+  .clamp-small { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 }
 
 @theme inline {
@@ -88,20 +118,22 @@
 
 /* ── App palette (light + dark). Everything else (shadcn tokens above) derives from these. ── */
 :root, [data-theme="light"] {
-  --bg: #f5f4f8;
+  --bg: #f4f4fb;
   --surface: #ffffff;
-  --border: #e2e0ea;
-  --text: #342440; /* primary text colour (light theme) */
-  --text-muted: #7a7890;
-  --accent: #dcbffe;
-  --row-hover: #f0effe;
-  --chip-bg: #eceaf8;
-  /* Brand palette: accent #dcbffe, green #e8f6ed, orange #ffedd5, blue #e8f1ff, gray #ebebeb, red #ef4444.
-     Each tone = a fill (-bg) and a readable text/border colour (-ink). Pastels are fills only. */
+  --border: #e0e0ef;
+  --text: #1f1d3a; /* primary text colour (light theme): deep indigo, the dark end of the accent hue */
+  --text-muted: #6f6e92;
+  --accent: #6c63ff; /* the main colour of the app */
+  --row-hover: #eeeefd;
+  --chip-bg: #e9e9f7;
+  /* Brand palette: accent #6c63ff, green #e8f6ed, orange #ffedd5, blue #e8f1ff, gray #ebebeb, red #ef4444.
+     Each tone = a fill (-bg) and a readable text/border colour (-ink). Pastels are fills only; the accent is a solid fill with white ink. */
   --c-danger: #ef4444;
   /* Emoji duotone is derived from the primary (--accent): highlights = primary itself, shadows = primary darkened. */
-  --tint-hi: var(--accent); --tint-lo: color-mix(in srgb, var(--accent) 40%, #1b0a3d);
-  --t-accent-bg: #dcbffe;   --t-accent-ink: #5b21b6;
+  --tint-hi: var(--accent); --tint-lo: color-mix(in srgb, var(--accent) 55%, #14123a);
+  --tint-on-hi: #ffffff; --tint-on-lo: #c9c5ff; /* icons on the accent fill */
+  --tint-light-hi: #f4f2ff; --tint-light-lo: #c9c4ff; /* the wrench on the secondary buttons */
+  --t-accent-bg: #6c63ff;   --t-accent-ink: #4f46e5;
   --t-success-bg: #e8f6ed;  --t-success-ink: #166534;
   --t-warning-bg: #ffedd5;  --t-warning-ink: #9a3412;
   --t-info-bg: #e8f1ff;     --t-info-ink: #1d4ed8;
@@ -111,19 +143,26 @@
 }
 
 [data-theme="dark"] {
-  --bg: #0f1117;
-  --surface: #1a1d26;
-  --border: #2a2d3a;
-  --text: #e8eaf0;
-  --text-muted: #7a7d90;
-  --accent: #6d4aae; /* active / primary fill in dark: a deeper purple than the light pastel */
-  --primary-foreground: #f5eefe;
-  --row-hover: #1f2230;
-  --chip-bg: #23263a;
+  --bg: #0f1020;
+  --surface: #181a2e;
+  --border: #292b45;
+  --text: #e8e8f6;
+  --text-muted: #8082a8;
+  --accent: #6c63ff;
+  --row-hover: #1e2038;
+  --chip-bg: #22243f;
+  --secondary: #6c63ffc0;
+  --secondary-soft: color-mix(in srgb, var(--accent) 45%, var(--surface));
+  --set-row: color-mix(in srgb, var(--accent) 35%, var(--surface));
+  --person-bg: color-mix(in srgb, #f6a623 22%, var(--surface));
+  --person-hi: #f6a623;
+  --item-bg: var(--card);
+  --table-text: var(--text);
+  --table-selected: color-mix(in srgb, var(--accent) 22%, var(--surface));
   /* Dark theme: the same hues as the light palette — green / orange / blue / gray / red — as clear tints on the dark surface, with light inks. */
   --c-danger: #ef4444;
-  --tint-hi: #dcbffe; --tint-lo: color-mix(in srgb, #dcbffe 65%, #1b0a3d);
-  --t-accent-bg: #6d4aae;   --t-accent-ink: #dcbffe;
+  --tint-hi: #b4afff; --tint-lo: color-mix(in srgb, #b4afff 60%, #14123a);
+  --t-accent-bg: #6c63ff;   --t-accent-ink: #a8a3ff;
   --t-success-bg: color-mix(in srgb, #22c55e 30%, var(--surface));  --t-success-ink: #86efac;
   --t-warning-bg: color-mix(in srgb, #f97316 32%, var(--surface));  --t-warning-ink: #fdba74;
   --t-info-bg: color-mix(in srgb, #3b82f6 32%, var(--surface));     --t-info-ink: #93c5fd;
@@ -183,6 +222,15 @@ body {
 
 /* Every emoji is tinted with the accent through the #tint-primary SVG filter (defined in AppShell). */
 img.emoji { filter: url(#tint-primary); }
+/* The lyrics 📝, personal-note 🤫 and stage 🎤 buttons, and the ⏭ of the set headers, show their natural emoji colours. */
+.no-tint img.emoji { filter: none; }
+/* Tinted icons on a secondary (accent-filled) button: the light tint, the accent one would vanish. */
+.bg-secondary:not(.no-tint) img.emoji,
+[data-state=on][class*="data-[state=on]:bg-secondary"]:not(.no-tint) img.emoji { filter: url(#tint-on-primary); }
+/* Only the selected first tab (🎵): its dark note would vanish on the accent fill, so it gets a lighter tint. Every other icon keeps the normal tint. */
+[data-active][class*="data-active:bg-primary"] img.emoji[alt="🎵"] { filter: url(#tint-on-primary); }
+/* The ➕ of the add buttons (solid accent fill) is drawn light so it reads clearly. */
+.bg-primary:not([style]) img.emoji[alt="➕"] { filter: url(#tint-on-primary); }
 
 /* Tailwind's reset makes buttons use the arrow cursor: every enabled button-like control gets the hand pointer. */
 @layer base {

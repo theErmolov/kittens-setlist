@@ -7,9 +7,13 @@
   import { useStore } from '$lib/store/bridge';
   import { noteStore, defaultNoteUi } from '$lib/store/shell';
 
-  let { value = '', label, onsave, preview = false, collapsible = false, mobileCollapsible = false, singleLineCollapsible = false }: {
+  let { value = '', label, icon, compact = false, onsave, preview = false, collapsible = false, mobileCollapsible = false, singleLineCollapsible = false }: {
     value?: string;
     label: string;
+    /** Shown instead of the label text (the label stays as its tooltip / accessible name). */
+    icon?: string;
+    /** Smaller text. */
+    compact?: boolean;
     onsave?: (value: string) => Promise<void>;
     preview?: boolean;
     collapsible?: boolean;
@@ -70,7 +74,7 @@
       </div>
       {#if failed}<span class="error" role="alert">{$t.common.commentSaveFailed}</span>{/if}
     {:else}
-      {#if value}<div {@attach measureOverflow} class="text" class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded} class:single-line-collapsed={singleLineCollapsible && !expanded}><span class="label">{label}: </span><LinkifiedText text={value} /></div>{/if}
+      {#if value}<div {@attach measureOverflow} class="text" class:compact class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded} class:single-line-collapsed={singleLineCollapsible && !expanded} class:clamp-small={preview || (mobileCollapsible && !expanded)}><span class="label" title={label}>{#if icon}<span aria-label={label} role="img">{icon}</span>{:else}{label}: {/if}</span><LinkifiedText text={value} /></div>{/if}
       {#if canExpand}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); patch({ expanded: !expanded }); }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</Button>{/if}
       {#if onsave}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" onclick={() => patch({ draft: value, editing: true, failed: false })}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible && !singleLineCollapsible} · {label}{/if}</Button>{/if}
     {/if}
@@ -79,6 +83,7 @@
 
 <style>
   .note { margin-top: 5px; font-size: 0.85rem; color: var(--text); min-width: 0; }
+  .text.compact { font-size: 0.74rem; }
   .text { line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
   .text .label { margin-right: 4px; }
   .label { color: var(--text-muted); font-size: 0.78rem; }
@@ -88,7 +93,4 @@
   .compact-actions :global(.edit) { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
   .actions { display: flex; gap: 6px; }
   .error { color: var(--c-danger); }
-  @media (max-width: 700px) {
-    .mobile-collapsed, .preview .text { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  }
 </style>

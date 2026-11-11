@@ -44,7 +44,7 @@
             </Item.Description>
             {#if r.songs.length}
               <!-- The actual songs, as a bullet list (columns as room allows; always two on small screens, in a smaller font). -->
-              <ul class="m-0 mt-2 grid list-disc grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-6 gap-y-2 pl-5 text-[.85rem] marker:text-primary-ink max-[1101px]:grid-cols-2 max-[1101px]:gap-x-4 max-[1101px]:pl-4 max-[1101px]:text-[.72rem]" aria-label={$rt.colSongs}>
+              <ul class="m-0 mt-2 grid list-disc grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-6 gap-y-2 pl-5 text-[.85rem] marker:text-primary-ink max-mid:grid-cols-2 max-mid:gap-x-4 max-mid:pl-4 max-mid:text-[.72rem]" aria-label={$rt.colSongs}>
                 {#each r.songs as item, i (`${item.sourceSetlistId ?? ''}:${item.songId}:${i}`)}
                   <li class={cn('min-w-0 leading-tight', item.played && 'text-muted-foreground line-through')} title="{item.song.artist} – {item.song.title}">
                     <!-- Always two lines: the artist, then the song name; neither wraps (long text is cut with an ellipsis). -->

@@ -9,7 +9,7 @@
 </script>
 
 {#if guests.length > 0}
-  <div class="flex flex-wrap gap-2">
+  <div class="flex flex-wrap gap-2 min-mid:flex-nowrap">
     {#each guests as g (g.name)}
       <Badge variant="secondary" class="gap-0.5 bg-neutral px-[7px] text-[0.7rem] font-normal text-neutral-ink"><span class="shrink-0">{#each g.instruments as inst (inst)}<span>{INSTRUMENT_ICONS[inst]}</span>{/each}</span><span class="max-w-[7ch] truncate">{g.name}</span></Badge>
     {/each}
