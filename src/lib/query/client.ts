@@ -38,9 +38,13 @@ export const queryClient = new QueryClient({
   queryCache: new QueryCache(),
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // In-memory only: everything stays cached until the tab is closed or reloaded. Data is
+      // refreshed solely by explicit invalidation (own mutations, server push, live-view polls).
+      staleTime: Infinity,
+      gcTime: Infinity,
       retry: (failureCount, err) => !isAuthError(err) && failureCount < 1,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
       retryOnMount: false,
     },
   },

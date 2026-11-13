@@ -12,7 +12,7 @@
 </script>
 
 {#if $showProgress && pct !== null}
-  <PctBadge value={pct} class="text-[0.9rem]" />
+  <PctBadge value={pct} class="text-body-lg" />
 {:else}
   <CategoryBadge category={song.category} iconOnly />
 {/if}

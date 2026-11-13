@@ -22,18 +22,12 @@ function setlistMutation<V>(fn: (setlistId: string, v: V) => Promise<Setlist>) {
 export const useAddSongs = () => setlistMutation<{ songs: Song[] }>((id, v) => api.addSongsToSetlist(id, v.songs));
 export const useAddSetlistOnlySong = () => setlistMutation<{ song: Song }>((id, v) => api.addSetlistOnlySong(id, v.song));
 export const useRemoveSong = () => setlistMutation<{ songId: string }>((id, v) => api.removeSongFromSetlist(id, v.songId));
-export const useTogglePlayed = () => setlistMutation<{ songId: string }>((id, v) => api.togglePlayed(id, v.songId));
-export const useToggleBreakPlayed = () => setlistMutation<{ breakOrder: number }>((id, v) => api.toggleBreakPlayed(id, v.breakOrder));
-export const useMarkThrough = () => setlistMutation<{ targetOrder: number }>((id, v) => api.markThrough(id, v.targetOrder));
 export const useAddBreak = () => setlistMutation<{ minutes: number }>((id, v) => api.addBreakToSetlist(id, v.minutes));
 export const useRemoveBreak = () => setlistMutation<{ order: number }>((id, v) => api.removeBreakFromSetlist(id, v.order));
 export const useUpdateBreak = () => setlistMutation<{ order: number; minutes: number }>((id, v) => api.updateBreak(id, v.order, v.minutes));
 export const useUpdateEntrySong = () => setlistMutation<{ order: number; song: Song }>((id, v) => api.updateEntrySong(id, v.order, v.song));
 export const useUpdateEntryComment = () => setlistMutation<{ order: number; comment: string }>((id, v) => api.updateEntryComment(id, v.order, v.comment));
-export const useUpdateSetlistComment = () => setlistMutation<{ comment: string }>((id, v) => api.updateSetlistComment(id, v.comment));
 export const useReorderEntries = () => setlistMutation<{ entries: SetlistEntry[]; subsets?: SetlistSubset[] }>((id, v) => api.reorderEntries(id, v.entries, v.subsets));
-export const useUpdateEntryProgress = () => setlistMutation<{ order: number; musicianName: string; stage: LearningStage; songId: string; isPermanent: boolean }>(
-  (id, v) => api.updateEntryProgress(id, v.order, v.musicianName, v.stage, v.songId, v.isPermanent));
 
 /** Replaces the whole setlist (name/date/vibe/etc.). */
 export function useUpdateSetlist() {

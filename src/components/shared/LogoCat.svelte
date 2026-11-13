@@ -11,13 +11,13 @@
   aria-label={$t.common.bandName}
 >
   <!-- Left ear -->
-  <polygon points="6,19 3,5 15,15" fill="var(--accent)"/>
-  <polygon points="7.5,17.5 6,9 13,14" fill="color-mix(in srgb, var(--accent) 55%, white)"/>
+  <polygon points="6,19 3,5 15,15" fill="var(--primary)"/>
+  <polygon points="7.5,17.5 6,9 13,14" fill="color-mix(in srgb, var(--primary) 55%, white)"/>
   <!-- Right ear -->
-  <polygon points="34,19 37,5 25,15" fill="var(--accent)"/>
+  <polygon points="34,19 37,5 25,15" fill="var(--primary)"/>
   <polygon points="32.5,17.5 34,9 27,14" fill="var(--primary-foreground)" opacity="0.55"/>
   <!-- Head -->
-  <circle cx="20" cy="23" r="15" fill="var(--accent)"/>
+  <circle cx="20" cy="23" r="15" fill="var(--primary)"/>
   <!-- Left eye -->
   <ellipse cx="14.5" cy="20.5" rx="2.8" ry="2.2" fill="white"/>
   <circle cx="15" cy="20.8" r="1.4" fill="#1a1d26"/>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { INSTRUMENT_ICONS } from '$lib/utils';
   import { browser } from '$app/environment';
   import type { Song, Category, MusicianRole, Instrument, BandMusician, LearningStage } from '$lib/types';
   import { below } from '$lib/breakpoints';
@@ -10,21 +11,18 @@
   import * as Dialog from '$components/ui/dialog';
   import * as Tooltip from '$components/ui/tooltip';
   import IconButton from '$components/shared/IconButton.svelte';
-  import * as AlertDialog from '$components/ui/alert-dialog';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
   import * as Tabs from '$components/ui/tabs';
   import { Button } from '$components/ui/button';
   import { Input } from '$components/ui/input';
   import { Textarea } from '$components/ui/textarea';
   import { Label } from '$components/ui/label';
-  import * as Table from '$components/ui/table';
-  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { createSvelteTable, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
   import { getCoreRowModel, type ColumnDef } from '@tanstack/table-core';
   import { ToggleGroup, ToggleGroupItem } from '$components/ui/toggle-group';
 
   const allInstruments: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
-  const instrumentIcons: Record<Instrument, string> = {
-    guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹', cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤'
-  };
 
   let {
     song,
@@ -57,12 +55,12 @@
   const confirmKind = useStore(songEditStore, s => s.confirm);
   const actions = songEditStore.getState();
   const setField = actions.setField;
-  const labelClass = 'text-[0.82rem] font-semibold tracking-[0.04em] text-muted-foreground uppercase';
-  const instClass = 'px-0 text-[1.35rem] data-[state=on]:bg-primary min-w-0 flex-1';
+  const labelClass = 'text-body font-normal text-muted-foreground';
+  const instClass = 'hover:border-primary h-8.5 w-8.5 min-w-8.5 flex-none px-0 text-[1.35rem] on:border-primary on:bg-primary';
   const catActive: Record<Category, string> = {
-    top: 'data-[state=on]:border-transparent data-[state=on]:bg-warning data-[state=on]:text-warning-ink',
-    mid: 'data-[state=on]:border-transparent data-[state=on]:bg-info data-[state=on]:text-info-ink',
-    low: 'data-[state=on]:border-transparent data-[state=on]:bg-success data-[state=on]:text-success-ink',
+    top: 'on:border-category-top-active-border on:bg-category-top-active-bg on:text-category-top-active-ink',
+    mid: 'on:border-category-mid-active-border on:bg-category-mid-active-bg on:text-category-mid-active-ink',
+    low: 'on:border-category-low-active-border on:bg-category-low-active-bg on:text-category-low-active-ink',
   };
   const numberOrNull = (v: string) => v === '' ? null : Number(v);
 
@@ -79,11 +77,11 @@
   ]);
   const rosterColumns: ColumnDef<RosterRow>[] = [
     { id: 'name', header: () => $t.song.musicians, cell: ({ row }) => renderSnippet(nameCell as never, row.original),
-      meta: { cell: 'max-[640px]:order-1 max-[640px]:min-w-0 max-[640px]:flex-1' } },
+      meta: { cellClass: 'max-mid:order-1 max-mid:min-w-0 max-mid:flex-1' } },
     { id: 'instruments', header: () => '', cell: ({ row }) => renderSnippet(instCell as never, row.original),
-      meta: { cell: 'w-full max-[640px]:order-3 max-[640px]:basis-full' } },
+      meta: { cellClass: 'w-full max-mid:order-3 max-mid:basis-full' } },
     { id: 'progress', header: () => $t.song.progress, cell: ({ row }) => renderSnippet(progCell as never, row.original),
-      meta: { cell: 'max-[640px]:order-2' } },
+      meta: { cellClass: 'max-mid:order-2' } },
   ];
   const table = createSvelteTable<RosterRow>({
     get data() { return rosterRows; },
@@ -165,11 +163,11 @@
 
 {#snippet nameCell(r: RosterRow)}
   {#if r.kind === 'member'}
-    <span class="block w-[88px] truncate font-semibold max-[760px]:w-auto">{r.name}</span>
+    <span class="block w-22 truncate font-semibold max-mid:w-auto">{r.name}</span>
   {:else}
     {@const g = guestOf(r.id)}
     <Input
-      class="w-[88px] rounded-none border-0 bg-transparent p-0 text-[0.9rem] shadow-none focus-visible:ring-0 max-[760px]:w-full max-[760px]:text-base dark:bg-transparent {g?.name.trim() ? 'font-semibold' : 'font-normal'}"
+      class="w-22 rounded-none border-0 bg-transparent p-0 text-body-lg shadow-none focus-visible:ring-0 max-mid:w-full max-mid:text-base {g?.name.trim() ? 'font-semibold' : 'font-normal'}"
       value={g?.name ?? ''}
       placeholder={g?.name.trim() ? $t.song.guestNamePlaceholder : $t.song.guestPlaceholder}
       aria-label={$t.song.guestNamePlaceholder}
@@ -223,7 +221,7 @@
       <Tooltip.Root>
         <Tooltip.Trigger>
           {#snippet child({ props })}
-            <ToggleGroupItem {...props} value={inst} class={instClass} aria-label={$t.instrument[inst]}>{instrumentIcons[inst]}</ToggleGroupItem>
+            <ToggleGroupItem {...props} value={inst} class={instClass} aria-label={$t.instrument[inst]}>{INSTRUMENT_ICONS[inst]}</ToggleGroupItem>
           {/snippet}
         </Tooltip.Trigger>
         <Tooltip.Content>{$t.instrument[inst]}</Tooltip.Content>
@@ -235,10 +233,10 @@
 <!-- Always mounted by its parent while visible, so `open` is constant and any dismissal (X, Esc, outside) goes through closeModal. -->
 <Dialog.Root open onOpenChange={(open) => { if (!open) closeModal(); }}>
   <Dialog.Content
-    class="flex h-[min(820px,calc(100dvh-2rem))] flex-col gap-4 rounded-2xl sm:max-w-[760px] max-[760px]:top-0 max-[760px]:left-0 max-[760px]:h-dvh max-[760px]:w-screen max-[760px]:max-w-none max-[760px]:translate-x-0 max-[760px]:translate-y-0 max-[760px]:rounded-none max-[760px]:ring-0"
+    class="flex h-[min(820px,calc(100dvh-2rem))] flex-col gap-3 rounded-2xl border border-border bg-card p-5.5 ring-0 mid:max-w-190 max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:w-screen max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:ring-0"
   >
     <Dialog.Header class="shrink-0 pr-8">
-      <Dialog.Title class="text-[1.2rem] leading-tight font-bold">{modalTitle}</Dialog.Title>
+      <Dialog.Title class="text-title leading-tight font-bold">{modalTitle}</Dialog.Title>
       <Dialog.Description class="sr-only">{$draftStore.artist} {$draftStore.title}</Dialog.Description>
     </Dialog.Header>
 
@@ -247,7 +245,7 @@
         <p>{$draftStore.artist} — {$draftStore.title}</p>
       {:else}
       <fieldset disabled={$saving} class="m-0 flex min-w-0 flex-col gap-3.5 border-0 p-0 {$activeTab === 'lyrics' ? 'flex-1' : ''}">
-        <div class="flex flex-col gap-3 min-[761px]:flex-row">
+        <div class="flex flex-col gap-3 mid:flex-row">
           <div class="flex flex-1 flex-col gap-1.5">
             <Label for="song-editor-artist" class={labelClass}>{$t.song.artist}</Label>
             <Input id="song-editor-artist" value={$draftStore.artist} oninput={e => setField('artist', e.currentTarget.value)} placeholder={$t.song.artist} />
@@ -278,7 +276,7 @@
                 {#each (['top', 'mid', 'low'] as Category[]) as cat}
                   <ToggleGroupItem
                     value={cat}
-                    class="px-4 text-[0.85rem] text-muted-foreground {catActive[cat]}"
+                    class="px-4 text-body text-muted-foreground hover:border-primary hover:text-primary-ink {catActive[cat]}"
                   >{$t.filter[cat]}</ToggleGroupItem>
                 {/each}
               </ToggleGroup>
@@ -286,34 +284,23 @@
 
             <div class="flex flex-col gap-1.5">
               <!-- Roster Data Table: permanent members first, then ad-hoc guests; the trailing empty guest row is a ghost "add" row. -->
-              <Table.Root class="max-[640px]:block">
-                <Table.Header class="max-[640px]:hidden">
-                  {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-                    <Table.Row class="hover:bg-transparent">
-                      {#each headerGroup.headers as header (header.id)}
-                        <Table.Head><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></Table.Head>
-                      {/each}
-                    </Table.Row>
-                  {/each}
-                </Table.Header>
-                <Table.Body class="max-[640px]:block">
-                  {#each table.getRowModel().rows as row (row.id)}
-                    {@const r = row.original}
-                    {@const isAdd = r.kind === 'guest' && !guestOf(r.id)?.name.trim()}
-                    {@const missingInst = r.kind === 'guest' && guestsMissingInstrument.has(r.id)}
-                    <Table.Row class="max-[640px]:flex max-[640px]:flex-wrap max-[640px]:items-center max-[640px]:gap-y-1 max-[640px]:py-2 {isAdd ? 'opacity-75 focus-within:opacity-100 [&>td]:border-dashed' : ''} {missingInst ? 'bg-destructive/10' : ''}">
-                      {#each row.getVisibleCells() as cell (cell.id)}
-                        <Table.Cell class="max-[640px]:not-last:border-r-0 max-[640px]:px-2 max-[640px]:py-0 {(cell.column.columnDef.meta as { cell?: string } | undefined)?.cell ?? ''}">
-                          <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
-                        </Table.Cell>
-                      {/each}
-                    </Table.Row>
-                  {/each}
-                </Table.Body>
-              </Table.Root>
+              <DataTableView
+                {table}
+                class="border-separate border-spacing-y-1 max-mid:block"
+                headerClass="max-mid:hidden"
+                bodyClass="max-mid:block"
+                headRowClass="hover:bg-transparent"
+                cellClass="border-y border-border bg-(--bg) py-1.25 first:rounded-l-lg first:border-l last:rounded-r-lg last:border-r not-last:border-r-0 max-mid:px-2 max-mid:py-0"
+                rowClass={row => {
+                  const r = row.original;
+                  const isAdd = r.kind === 'guest' && !guestOf(r.id)?.name.trim();
+                  const missingInst = r.kind === 'guest' && guestsMissingInstrument.has(r.id);
+                  return `border-0 max-mid:flex max-mid:flex-wrap max-mid:items-center max-mid:gap-y-1 max-mid:py-2 ${isAdd ? 'opacity-75 focus-within:opacity-100 [&>td]:border-dashed' : ''} ${missingInst ? 'bg-destructive/10' : ''}`;
+                }}
+              />
             </div>
 
-            <div class="flex flex-col gap-3 min-[761px]:flex-row">
+            <div class="flex flex-col gap-3 mid:flex-row">
               <div class="flex flex-[3] flex-col gap-1.5">
                 <Label for="song-editor-comment" class={labelClass}>{$t.song.comment}</Label>
                 <Input id="song-editor-comment" value={$draftStore.comment} oninput={e => setField('comment', e.currentTarget.value)} placeholder={$t.song.commentPlaceholder} />
@@ -325,9 +312,9 @@
             </div>
           </Tabs.Content>
 
-          <Tabs.Content value="lyrics" class="flex min-h-[260px] flex-col pt-2">
+          <Tabs.Content value="lyrics" class="flex min-h-65 flex-col pt-2">
             <Textarea
-              class="field-sizing-fixed min-h-[220px] flex-1 resize-y overflow-x-auto font-mono text-base leading-[1.55] whitespace-pre md:text-[0.88rem]"
+              class="field-sizing-fixed min-h-55 flex-1 resize-y overflow-x-auto font-mono text-base leading-[1.55] whitespace-pre mid:text-body"
               value={$draftStore.lyrics}
               oninput={e => setField('lyrics', e.currentTarget.value)}
               placeholder={$t.song.lyricsPlaceholder}
@@ -344,19 +331,19 @@
       {#if $saveFailed}<p class="text-destructive" role="alert">{$t.common.commentSaveFailed}</p>{/if}
     </div>
 
-    <Dialog.Footer class="shrink-0 flex-row items-center justify-between">
+    <Dialog.Footer class="mx-0 mb-0 shrink-0 flex-row items-center justify-between mid:justify-between rounded-none border-t border-border bg-transparent p-0 pt-3">
       <div class="flex gap-2">
         {#if ondelete}
-          <IconButton icon="🗑" label={$t.song.remove} class="text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('delete')} />
+          <IconButton icon="🗑" label={$t.song.remove} class="text-muted-foreground hover:border-danger hover:text-danger" onclick={() => actions.setConfirm('delete')} />
         {/if}
         {#if onaddtosetlist}
-          <IconButton icon="📋" label={$t.addToSetlist.title} onclick={() => { onaddtosetlist!(); closeModal(); }} />
+          <IconButton icon="📋" label={$t.addToSetlist.title} class="text-muted-foreground hover:border-primary hover:text-foreground" onclick={() => { onaddtosetlist!(); closeModal(); }} />
         {/if}
         {#if !personalOnly && mode === 'backlog' && song?.id}
-          <IconButton icon={$draftStore.archived ? '📤' : '📦'} label={$draftStore.archived ? $t.song.unarchive : $t.song.archive} onclick={toggleArchive} />
+          <IconButton icon={$draftStore.archived ? '📤' : '📦'} label={$draftStore.archived ? $t.song.unarchive : $t.song.archive} class="text-muted-foreground hover:border-primary hover:text-foreground" onclick={toggleArchive} />
         {/if}
         {#if onremove}
-          <Button variant="outline" size="lg" class="text-muted-foreground hover:border-destructive/40 hover:text-destructive" onclick={() => actions.setConfirm('remove')} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</Button>
+          <Button variant="outline" size="lg" class="text-muted-foreground hover:border-danger hover:text-danger" onclick={() => actions.setConfirm('remove')} title={$t.song.removeFromSetlist}>{$t.song.removeFromSetlist}</Button>
         {/if}
       </div>
       <div class="flex gap-2">
@@ -367,23 +354,16 @@
   </Dialog.Content>
 </Dialog.Root>
 
-<AlertDialog.Root open={$confirmKind !== null} onOpenChange={(open) => { if (!open) actions.setConfirm(null); }}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}</AlertDialog.Title>
-      <AlertDialog.Description>{$confirmKind === 'delete' ? $t.deleteConfirm : $t.song.removeFromSetlistConfirm}</AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$t.song.cancel}</AlertDialog.Cancel>
-      <AlertDialog.Action
-        variant="destructive"
-        onclick={() => {
-          const kind = $confirmKind;
-          actions.setConfirm(null);
-          if (kind === 'delete') { ondelete?.(); closeModal(); }
-          else if (kind === 'remove') { onremove?.(); closeModal(); }
-        }}
-      >{$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+<ConfirmDialog
+  open={$confirmKind !== null}
+  title={$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}
+  description={$confirmKind === 'delete' ? $t.deleteConfirm : $t.song.removeFromSetlistConfirm}
+  confirmLabel={$confirmKind === 'delete' ? $t.song.remove : $t.song.removeFromSetlist}
+  onopenchange={open => { if (!open) actions.setConfirm(null); }}
+  onconfirm={() => {
+    const kind = $confirmKind;
+    actions.setConfirm(null);
+    if (kind === 'delete') { ondelete?.(); closeModal(); }
+    else if (kind === 'remove') { onremove?.(); closeModal(); }
+  }}
+/>

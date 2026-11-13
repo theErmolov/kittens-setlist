@@ -2,11 +2,11 @@
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { Button } from '$components/ui/button';
   import * as Select from '$components/ui/select';
-  import * as Table from '$components/ui/table';
   import IconButton from '$components/shared/IconButton.svelte';
   import * as Empty from '$components/ui/empty';
   import { getCoreRowModel, type ColumnDef, type PaginationState, type Updater } from '@tanstack/table-core';
-  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { createSvelteTable, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
   import type { AuditLogEntry } from '$lib/types';
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
@@ -69,7 +69,7 @@
     <section>
       <div class="audit-header mb-2 flex justify-end">
         <Select.Root type="single" value={String($auditPageSize)} onValueChange={v => table.setPageSize(Number(v))}>
-          <Select.Trigger class="page-size-select w-20 bg-card max-md:text-base" aria-label={$t.admin.auditLog}>{$auditPageSize}</Select.Trigger>
+          <Select.Trigger class="page-size-select w-20 bg-control-bg max-mid:text-base" aria-label={$t.admin.auditLog}>{$auditPageSize}</Select.Trigger>
           <Select.Content>
             {#each [20, 50, 100] as size (size)}
               <Select.Item value={String(size)} label={String(size)} />
@@ -81,30 +81,7 @@
       {:else if auditItems.length === 0}<Empty.Root class="hint border"><Empty.Header><Empty.Description>{$t.admin.auditEmpty}</Empty.Description></Empty.Header></Empty.Root>
       {:else}
         <div class="audit-table">
-          <Table.Root class="max-mid:[&_tbody]:grid max-mid:[&_tbody]:gap-[3px] max-mid:[&_thead]:hidden">
-            <Table.Header>
-              {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-                <Table.Row>
-                  {#each headerGroup.headers as header (header.id)}
-                    <Table.Head>
-                      <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
-                    </Table.Head>
-                  {/each}
-                </Table.Row>
-              {/each}
-            </Table.Header>
-            <Table.Body>
-              {#each table.getRowModel().rows as row (row.id)}
-                <Table.Row class="max-mid:grid max-mid:grid-cols-2 max-mid:gap-x-2">
-                  {#each row.getVisibleCells() as cell (cell.id)}
-                    <Table.Cell class="max-mid:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
-                      <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
-                    </Table.Cell>
-                  {/each}
-                </Table.Row>
-              {/each}
-            </Table.Body>
-          </Table.Root>
+          <DataTableView {table} class=" table-stack" rowClass={() => 'max-mid:grid max-mid:grid-cols-2 max-mid:gap-x-2'} cellClass="max-mid:not-last:border-r-0" />
         </div>
         <div class="audit-nav mt-2.5 flex gap-2">
           <IconButton icon="⬅️" label={$t.admin.auditPrev} disabled={!table.getCanPreviousPage()} onclick={() => table.previousPage()} />
@@ -116,5 +93,5 @@
 
 {#snippet whenCell(entry: AuditLogEntry)}{formatTimestamp(entry.timestamp)}{/snippet}
 {#snippet whoCell(entry: AuditLogEntry)}{entry.actorName}{/snippet}
-{#snippet entityCell(entry: AuditLogEntry)}<span class="entity-type mr-1 text-[0.68rem] font-bold uppercase text-primary-ink">{$t.admin.auditEntities[entry.entityType]}</span>{formatLocalizedAuditEntity(entry, $lang)}{/snippet}
+{#snippet entityCell(entry: AuditLogEntry)}<span class="entity-type mr-1 text-micro font-bold uppercase text-primary-ink">{$t.admin.auditEntities[entry.entityType]}</span>{formatLocalizedAuditEntity(entry, $lang)}{/snippet}
 {#snippet detailsCell(entry: AuditLogEntry)}{formatLocalizedAuditSummary(entry, $lang)}{/snippet}

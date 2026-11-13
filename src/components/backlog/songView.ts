@@ -1,11 +1,9 @@
 import type { Song, Instrument, LearningStage } from '$lib/types';
 import { sortInstruments, progressPct } from '$lib/utils';
-import { STAGE_TONE, toneBg, toneStyle } from '$lib/palette';
+import { stageCellClass } from '$lib/palette';
 
-/** Fill colour of a learning stage (palette tone). */
-export const stageBg = (stage: LearningStage): string => toneBg(STAGE_TONE[stage]);
-/** Fill + ink inline style of a learning stage. */
-export const stageStyle = (stage: LearningStage): string => toneStyle(STAGE_TONE[stage]);
+/** Fill classes of a catalog cell showing a learning stage (the stage tint over the page background). */
+export const stageBg = (stage: LearningStage): string => stageCellClass(stage, 'bg');
 
 /** Overall learning percentage across the permanent roster, or null when nobody plays the song. */
 export function overallPct(song: Song, allMusicians: string[]): number | null {

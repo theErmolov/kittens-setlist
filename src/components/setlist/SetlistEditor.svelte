@@ -1,9 +1,9 @@
 <script lang="ts">
+  import NotFound from '$components/shared/NotFound.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { Button } from '$components/ui/button';
   import * as Empty from '$components/ui/empty';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
-  import { base } from '$app/paths';
   import { t } from '$lib/i18n';
   import { currentUser, canWrite } from '$lib/auth';
   import { PresenceController, setlistRoom } from '$lib/presence';
@@ -47,7 +47,6 @@
   const setlistQ = createQuery(() => ({
     ...editorSetlistQuery(setlistId),
     refetchInterval: pollUnlessDenied($pollPaused ? false : pollMs),
-    refetchOnWindowFocus: !$pollPaused,
   }));
 
   // Quick-set mode ends when its subset disappears (e.g. dissolved by someone else).
@@ -77,23 +76,16 @@
 </script>
 
 {#if notFound}
-  <Empty.Root class="m-4 py-[60px]">
-    <Empty.Header>
-      <Empty.Title class="text-base font-normal text-muted-foreground">{$t.notFound.message}</Empty.Title>
-    </Empty.Header>
-    <Empty.Content>
-      <Button variant="link" href="{base}/setlists">{$t.notFound.backToSetlists}</Button>
-    </Empty.Content>
-  </Empty.Root>
+  <NotFound />
 {:else if !data.loaded || !data.ready}
   <LoadingCat />
 {:else}
-  <div class="editor flex h-[calc(100dvh-56px)] flex-col max-mid:h-[calc(100dvh-56px-64px)]" class:read-only={!$canWrite}>
+  <div class="editor flex h-[calc(100dvh-56px)] flex-col max-mid:h-[calc(100dvh-56px-64px-env(safe-area-inset-bottom))]" class:read-only={!$canWrite}>
     <EditorHeader />
     <EditorFilters />
 
     {#if data.sortedEntries.length === 0}
-      <Empty.Root class="m-4 flex-none py-[60px]">
+      <Empty.Root class="m-4 flex-none py-15">
         <Empty.Header>
           <Empty.Title class="text-base font-normal text-muted-foreground">{$t.editor.empty}</Empty.Title>
         </Empty.Header>

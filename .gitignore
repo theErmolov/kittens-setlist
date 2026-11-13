@@ -32,3 +32,5 @@ api/dist/
 
 # IDE
 .idea/
+
+src/lib/dev/mock-data.json

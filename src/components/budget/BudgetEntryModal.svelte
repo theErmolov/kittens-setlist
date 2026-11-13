@@ -177,7 +177,7 @@
 
 {#snippet field(id: string, label: string, key: 'person' | 'spentBy' | 'description' | 'creditor' | 'comment')}
   <div class="field flex flex-col gap-1">
-    <Label for={id} class="text-[0.8rem] font-normal text-muted-foreground">{label}</Label>
+    <Label for={id} class="text-small font-normal text-muted-foreground">{label}</Label>
     <Input {id} class="bg-background" value={$draft[key]} oninput={e => setDraft({ [key]: e.currentTarget.value })} />
   </div>
 {/snippet}
@@ -186,22 +186,22 @@
   <Dialog.Content
     showCloseButton={false}
     aria-describedby={undefined}
-    class="modal flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[480px] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-full max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:ring-0"
+    class="modal flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 mid:max-w-120 max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-full max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:ring-0"
   >
     <Dialog.Header class="modal-header flex-row items-center justify-between border-b px-5 py-4">
-      <Dialog.Title class="text-[1.1rem] font-bold">{modalTitle}</Dialog.Title>
-      <Button variant="ghost" size="icon-sm" class="text-[1.1rem] text-muted-foreground" onclick={closeModal} aria-label={$t.common.close}>✕</Button>
+      <Dialog.Title class="text-title-sm font-bold">{modalTitle}</Dialog.Title>
+      <Button variant="ghost" size="icon-sm" class="text-title-sm text-muted-foreground" onclick={closeModal} aria-label={$t.common.close}>✕</Button>
     </Dialog.Header>
 
     <div class="modal-body flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
       <div class="field flex flex-col gap-1">
-        <Label for="b-amount" class="text-[0.8rem] font-normal text-muted-foreground">{$t.budget.amount}</Label>
+        <Label for="b-amount" class="text-small font-normal text-muted-foreground">{$t.budget.amount}</Label>
         <Input id="b-amount" class="bg-background" inputmode="decimal" value={$draft.amountInput} oninput={e => setDraft({ amountInput: e.currentTarget.value })} placeholder="0,00" />
       </div>
 
       {#if kind === 'income' || kind === 'expense'}
         <div class="field flex flex-col gap-1" role="group" aria-labelledby="b-method">
-          <span id="b-method" class="lbl text-[0.8rem] text-muted-foreground">{$t.budget.method}</span>
+          <span id="b-method" class="lbl text-small text-muted-foreground">{$t.budget.method}</span>
           <div class="seg flex gap-2">
             <Button class="flex-1" variant={$draft.method === 'cash' ? 'default' : 'outline'} aria-pressed={$draft.method === 'cash'} onclick={() => setDraft({ method: 'cash' })}>{$t.budget.methodCash}</Button>
             <Button class="flex-1" variant={$draft.method === 'transfer' ? 'default' : 'outline'} aria-pressed={$draft.method === 'transfer'} onclick={() => setDraft({ method: 'transfer' })}>{$t.budget.methodTransfer}</Button>
@@ -219,19 +219,19 @@
         {@render field('b-debtdesc', $t.budget.description, 'description')}
         <div class="check flex items-center gap-2">
           <Checkbox id="b-paid" bind:checked={() => $draft.paid, v => setDraft({ paid: v })} />
-          <Label for="b-paid" class="cursor-pointer text-[0.9rem] font-normal">{$t.budget.paid}</Label>
+          <Label for="b-paid" class="cursor-pointer text-body-lg font-normal">{$t.budget.paid}</Label>
         </div>
       {/if}
 
       <div class="field flex flex-col gap-1">
-        <Label for="b-date" class="text-[0.8rem] font-normal text-muted-foreground">{$t.budget.date}</Label>
+        <Label for="b-date" class="text-small font-normal text-muted-foreground">{$t.budget.date}</Label>
         <Input id="b-date" class="bg-background" type="datetime-local" value={$draft.dateLocal} oninput={e => setDraft({ dateLocal: e.currentTarget.value })} />
       </div>
 
       <div class="field flex flex-col gap-1">
-        <Label for="b-event" class="text-[0.8rem] font-normal text-muted-foreground">{$t.budget.event}</Label>
+        <Label for="b-event" class="text-small font-normal text-muted-foreground">{$t.budget.event}</Label>
         <Select.Root type="single" value={$draft.setlistId || NO_EVENT} onValueChange={v => setDraft({ setlistId: v === NO_EVENT ? '' : v })}>
-          <Select.Trigger id="b-event" class="w-full bg-background text-[0.9rem] max-mid:text-base"><span class="truncate">{eventName}</span></Select.Trigger>
+          <Select.Trigger id="b-event" class="w-full bg-background text-body-lg max-mid:text-base"><span class="truncate">{eventName}</span></Select.Trigger>
           <Select.Content>
             <Select.Item value={NO_EVENT} label={$t.budget.noEvent} />
             {#each sortedSetlists as s (s.id)}
@@ -245,20 +245,20 @@
 
       {#if kind === 'expense'}
         <div class="field flex flex-col gap-1">
-          <Label for="b-receipt" class="text-[0.8rem] font-normal text-muted-foreground">{$t.budget.receipt}</Label>
+          <Label for="b-receipt" class="text-small font-normal text-muted-foreground">{$t.budget.receipt}</Label>
           <Input id="b-receipt" type="file" class="bg-background" accept="image/*,application/pdf" onchange={onReceiptPick} />
           {#if $draft.receiptKey && !$draft.receiptFile}
-            <Button variant="link" class="self-start px-0 text-[0.88rem]" onclick={openReceipt}>{$t.budget.viewReceipt}</Button>
+            <Button variant="link" class="self-start px-0 text-body" onclick={openReceipt}>{$t.budget.viewReceipt}</Button>
           {/if}
         </div>
       {/if}
 
-      {#if $draft.error}<p class="err text-[0.85rem] text-destructive" role="alert">{$t.common[$draft.error]}</p>{/if}
+      {#if $draft.error}<p class="err text-body text-destructive" role="alert">{$t.common[$draft.error]}</p>{/if}
     </div>
 
     <Dialog.Footer class="modal-footer m-0 shrink-0 flex-row justify-end gap-2 rounded-none px-5 py-3">
-      <Button variant="outline" class="px-[18px]" onclick={closeModal}>{$t.budget.cancel}</Button>
-      <Button class="px-[18px]" onclick={handleSave} disabled={$draft.saving}>
+      <Button variant="outline" class="px-4.5" onclick={closeModal}>{$t.budget.cancel}</Button>
+      <Button class="px-4.5" onclick={handleSave} disabled={$draft.saving}>
         {$draft.saving ? $t.budget.uploading : $t.budget.save}
       </Button>
     </Dialog.Footer>

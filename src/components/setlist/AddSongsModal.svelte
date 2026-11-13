@@ -50,24 +50,24 @@
 </script>
 
 <Dialog.Root open onOpenChange={o => { if (!o) onclose(); }}>
-  <Dialog.Content showCloseButton class="flex max-h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px] {mobileFullscreen}">
-    <Dialog.Header class="shrink-0 border-b px-[18px] py-3.5">
-      <Dialog.Title class="text-[1.05rem] font-bold">{$t.addSongs.title}</Dialog.Title>
+  <Dialog.Content showCloseButton class="flex max-h-[80vh] flex-col gap-0 overflow-hidden p-0 mid:max-w-120 {mobileFullscreen}">
+    <Dialog.Header class="shrink-0 border-b px-4.5 py-3.5">
+      <Dialog.Title class="text-lead font-bold">{$t.addSongs.title}</Dialog.Title>
     </Dialog.Header>
-    <div class="shrink-0 border-b px-[18px] py-2.5">
+    <div class="shrink-0 border-b px-4.5 py-2.5">
       <Input class="bg-background" value={$search} oninput={e => setSearch(e.currentTarget.value)} placeholder={$t.addSongs.search} aria-label={$t.addSongs.search} />
     </div>
-    <div class="shrink-0 border-b px-[18px] py-2">
+    <div class="shrink-0 border-b px-4.5 py-2">
       <FilterChips selected={$categoryFilter} onchange={setCategoryFilter} />
     </div>
-    <ScrollArea class="min-h-[240px] flex-1 basis-0 py-2">
+    <ScrollArea class="min-h-60 flex-1 basis-0 py-2">
       {#each filtered as song (song.id)}
         <Item.Root class="rounded-none border-0 p-0 hover:bg-(--row-hover) {$selected.has(song.id) ? 'bg-(--row-hover)' : ''}">
-          <Label for="add-song-{song.id}" class="w-full cursor-pointer gap-2.5 px-[18px] py-[9px] font-normal">
+          <Label for="add-song-{song.id}" class="w-full cursor-pointer gap-2.5 px-4.5 py-2.25 font-normal">
             <Checkbox id="add-song-{song.id}" checked={$selected.has(song.id)} onCheckedChange={() => toggle(song)} />
             <Item.Content class="flex-row items-center gap-1.5">
               <CategoryBadge category={song.category} iconOnly />
-              <Item.Title class="text-[0.88rem] font-normal">{song.artist} – {song.title}</Item.Title>
+              <Item.Title class="text-body font-normal">{song.artist} – {song.title}</Item.Title>
             </Item.Content>
           </Label>
         </Item.Root>
@@ -78,11 +78,11 @@
         </Empty.Root>
       {/if}
     </ScrollArea>
-    <Dialog.Footer class="m-0 shrink-0 flex-row flex-wrap items-center gap-2 px-[18px] py-3">
+    <Dialog.Footer class="m-0 shrink-0 flex-row flex-wrap items-center gap-2 px-4.5 py-3">
       {#if onaddnew}
-        <Button variant="outline" class="w-full justify-start sm:hidden" onclick={onaddnew}>{$t.editor.addSetlistOnly}</Button>
+        <Button variant="outline" class="w-full justify-start mid:hidden" onclick={onaddnew}>{$t.editor.addSetlistOnly}</Button>
       {/if}
-      <span class="flex-1 text-[0.82rem] text-muted-foreground">{$t.addSongs.selected($selected.size)}</span>
+      <span class="flex-1 text-small text-muted-foreground">{$t.addSongs.selected($selected.size)}</span>
       <Button variant="outline" onclick={onclose}>{$t.addSongs.cancel}</Button>
       <Button class="font-semibold" onclick={handleAdd} disabled={$selected.size === 0}>
         {$t.addSongs.addBtn($selected.size)}

@@ -9,28 +9,26 @@
   import * as Breadcrumb from '$components/ui/breadcrumb';
   import { Button } from '$components/ui/button';
   import { Input } from '$components/ui/input';
-  import { Label } from '$components/ui/label';
-  import { Switch } from '$components/ui/switch';
+  import VibeSwitch from '$components/shared/VibeSwitch.svelte';
   import * as Dialog from '$components/ui/dialog';
   import { mobileFullscreen } from '$components/setlist/dialogClasses';
   import * as Empty from '$components/ui/empty';
-  import * as Table from '$components/ui/table';
-  import { Badge } from '$components/ui/badge';
-  import RowActions from '$components/shared/RowActions.svelte';
   import IconButton from '$components/shared/IconButton.svelte';
-  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
-  import { getCoreRowModel, getSortedRowModel, type ColumnDef } from '@tanstack/table-core';
   import { base } from '$app/paths';
-  import { lang } from '$lib/i18n';
-  import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { cn, formatDuration, formatDate } from '$lib/utils';
   import type { Setlist } from '$lib/types';
-  import * as AlertDialog from '$components/ui/alert-dialog';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
-  import { t } from '$lib/i18n';
+  import { t, lang } from '$lib/i18n';
+  import { formatDuration, formatDate, cn } from '$lib/utils';
+  import EventCalendar from '$components/shared/EventCalendar.svelte';
+  import { localDate } from '$lib/rehearsals';
+  import { setlistEmojis } from '$lib/setlistEmoji';
+  import { calendarStore } from '$lib/store/calendar';
+  import * as Card from '$components/ui/card';
   import { canWrite } from '$lib/auth';
   import { setlistsQuery } from '$lib/query/queries';
+  import { prefetchSetlists } from '$lib/query/prefetch';
   import { useCreateSetlist, useDeleteSetlist } from '$lib/query/setlistMutations';
   import { useStore } from '$lib/store/bridge';
   import { setlistListStore } from '$lib/store/setlistList';
@@ -47,27 +45,35 @@
   const deleteId = useStore(setlistListStore, s => s.deleteId);
   const { setShowNew, setField, resetForm, setDeleteId } = setlistListStore.getState();
 
-  const sorting = useStore(setlistListStore, s => s.sorting);
   const songCount = (sl: Setlist) => sl.entries.filter(e => e.songId).length;
   const totalMinutes = (sl: Setlist) => sl.entries.reduce((n, e) => n + (e.breakMinutes ?? (e.songId ? (e.song?.lengthMinutes ?? 5) : 0)), 0);
-  const columns: ColumnDef<Setlist>[] = [
-    { id: 'name', accessorFn: sl => sl.name, header: () => $t.setlists.colName, cell: ({ row }) => renderSnippet(nameCell, row.original), meta: { cls: 'w-full max-w-0 max-mid:overflow-hidden' } },
-    // Date and start time in one column, as wide as its content.
-    { id: 'date', accessorFn: sl => sl.date || undefined, header: () => $rt.date, sortUndefined: 'last', cell: ({ row }) => [row.original.date ? formatDate(row.original.date, $lang) : '', row.original.startTime ?? ''].filter(Boolean).join(' '), meta: { cls: 'w-px max-mid:hidden', head: 'w-px max-mid:hidden' } },
-    { id: 'songs', accessorFn: songCount, header: () => $t.setlists.colSongs, cell: ({ row }) => `${$t.setlists.songs(songCount(row.original))} (${formatDuration(totalMinutes(row.original), $lang)})`, meta: { cls: 'w-px max-mid:hidden', head: 'w-px max-mid:hidden' } },
-    { id: 'vibe', accessorFn: sl => sl.vibe, header: () => $t.setlists.colVibe, enableSorting: false, cell: ({ row }) => renderSnippet(vibeCell, row.original), meta: { cls: 'w-px max-mid:hidden', head: 'w-px max-mid:hidden' } },
-    { id: 'actions', header: '', enableSorting: false, cell: ({ row }) => renderSnippet(actionsCell, row.original), meta: { cls: 'w-px h-px p-0 text-right max-mid:px-0', head: 'w-px' } },
-  ];
-  const table = createSvelteTable<Setlist>({
-    get data() { return setlistsQ.data ?? []; },
-    columns,
-    state: { get sorting() { return $sorting; } },
-    onSortingChange: u => setlistListStore.getState().setSorting(typeof u === 'function' ? u($sorting) : u),
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getRowId: sl => sl.id,
-  });
-  const metaOf = (c: { columnDef: { meta?: unknown } }) => (c.columnDef.meta ?? {}) as { cls?: string; head?: string };
+  // Default order: date, newest first; undated last.
+  // Info-only calendar: setlists by date (undated ones are not shown there).
+  const today = localDate();
+  const byDate = $derived((setlistsQ.data ?? []).reduce((acc, sl) => { if (sl.date) (acc[sl.date] ??= []).push(sl); return acc; }, {} as Record<string, Setlist[]>));
+  // Hover link between list items and calendar days: the hovered item's date or the hovered day's date.
+  const hoverIso = useStore(calendarStore, s => s.hoverIso);
+  const { setHoverIso } = calendarStore.getState();
+  // Day picked by clicking an empty calendar day; prefills the date of a new setlist (today when nothing is picked).
+  const selectedIso = useStore(setlistListStore, s => s.selectedIso);
+  const monthIso = useStore(setlistListStore, s => s.monthIso);
+  const { setSelectedIso, setMonthIso } = setlistListStore.getState();
+  function toggleNew() {
+    const open = !setlistListStore.getState().showNew;
+    if (open) setField({ date: $selectedIso ?? today });
+    setShowNew(open);
+  }
+  function openNew() {
+    setField({ date: $selectedIso ?? today });
+    setShowNew(true);
+  }
+  const emojiOf = $derived(setlistEmojis(setlistsQ.data ?? []));
+  const sorted = $derived([...(setlistsQ.data ?? [])].sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  }));
 
   async function handleCreate() {
     const { name, date, startTime, vibe } = setlistListStore.getState();
@@ -84,6 +90,11 @@
   }
 
   const primaryBtn = 'font-semibold';
+
+  // Once the list is shown, warm the first rows (in the current sort order) for instant opening.
+  $effect(() => {
+    if (browser && !setlistsQ.isPending) prefetchSetlists(sorted.map(sl => sl.id));
+  });
 </script>
 
 <!-- Desktop bar; on small screens the actions live in a bottom bar (as in the catalog). -->
@@ -96,14 +107,14 @@
   {#snippet end()}
     {#if $canWrite}
       <PageControlsDivider />
-      <NavigationMenu.Item><IconButton icon="➕" variant="default" label={$t.setlists.newBtn.replace(/^\+\s*/, '')} onclick={() => setShowNew(!setlistListStore.getState().showNew)} /></NavigationMenu.Item>
+      <NavigationMenu.Item><IconButton text={$t.setlists.newBtn.replace(/^\+\s*/, '')} icon="➕" variant="default" label={$t.setlists.newBtn.replace(/^\+\s*/, '')}  onclick={toggleNew} /></NavigationMenu.Item>
     {/if}
   {/snippet}
 </PageControls>
 </div>
 {#if $canWrite}
-  <div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
-    <IconButton variant="default" icon="➕" label={$t.setlists.newBtn.replace(/^\+\s*/, '')} onclick={() => setShowNew(!setlistListStore.getState().showNew)} />
+  <div class="fixed inset-x-0 bottom-0 z-40 hidden safe-bar items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
+    <IconButton variant="default" icon="➕" label={$t.setlists.newBtn.replace(/^\+\s*/, '')} onclick={toggleNew} />
   </div>
 {/if}
 
@@ -111,104 +122,106 @@
 
 <!-- New setlist: a dialog (same layout as the editor's «Edit» dialog). -->
 <Dialog.Root open={$showNew && $canWrite} onOpenChange={o => { if (!o) setShowNew(false); }}>
-  <Dialog.Content class="gap-4 max-sm:grid-rows-[auto_1fr_auto] sm:max-w-md {mobileFullscreen}">
-    <Dialog.Header><Dialog.Title class="text-[1.1rem] font-bold">{$t.setlists.newBtn.replace(/^\+\s*/, '')}</Dialog.Title></Dialog.Header>
+  <Dialog.Content class="gap-4 max-mid:grid-rows-[auto_1fr_auto] mid:max-w-md {mobileFullscreen}">
+    <Dialog.Header><Dialog.Title class="text-title-sm font-bold">{$t.setlists.newBtn.replace(/^\+\s*/, '')}</Dialog.Title></Dialog.Header>
     <div class="flex flex-col gap-3">
       <Input value={$newName} oninput={e => setField({ name: e.currentTarget.value })} placeholder={$t.setlists.namePlaceholder} aria-label={$t.setlists.namePlaceholder} />
       <div class="flex flex-wrap gap-2">
-        <Input type="date" class="min-w-[140px] flex-1" value={$newDate} oninput={e => setField({ date: e.currentTarget.value })} />
-        <Input type="time" class="min-w-[120px] flex-1" value={$newStartTime} oninput={e => setField({ startTime: e.currentTarget.value })} />
+        <Input type="date" class="min-w-35 flex-1" value={$newDate} oninput={e => setField({ date: e.currentTarget.value })} />
+        <Input type="time" class="min-w-30 flex-1" value={$newStartTime} oninput={e => setField({ startTime: e.currentTarget.value })} />
       </div>
-      <div class="flex items-center gap-2">
-        <Switch id="new-vibe" size="sm" checked={$newVibe} onCheckedChange={v => setField({ vibe: v })} />
-        <Label for="new-vibe" class="text-[0.88rem] font-normal text-muted-foreground">{$t.setlists.vibe}</Label>
-        <span class="inline-flex size-4 shrink-0 cursor-default items-center justify-center rounded-full border text-[0.7rem] leading-none text-muted-foreground" title={$t.setlists.vibeTooltip}>?</span>
-      </div>
+      <VibeSwitch id="new-vibe" checked={$newVibe} onchange={v => setField({ vibe: v })} />
     </div>
-    <Dialog.Footer class="max-sm:mt-auto">
+    <Dialog.Footer class="max-mid:mt-auto">
       <Button variant="outline" onclick={() => setShowNew(false)}>{$t.setlists.cancel}</Button>
       <Button onclick={handleCreate} disabled={!$newName.trim()}>{$t.setlists.create}</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
 
-<div class="p-0 max-mid:pb-[52px]">
+<div class="w-full px-3 pt-3 pb-4 max-mid:px-2.5 max-mid:pb-[calc(68px+env(safe-area-inset-bottom))]">
 
 
   {#if !browser || setlistsQ.isPending}
     <LoadingCat />
   {:else if (setlistsQ.data ?? []).length === 0}
-    <Empty.Root class="border py-[60px]">
+    <Empty.Root class="border py-15">
       <Empty.Header>
         <Empty.Title class="text-base font-normal text-muted-foreground">{$t.setlists.empty}</Empty.Title>
       </Empty.Header>
       {#if !$showNew && $canWrite}
         <Empty.Content>
-          <Button class={primaryBtn} onclick={() => setShowNew(true)}>{$t.setlists.createFirst}</Button>
+          <Button class={primaryBtn} onclick={openNew}>{$t.setlists.createFirst}</Button>
         </Empty.Content>
       {/if}
     </Empty.Root>
   {:else}
-    <Table.Root>
-      <Table.Header>
-        {#each table.getHeaderGroups() as group (group.id)}
-          <Table.Row class="border-0 hover:bg-transparent">
-            {#each group.headers as header (header.id)}
-              <Table.Head class={metaOf(header.column).head}><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></Table.Head>
+    <div class="grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-6 max-mid:grid-cols-1 max-mid:gap-4">
+    <EventCalendar
+      items={byDate}
+      selected={$selectedIso}
+      placeholder={$monthIso}
+      onplaceholderchange={setMonthIso}
+      onselect={iso => { if (iso && byDate[iso]?.length) goto(`${base}/setlists/${byDate[iso][0].id}`); else setSelectedIso(iso); }}
+      lang={$lang}
+      label={$t.nav.setlists}
+      dayLabel={(iso, lists) => lists.length ? `${formatDate(iso, $lang)} · ${lists.map(l => l.name).join(', ')}` : formatDate(iso, $lang)}
+    >
+      {#snippet dayContent({ items: lists, past })}
+        {#if lists.length}
+          <!-- One fixed-height row (the cell never grows): two emoji, or one emoji and «+N» when there are more. -->
+          {@const shown = lists.length > 2 ? 1 : lists.length}
+          <span class="flex h-5 w-full items-center justify-center gap-0.5">
+            {#each lists.slice(0, shown) as sl (sl.id)}
+              <span class={cn('no-tint inline-flex items-center justify-center text-[1.25rem] leading-none', past && 'opacity-60')} title={sl.name}>{emojiOf.get(sl.id)}</span>
             {/each}
-          </Table.Row>
-        {/each}
-      </Table.Header>
-      <Table.Body>
-        {#each table.getRowModel().rows as row (row.id)}
-          <Table.Row class="group/row h-14 cursor-pointer border-0 hover:bg-transparent" onclick={() => goto(`${base}/setlists/${row.original.id}`)}>
-            {#each row.getVisibleCells() as cell (cell.id)}
-              <Table.Cell class={cn('border-b bg-card py-0.5 min-mid:group-hover/row:bg-(--row-hover)', metaOf(cell.column).cls)}><FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} /></Table.Cell>
-            {/each}
-          </Table.Row>
-        {/each}
-      </Table.Body>
-    </Table.Root>
+            {#if lists.length > shown}<span class="text-micro leading-none text-muted-foreground group-data-selected/day:text-primary-foreground">+{lists.length - shown}</span>{/if}
+          </span>
+        {/if}
+      {/snippet}
+    </EventCalendar>
+    <ul class="m-0 flex list-none flex-col gap-2.5 p-0">
+      {#each sorted as sl (sl.id)}
+        {@const dateTime = [sl.date ? formatDate(sl.date, $lang) : '', sl.startTime ? `⏱ ${sl.startTime}` : ''].filter(Boolean).join(' · ')}
+        <li>
+          <!-- Stretched-link card: the name anchor covers the whole card (real link, so SvelteKit navigates client-side); the action buttons sit above it. -->
+          <Card.Root
+            onpointerenter={() => setHoverIso(sl.date ?? null)}
+            onpointerleave={() => setHoverIso(null)}
+            class={cn('relative isolate flex-row items-center gap-2 rounded-lg p-2 transition-colors focus-within:border-primary hover:border-primary', sl.date && $hoverIso === sl.date && 'border-primary')}>
+            <div class="flex min-w-0 flex-1 items-center gap-3 max-mid:gap-0.5">
+            <div class="flex shrink-0 flex-col items-center gap-0.5 p-1">
+              <span class="no-tint text-[2rem] leading-none" aria-hidden="true">{emojiOf.get(sl.id)}</span>
+              <!-- The vibe badge sits under the icon. -->
+              <VibeBadge vibe={sl.vibe} class="h-4 px-1 text-micro" />
+            </div>
+            <div class="flex min-w-0 flex-1 flex-col gap-1">
+              <!-- The title and its comment run on as one text that takes at most two lines. -->
+              <div class="min-w-0 block line-clamp-2 break-words">
+                <a href="{base}/setlists/{sl.id}" class="text-base font-semibold text-inherit no-underline after:absolute after:inset-0 after:content-[''] inline overflow-visible whitespace-normal">{sl.name}</a>
+                {#if sl.comment}<span class="relative z-10 min-w-0 text-body text-muted-foreground ml-1 inline overflow-visible whitespace-normal" title={sl.comment}><LinkifiedText text={sl.comment} /></span>{/if}
+              </div>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-muted-foreground max-mid:flex-col max-mid:items-start">
+                {#if dateTime}<span>{dateTime}</span>{/if}
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>{$t.setlists.songs(songCount(sl))} ({formatDuration(totalMinutes(sl), $lang)})</span>
+                </span>
+              </div>
+            </div>
+            </div>
+            <!-- Two buttons: labelled and stacked (touching top/bottom) on small screens, icon-only side by side on mid, labelled side by side (touching left/right) on big. -->
+            <div class="relative z-10 flex shrink-0 items-stretch max-big:self-stretch big:self-center max-mid:w-fit max-mid:flex-col mid:grid mid:auto-cols-fr mid:grid-flow-col">
+              <Button variant="default" href="{base}/setlists/{sl.id}/stage" class="h-auto min-h-10 w-full gap-0.5 big:h-10 rounded-lg border-0 px-2 font-semibold mid:max-big:min-w-16 mid:max-big:px-0 mid:max-big:text-glyph max-mid:flex-1 max-mid:not-last:rounded-b-none mid:not-last:rounded-r-none" aria-label={$t.setlists.stage} title={$t.setlists.stage}><span aria-hidden="true">{$t.setlists.stage.split(' ')[0]}</span><span class="mid:max-big:hidden" aria-hidden="true">{$t.setlists.stageShort}</span></Button>
+              {#if $canWrite}
+                <Button variant="outline" class="h-auto min-h-10 w-full gap-0.5 big:h-10 rounded-lg border-0 px-2 font-semibold mid:max-big:min-w-16 mid:max-big:px-0 mid:max-big:text-glyph max-mid:flex-1 max-mid:rounded-t-none mid:rounded-l-none" onclick={() => setDeleteId(sl.id)}><span aria-hidden="true">🗑</span><span class="mid:max-big:hidden">{$t.song.remove}</span></Button>
+              {/if}
+            </div>
+          </Card.Root>
+        </li>
+      {/each}
+    </ul>
+    </div>
   {/if}
 </div>
 
-{#snippet nameCell(sl: Setlist)}
-  <div class="flex min-w-0 flex-col">
-    <!-- Name with the comment to its right (no label; links shown as «domain.tld»), on one line at every size. -->
-    <div class="flex min-w-0 items-baseline gap-x-3">
-      <a href="{base}/setlists/{sl.id}" class="block max-w-full shrink-0 truncate text-inherit no-underline" onclick={(e) => e.stopPropagation()}>
-        <span class="font-semibold">{sl.name}</span>
-      </a>
-      {#if sl.comment}<span class="min-w-0 flex-1 truncate text-[0.88rem] text-muted-foreground" title={sl.comment}><LinkifiedText text={sl.comment} /></span>{/if}
-    </div>
-    <!-- Small view only: date / time, then the song count and total length with the vibe badge to their right. -->
-    <span class="mt-0.5 truncate text-[0.78rem] text-muted-foreground min-mid:hidden">{[sl.date ? formatDate(sl.date, $lang) : '', sl.startTime ?? ''].filter(Boolean).join(' · ')}</span>
-    <span class="flex items-center gap-1.5 text-[0.78rem] text-muted-foreground min-mid:hidden"><span class="truncate">{$t.setlists.songs(songCount(sl))} ({formatDuration(totalMinutes(sl), $lang)})</span><VibeBadge vibe={sl.vibe} class="h-4 shrink-0 px-1.5 py-0 text-[0.65rem]" /></span>
-  </div>
-{/snippet}
-
-{#snippet vibeCell(sl: Setlist)}
-  <VibeBadge vibe={sl.vibe} />
-{/snippet}
-
-{#snippet actionsCell(sl: Setlist)}
-  <!-- The ⋯ fills the whole row height, so rows leave no gaps between buttons. -->
-  <div class="flex h-full justify-end">
-    <RowActions class="h-full rounded-none" actions={[
-      { icon: '🎤', label: $t.setlists.stage, primary: true, href: `${base}/setlists/${sl.id}/stage` },
-      ...($canWrite ? [{ icon: '🗑', label: $t.song.remove, destructive: true, separatorBefore: true, onselect: () => setDeleteId(sl.id) }] : []),
-    ]} />
-  </div>
-{/snippet}
-
-<AlertDialog.Root open={$deleteId !== null} onOpenChange={o => { if (!o) setDeleteId(null); }}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$t.setlists.deleteConfirm}</AlertDialog.Title>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$t.setlists.cancel}</AlertDialog.Cancel>
-      <AlertDialog.Action variant="destructive" onclick={confirmDelete}>{$t.song.remove}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+<ConfirmDialog open={$deleteId !== null} title={$t.setlists.deleteConfirm} confirmLabel={$t.song.remove} cancelLabel={$t.setlists.cancel} onopenchange={o => { if (!o) setDeleteId(null); }} onconfirm={confirmDelete} />

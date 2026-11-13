@@ -66,7 +66,7 @@
     {#if editing}
       <label>
         <span class="label">{label}</span>
-        <Textarea class="my-1 min-h-16 resize-y bg-card text-base md:text-[0.85rem]" value={$ui.draft} oninput={e => patch({ draft: e.currentTarget.value })} maxlength={4000} rows={3} disabled={saving} />
+        <Textarea class="my-1 min-h-16 resize-y bg-control-bg text-base mid:text-body" value={$ui.draft} oninput={e => patch({ draft: e.currentTarget.value })} maxlength={4000} rows={3} disabled={saving} />
       </label>
       <div class="actions">
         <Button size="sm" disabled={saving} onclick={save}>{saving ? '…' : $t.editor.save}</Button>
@@ -75,8 +75,8 @@
       {#if failed}<span class="error" role="alert">{$t.common.commentSaveFailed}</span>{/if}
     {:else}
       {#if value}<div {@attach measureOverflow} class="text" class:compact class:collapsed={long && !expanded} class:mobile-collapsed={mobileCollapsible && !expanded} class:single-line-collapsed={singleLineCollapsible && !expanded} class:clamp-small={preview || (mobileCollapsible && !expanded)}><span class="label" title={label}>{#if icon}<span aria-label={label} role="img">{icon}</span>{:else}{label}: {/if}</span><LinkifiedText text={value} /></div>{/if}
-      {#if canExpand}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); patch({ expanded: !expanded }); }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</Button>{/if}
-      {#if onsave}<Button variant="ghost" size="xs" class="edit px-0 text-[0.78rem] font-normal text-muted-foreground hover:bg-transparent" onclick={() => patch({ draft: value, editing: true, failed: false })}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible && !singleLineCollapsible} · {label}{/if}</Button>{/if}
+      {#if canExpand}<Button variant="ghost" size="xs" class="edit px-0 text-small font-normal text-muted-foreground hover:bg-transparent" aria-expanded={expanded} onclick={(e) => { e.stopPropagation(); patch({ expanded: !expanded }); }}>{expanded ? $t.common.collapseComment : $t.common.expandComment}</Button>{/if}
+      {#if onsave}<Button variant="ghost" size="xs" class="edit px-0 text-small font-normal text-muted-foreground hover:bg-transparent" onclick={() => patch({ draft: value, editing: true, failed: false })}>{value ? $t.common.edit : $t.common.addComment}{#if !mobileCollapsible && !singleLineCollapsible} · {label}{/if}</Button>{/if}
     {/if}
   </div>
 {/if}
@@ -90,7 +90,7 @@
   .collapsed { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .single-line-collapsed { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .preview .text { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .compact-actions :global(.edit) { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
+  .compact-actions :global(.edit) { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; margin-right: 12px; }
   .actions { display: flex; gap: 6px; }
-  .error { color: var(--c-danger); }
+  .error { color: var(--destructive); }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+    import { countByMusician } from '$lib/musicianStats';
   import { below } from '$lib/breakpoints';
   import BacklogMidBars from './BacklogMidBars.svelte';
   import SongCardRow from './SongCardRow.svelte';
@@ -10,7 +11,7 @@
   import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { setlistsQuery, musiciansQuery } from '$lib/query/queries';
-  import { backlogSongsQuery, useSaveBacklogSong, useDeleteBacklogSong, patchBacklogSong } from '$lib/query/backlog';
+  import { backlogSongsQuery, useSaveBacklogSong, useDeleteBacklogSong, patchBacklogSong, refreshBacklogSong } from '$lib/query/backlog';
   import { useAddSongs } from '$lib/query/setlistMutations';
   import { useStore } from '$lib/store/bridge';
   import { backlogStore } from '$lib/store/backlog';
@@ -20,7 +21,7 @@
   import { canWrite, currentUser } from '$lib/auth';
   import { base } from '$app/paths';
   import * as Dialog from '$components/ui/dialog';
-  import * as AlertDialog from '$components/ui/alert-dialog';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
   import { Button } from '$components/ui/button';
   import { ButtonGroup } from '$components/ui/button-group';
   import IconButton from '$components/shared/IconButton.svelte';
@@ -32,9 +33,9 @@
   import SortHead from './cells/SortHead.svelte';
   import TitleCell from './cells/TitleCell.svelte';
   import MusicianCell from './cells/MusicianCell.svelte';
-  import GuestsCell from './cells/GuestsCell.svelte';
+  import TitleHead from './cells/TitleHead.svelte';
   import ActionsCell from './cells/ActionsCell.svelte';
-  import { stageBg, guestTags } from './songView';
+  import { stageBg } from './songView';
   import * as Tooltip from '$components/ui/tooltip';
   import * as Drawer from '$components/ui/drawer';
   import * as Empty from '$components/ui/empty';
@@ -66,7 +67,14 @@
   const addToSetlistSongId = useStore(backlogStore, s => s.addToSetlistSongId);
   const lyricsViewSongId = useStore(backlogStore, s => s.lyricsViewSongId);
   const songById = (id: string | null) => (id ? songs.find(s => s.id === id) ?? null : null);
-  const editingSong = $derived(songById($editingSongId));
+  const editFreshId = useStore(backlogStore, s => s.editFreshId);
+  // The edit dialog opens on a fresh server copy (cached lists are never refetched on their own).
+  const editingSong = $derived($editFreshId === $editingSongId ? songById($editingSongId) : null);
+  $effect(() => {
+    const id = $editingSongId;
+    if (!id) return;
+    refreshBacklogSong(id).catch(() => {}).finally(() => { if (backlogStore.getState().editingSongId === id) actions.setEditFresh(id); });
+  });
   const addToSetlistSong = $derived(songById($addToSetlistSongId));
   const lyricsViewSong = $derived(songById($lyricsViewSongId));
   const addRequest = useStore(backlogStore, s => s.addRequest);
@@ -98,16 +106,7 @@
     return counts;
   });
 
-  let musicianCounts = $derived(() => {
-    const counts: Record<string, number> = {};
-    for (const name of permanentNames) {
-      counts[name] = scoped().filter(s => {
-        const role = s.musicians[name];
-        return role && role.instruments.length > 0;
-      }).length;
-    }
-    return counts;
-  });
+  let musicianCounts = $derived(() => countByMusician(scoped(), permanentNames));
 
   let filtered = $derived(() => {
     const f = scoped().filter(s => matchesBacklogFilters(
@@ -119,7 +118,7 @@
   // ── Data Table (TanStack): column defs, sorting state lives in backlogStore ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rc = (component: any, props?: Record<string, unknown>) => renderComponent(component, (props ?? {}) as never);
-  interface ColMeta { people?: boolean; minWidth?: string; head?: string; cell?: string; width?: string; cellStyle?: (song: Song) => string }
+  interface ColMeta { people?: boolean; head?: string; cell?: string; cellClass?: (song: Song) => string }
   const isCyrillic = (s: string) => /[\u0400-\u04FF]/.test(s.trimStart().charAt(0)) ? 1 : 0;
   const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   // Artist: English artists before Russian, then alphabetical, then title.
@@ -136,35 +135,27 @@
       cell: ({ row }) => rc(MusicianCell, { song: row.original, name }),
       meta: {
         // Mid and small: equal fixed-width columns; big: as narrow as the content, at least wide enough for the most instruments.
-        head: 'w-[3.75rem] min-w-[3.75rem] px-1 text-[0.66rem] tracking-normal',
+        head: 'w-15 min-w-15 px-1 text-micro tracking-normal',
         cell: 'px-1',
         people: true,
-        // Wide enough for the most instruments any shown row has in this column (icons keep full size).
-        minWidth: `--mw: calc(${Math.max(1, ...filtered().map(song => song.musicians[name]?.instruments?.length ?? 0))} * 1.6rem + 1.5rem)`,
-        cellStyle: (song: Song) => {
+        cellClass: (song: Song) => {
           const role = song.musicians[name];
           // Stage colours only in progress mode.
-          return $showProgress && role?.instruments?.length ? `background: ${stageBg((song.progress?.[name] ?? 'queue') as LearningStage)}` : '';
+          return $showProgress && role?.instruments?.length ? stageBg((song.progress?.[name] ?? 'queue') as LearningStage) : '';
         },
       } satisfies ColMeta,
     }));
     return [
       { id: 'category', header: () => rc(CatHead), enableSorting: false,
         cell: ({ row }) => rc(CatCell, { song: row.original, names }),
-        meta: { head: 'w-[4.5rem] min-w-[4.5rem] max-w-[4.5rem]', cell: 'px-0 text-center' } satisfies ColMeta },
-      { id: 'artist', accessorKey: 'artist', sortingFn: artistSort,
-        header: () => rc(SortHead, { id: 'artist', label: $t.backlog.cols.artist }),
-        cell: ({ row }) => row.original.artist,
-        meta: { cell: 'max-w-0 truncate text-[0.95rem] font-normal', width: '22%' } satisfies ColMeta },
+        meta: { head: 'w-18 min-w-18 max-w-18', cell: 'px-0 text-center' } satisfies ColMeta },
+      // Hidden column: only carries the artist sort; the visible title column shows "Artist – Title" like the small view.
+      { id: 'artist', accessorKey: 'artist', sortingFn: artistSort, header: () => '', cell: () => '' },
       { id: 'title', accessorKey: 'title', sortingFn: titleSort,
-        header: () => rc(SortHead, { id: 'title', label: $t.backlog.cols.title }),
-        cell: ({ row }) => rc(TitleCell, { song: row.original }),
-        meta: { cell: 'max-w-0 text-[0.95rem] font-semibold', width: '32%' } satisfies ColMeta },
+        header: () => rc(TitleHead),
+        cell: ({ row }) => rc(TitleCell, { song: row.original, names }),
+        meta: { head: 'w-[54%]', cell: 'max-w-0 text-body-lg' } satisfies ColMeta },
       ...musicianCols,
-      { id: 'guests', enableSorting: false,
-        header: () => $t.backlog.cols.guests,
-        cell: ({ row }) => rc(GuestsCell, { song: row.original, names }),
-        meta: { cell: 'max-w-0 overflow-hidden', width: '14%', people: true } satisfies ColMeta },
       { id: 'actions', enableSorting: false,
         header: () => $t.song.editTitle,
         cell: ({ row }) => rc(ActionsCell, { song: row.original }),
@@ -172,13 +163,12 @@
     ];
   });
 
-  let hasGuests = $derived(filtered().some(song => guestTags(song, permanentNames).length > 0));
   const table = createSvelteTable<Song>({
     get data() { return filtered(); },
     get columns() { return columns; },
     getRowId: song => song.id,
-    // The Guests column is shown only while some shown row has a guest.
-    state: { get sorting() { return $sorting; }, get columnVisibility() { return { guests: hasGuests }; } },
+    // The artist column only carries the sort (artist and title share one visible column).
+    state: { get sorting() { return $sorting; }, get columnVisibility() { return { artist: false }; } },
     onSortingChange: updater => actions.setSorting(typeof updater === 'function' ? updater($sorting) : updater),
     enableSortingRemoval: false,
     getCoreRowModel: getCoreRowModel(),
@@ -187,9 +177,9 @@
   let rows = $derived(table.getRowModel().rows);
   const meta = (c: { columnDef: { meta?: unknown } }) => (c.columnDef.meta ?? {}) as ColMeta & { last?: boolean };
   const ariaSort = (dir: false | 'asc' | 'desc') => dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined;
-  /** Musician / guest columns (the song-info cells get the table colour `--table-selected`). */
+  /** Musician columns (the song-info cells get the table colour `--table-song-bg`). */
   const isPeople = (m: ColMeta) => !!m.people;
-  const tint = 'bg-(--table-selected)';
+  const tint = 'bg-table-song-bg';
   // Small tier: song rows laid out like the setlist's instead of the table.
   $effect(() => {
     if (!browser) return;
@@ -215,7 +205,7 @@
     if (id) deleteSongM.mutate(id);
   }
 
-  const onClass = 'data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
+  const onClass = 'on:bg-secondary on:text-secondary-foreground on:hover:bg-secondary/90';
 
   // Add a song to a setlist, skipping if it's already there. Always shows green feedback.
   function addSongToSetlist(sl: Setlist, song: Song) {
@@ -269,9 +259,9 @@
             <Table.Row class="hover:bg-transparent">
               {#each headerGroup.headers as header (header.id)}
                 {@const m = meta(header.column)}
+                {@const hi = isPeople(m) ? headerGroup.headers.filter(h => isPeople(meta(h.column))).indexOf(header) : -1}
                 <Table.Head
-                  class={m.head ?? ''}
-                  style="{m.width ? `width: ${m.width};` : ''}{m.minWidth ?? ''}"
+                  class="{m.head ?? ''} {hi >= 0 ? 'text-center' : ''} {hi >= 0 && hi % 2 === 0 ? 'bg-table-zebra-bg' : ''}"
                   aria-sort={ariaSort(header.column.getIsSorted())}
                 >
                   {#if m.last}<span class="sr-only"><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></span>
@@ -286,7 +276,9 @@
             <Table.Row class="group/row relative h-11 cursor-pointer border-0 hover:bg-transparent" onclick={() => onRowClick(row.original)}>
               {#each row.getVisibleCells() as cell (cell.id)}
                 {@const m = meta(cell.column)}
-                <Table.Cell class="bg-card py-0 text-(--table-text) group-hover/row:bg-(--row-hover) {m.cell ?? ''} {isPeople(m) ? '' : tint}" style={m.cellStyle?.(row.original) ?? ''}>
+                {@const pi = isPeople(m) ? row.getVisibleCells().filter(c => isPeople(meta(c.column))).indexOf(cell) : -1}
+                {@const stage = m.cellClass?.(row.original)}
+                <Table.Cell class="py-0 text-table-ink {m.cell ?? ''} {stage || `group-hover/row:bg-(--row-hover) ${pi < 0 ? tint : pi % 2 === 0 ? 'bg-table-zebra-bg' : 'bg-table-people-bg'}`}">
                   <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
                 </Table.Cell>
               {/each}
@@ -310,7 +302,7 @@
   {#if !loading}
   <!-- Mobile filter drawer -->
   <Drawer.Root open={$filterOpen} onOpenChange={v => actions.setFilterOpen(v)} shouldScaleBackground={false}>
-    <Drawer.Content class="after:hidden min-mid:hidden" style="bottom: 52px" onInteractOutside={(e) => { if ((e.target as HTMLElement | null)?.closest('[data-backlog-bar]')) e.preventDefault(); }}>
+    <Drawer.Content class="after:hidden min-mid:hidden data-[vaul-drawer-direction=bottom]:bottom-[calc(52px+env(safe-area-inset-bottom))]" onInteractOutside={(e) => { if ((e.target as HTMLElement | null)?.closest('[data-backlog-bar]')) e.preventDefault(); }}>
       <Drawer.Header class="p-2">
         <Drawer.Title class="text-sm">{$t.backlog.filterBtn}</Drawer.Title>
         <Drawer.Description class="sr-only">{$t.backlog.search}</Drawer.Description>
@@ -329,10 +321,10 @@
 
   <!-- Mobile bottom bar -->
   <!-- Above the filter drawer (z-50) so it stays visible and clickable while that drawer opens and closes; row-action drawers (z-70) cover it. -->
-  <div data-backlog-bar class="fixed inset-x-0 bottom-0 z-[60] hidden h-[52px] items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
+  <div data-backlog-bar class="fixed inset-x-0 bottom-0 z-60 hidden safe-bar items-center justify-center gap-2 border-t bg-card px-3 max-mid:flex">
     <!-- Centred: filter | add (centre) | add-to-setlist mode. -->
     <IconButton class="no-tint relative {onClass}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpen || hasActiveFilters} onpressedchange={() => actions.toggleFilterOpen()}>
-      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
+      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-micro">{activeFilterCount}</Badge>{/if}
     </IconButton>
     {#if $canWrite}
       <IconButton variant="default" icon="➕" label={$t.backlog.addSong} onclick={() => actions.setShowAddModal(true)} />
@@ -359,7 +351,7 @@
 
 <!-- Add-to-setlist picker -->
 <Dialog.Root open={!!addToSetlistSong && $canWrite} onOpenChange={(open) => { if (!open) actions.setAddToSetlistSong(null); }}>
-  <Dialog.Content class="sm:max-w-sm">
+  <Dialog.Content class="mid:max-w-sm">
     {#if addToSetlistSong}
       {@const pickSong = addToSetlistSong}
       <Dialog.Header>
@@ -378,7 +370,7 @@
             {@const inSetlist = sl.entries.some(e => e.songId === pickSong.id)}
             <Button
               variant="outline"
-              class="w-full justify-between px-3.5 text-[0.9rem] {inSetlist ? 'border-primary bg-primary/10 hover:bg-primary/20' : ''}"
+              class="w-full justify-between px-3.5 text-body-lg {inSetlist ? 'border-primary bg-primary/10 hover:bg-primary/20' : ''}"
               onclick={() => handlePickSetlist(sl)}
             >
               <span class="font-medium">{sl.name}</span>
@@ -395,18 +387,7 @@
 </Dialog.Root>
 
 <!-- Delete-song confirmation -->
-<AlertDialog.Root open={$deleteRequest !== null} onOpenChange={(open) => { if (!open) actions.requestDelete(null); }}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$t.song.remove}</AlertDialog.Title>
-      <AlertDialog.Description>{$t.deleteConfirm}</AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$t.song.cancel}</AlertDialog.Cancel>
-      <AlertDialog.Action variant="destructive" onclick={confirmDelete}>{$t.song.remove}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+<ConfirmDialog open={$deleteRequest !== null} title={$t.song.remove} description={$t.deleteConfirm} confirmLabel={$t.song.remove} cancelLabel={$t.song.cancel} onopenchange={open => { if (!open) actions.requestDelete(null); }} onconfirm={confirmDelete} />
 
 {#if lyricsViewSong}
   <LyricsOverlay

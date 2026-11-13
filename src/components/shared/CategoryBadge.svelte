@@ -5,12 +5,12 @@
 
   const icons: Record<Category, string> = { top: '💩', mid: '🎵', low: '🧪' };
   const colors: Record<Category, string> = {
-    top: 'border-warning-ink/30 bg-warning text-warning-ink',
-    mid: 'border-info-ink/30 bg-info text-info-ink',
-    low: 'border-success-ink/30 bg-success text-success-ink',
+    top: 'border-category-top-border bg-category-top-bg text-category-top-ink',
+    mid: 'border-category-mid-border bg-category-mid-bg text-category-mid-ink',
+    low: 'border-category-low-border bg-category-low-bg text-category-low-ink',
   };
 
   let { category, iconOnly = false }: { category: Category; iconOnly?: boolean } = $props();
 </script>
 
-<Badge variant="outline" class="badge badge-{category} {colors[category]} font-semibold tracking-[0.02em] {iconOnly ? 'icon-only size-8 p-0 text-[1.2rem] leading-none' : 'text-[0.8rem]'}">{iconOnly ? icons[category] : $t.filter[category]}</Badge>
+<Badge variant="outline" class="{colors[category]} font-semibold tracking-[0.02em] {iconOnly ? 'size-8 p-0 text-title leading-none' : 'text-small'}">{iconOnly ? icons[category] : $t.filter[category]}</Badge>

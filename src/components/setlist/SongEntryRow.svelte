@@ -6,6 +6,7 @@
    * (see ./classes.ts for the shared table / header classes).
    */
   import type { Snippet } from 'svelte';
+  import SongName from '$components/shared/SongName.svelte';
   import type { ClassValue, HTMLAttributes } from 'svelte/elements';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
   import { Badge } from '$components/ui/badge';
@@ -14,15 +15,16 @@
   import type { Row } from '@tanstack/table-core';
   import PctBadge from '$components/shared/PctBadge.svelte';
   import RowActions, { type RowAction } from '$components/shared/RowActions.svelte';
+  import GuestBadge from '$components/shared/GuestBadge.svelte';
   import IconButton from '$components/shared/IconButton.svelte';
   import * as Table from '$components/ui/table';
   import * as Tooltip from '$components/ui/tooltip';
   import type { Song, Instrument, LearningStage } from '$lib/types';
   import { t } from '$lib/i18n';
   import { cn, sortInstruments, INSTRUMENT_ICONS } from '$lib/utils';
-  import { STAGE_TONE, toneStyle, toneBg } from '$lib/palette';
+  import { STAGE_BADGE, stageCellClass } from '$lib/palette';
 
-  const tone = (stage: LearningStage) => STAGE_TONE[stage] ?? 'neutral';
+  const tone = (stage: LearningStage) => STAGE_BADGE[stage] ?? STAGE_BADGE.queue;
 
   let {
     row, song, number, pct, pctTitle, played = false, stageOf, permanentNames, bubbleMusicians,
@@ -92,15 +94,16 @@
   const flags = $derived(new Set(cn(rowClass).split(/\s+/).filter(Boolean)));
   const blockOver = $derived(flags.has('subset-block-over'));
   const cellBg = $derived(
-    blockOver ? 'bg-muted'
-    : flags.has('subset-active-member') ? 'bg-muted'
+    blockOver ? 'tint-set-header-bg'
+    : flags.has('subset-active-member') ? 'tint-set-member-hover-bg'
+    : flags.has('subset-member') ? 'tint-set-member-bg min-mid:group-hover/row:tint-set-member-hover-bg'
         : 'bg-card min-mid:group-hover/row:bg-(--row-hover)',
   );
-  const cellState = $derived(cn(
-    flags.has('dragging') || flags.has('subset-block-dragging') ? 'opacity-35' : played ? 'opacity-45' : '',
-    flags.has('drag-over') && 'bg-muted ring-1 ring-inset ring-border',
-  ));
-  const cell = $derived(cn('border-t border-border py-0 max-mid:px-2 max-mid:py-[7px] [&:has(+td:last-child)]:border-r-0', cellBg, cellState));
+  const cellFade = $derived(flags.has('dragging') || flags.has('subset-block-dragging') ? 'opacity-35' : played ? 'opacity-45' : '');
+  const cellBase = 'border-t border-border py-0 max-mid:px-2 max-mid:py-1.75 [&:has(+td:last-child)]:border-r-0';
+  const cell = $derived(cn(cellBase, cellBg, cellFade, flags.has('drag-over') && 'bg-muted ring-1 ring-inset ring-border'));
+  /** A musician cell coloured by learning stage: the stage tint always wins (no zebra / hover / drag-over fill), only the ring shows. */
+  const stageCell = $derived(cn(cellBase, cellFade, flags.has('drag-over') && 'ring-1 ring-inset ring-border'));
   const strike = $derived(played ? 'line-through' : '');
 
   const guestTags = $derived(
@@ -111,31 +114,31 @@
   );
 
   const bubbles = $derived.by(() => {
-    const out: { name: string; instruments: Instrument[]; style: string; isGuest: boolean }[] = [];
+    const out: { name: string; instruments: Instrument[]; tone: string; isGuest: boolean }[] = [];
     for (const name of bubbleMusicians ?? permanentNames) {
       const role = song.musicians[name];
       if (!role?.instruments?.length) continue;
       const stage = stageOf(name);
-      out.push({ name, instruments: sortInstruments(role.instruments), style: toneStyle(tone(stage)), isGuest: false });
+      out.push({ name, instruments: sortInstruments(role.instruments), tone: tone(stage), isGuest: false });
     }
     for (const [name, role] of Object.entries(song.musicians)) {
       if (!permanent.has(name) && role.instruments.length > 0) {
         const stage = stageOf(name);
-        out.push({ name, instruments: sortInstruments(role.instruments), style: toneStyle(tone(stage)), isGuest: true });
+        out.push({ name, instruments: sortInstruments(role.instruments), tone: tone(stage), isGuest: true });
       }
     }
     return out;
   });
 
-  const snippets = { drag: cDrag, num: cNum, time: cTime, song: cSong, m: cMusician, guests: cGuests, actions: cActions } as const;
+  const snippets = { drag: cDrag, num: cNum, time: cTime, song: cSong, m: cMusician, actions: cActions } as const;
   /** Index of a musician column among the visible musician columns (striped background). */
   const mIndex = (id: string) => row.getVisibleCells().filter(x => x.column.id.startsWith('m:')).findIndex(x => x.column.id === id);
 
   /** Row buttons that stretch to the cell: share its height when stacked, full height in a row. */
   const cellBtn = 'h-auto min-h-10 w-10 flex-1 basis-0 rounded-none border-0 border-primary/30 bg-clip-border min-mid:flex-none min-mid:basis-auto';
   const offCls = 'opacity-40 grayscale disabled:opacity-40';
-  const tagCls = 'px-2.5 text-[0.89rem] font-medium';
-  const bubbleCls = 'min-w-0 gap-[3px] pr-1.5 pl-[3px] text-[0.82rem] font-normal text-muted-foreground max-mid:flex max-mid:w-full';
+  const tagCls = 'px-2 text-small font-medium';
+  const bubbleCls = 'min-w-0 gap-0.75 pr-1.5 pl-0.75 text-small font-normal text-muted-foreground max-mid:flex max-mid:w-full';
 </script>
 
 {#snippet icons(insts: Instrument[])}{#each insts as inst (inst)}<span>{INSTRUMENT_ICONS[inst]}</span>{/each}{/snippet}
@@ -144,16 +147,19 @@
   {#if titleFirst}
     <span class="flex min-w-0 flex-col text-left leading-tight" title="{song.artist} – {song.title}">
       <span class={cn('title truncate text-base leading-snug font-bold', strike)}>{song.title}</span>
-      <span class={cn('truncate text-[0.85rem] text-muted-foreground', strike)}>{song.artist}</span>
+      <span class={cn('truncate text-body text-muted-foreground', strike)}>{song.artist}</span>
     </span>
   {:else}
-  <!-- From the mid tier up: three lines per row (artist, title, comment below). Small view: "Artist – Title" on one wrapping line, then the comment. -->
-  <span class="min-w-0 truncate text-left max-mid:overflow-visible max-mid:whitespace-normal" title="{song.artist} – {song.title}">
-    <span class={cn('text-[1.08rem] font-normal min-mid:block min-mid:text-base min-mid:leading-[1.2] min-mid:truncate', strike)}>{song.artist}</span>
-    <span class={cn('mx-1 text-muted-foreground min-mid:hidden', strike)}>–</span>
-    <span class={cn('title text-[1.08rem] font-semibold min-mid:block min-mid:text-base min-mid:leading-[1.2] min-mid:truncate', strike)}>{song.title}</span>
-  </span>
+  <!-- The app-wide song format on every tier: "Artist – Title" on one line (wrapping on the small tier), then the comment. -->
+  <SongName artist={song.artist} title={song.title} {strike} titleClass="title" class="truncate text-left max-mid:overflow-visible max-mid:whitespace-normal" />
   {/if}
+{/snippet}
+
+{#snippet guestTagsList()}
+  <!-- Guests (not in the roster) sit as tags right of the title, highlighted by learning stage (background only); the small view shows them as bubbles instead. -->
+  {#each guestTags as g (g.name)}
+    <GuestBadge name={g.name} instruments={g.instruments} stage={stageOf(g.name)} disabled={off.has(g.name)} label={cellLabel?.(g.name)} onclick={oncell ? (el) => oncell(g.name, el) : undefined} />
+  {/each}
 {/snippet}
 
 {#snippet rowButton(label: string, icon: string, run: (el: HTMLElement) => void)}
@@ -165,15 +171,15 @@
 {#snippet cNum()}
   <!-- The small view's cell has no padding of its own so that the lyrics button (titleFirst, as in the stage view) can fill the bottom of the column. -->
   <div class="flex h-full flex-col">
-    <div class="max-mid:py-[7px] {titleFirst ? 'max-mid:px-1' : 'max-mid:px-2'} {titleFirst ? 'max-mid:flex max-mid:flex-col max-mid:items-center max-mid:gap-1' : ''}">
-      <div class="flex items-center justify-center gap-1.5 min-mid:justify-start {titleFirst ? 'max-mid:contents' : ''}">
+    <div class="max-mid:py-1.75 {titleFirst ? 'max-mid:px-1' : 'max-mid:px-2'} {titleFirst ? 'max-mid:flex max-mid:flex-col max-mid:items-center max-mid:gap-1' : ''}">
+      <div class="flex w-full items-center justify-center gap-1 min-mid:justify-start {titleFirst ? 'max-mid:contents' : ''}">
         <span class="max-mid:order-1">{number}</span>
-        <PctBadge value={pct} class="min-w-[4.2em] text-[0.68rem] {titleFirst ? 'max-mid:order-3' : ''}" title={pctTitle} />
+        <PctBadge value={pct} class="h-5 min-w-[3.4em] max-w-none flex-1 px-0 text-micro whitespace-nowrap min-mid:w-auto {titleFirst ? 'max-mid:order-3' : ''}" title={pctTitle} />
       </div>
       <!-- In the small view the time column is hidden and the type badge leaves the title: both sit here, inline under the number. -->
       <div class="mt-1.5 flex items-center justify-center gap-1.5 min-mid:justify-start min-mid:hidden {titleFirst ? 'max-mid:order-2 max-mid:mt-0' : ''}">
-        {#if time !== undefined}<span class="text-[0.85rem] whitespace-nowrap text-muted-foreground">{time}</span>{/if}
-        <span class="[&_[data-slot=badge]]:size-6 [&_[data-slot=badge]]:text-[0.9rem]"><CategoryBadge category={song.category} iconOnly /></span>
+        {#if time !== undefined}<span class="text-body whitespace-nowrap text-muted-foreground">{time}</span>{/if}
+        <span class="[&_[data-slot=badge]]:size-6 [&_[data-slot=badge]]:text-body-lg"><CategoryBadge category={song.category} iconOnly /></span>
       </div>
     </div>
     {#if titleFirst && song.lyrics && onlyrics}
@@ -181,10 +187,10 @@
     {/if}
   </div>
 {/snippet}
-{#snippet cTime()}{time}{/snippet}
+{#snippet cTime()}<span class="block w-full text-center">{time}</span>{/snippet}
 {#snippet cSong()}
   {@const nBtn = (personalNote && onpersonal ? 1 : 0) + (song.lyrics && onlyrics ? 1 : 0)}
-  <div class="relative min-mid:pr-(--btn-pad)" style:--btn-pad={nBtn ? `${nBtn * 48}px` : undefined}>
+  <div class="relative pt-1 min-mid:pr-(--btn-pad)" style:--btn-pad={nBtn ? `${nBtn * 48}px` : undefined}>
     <!-- Mid and up: the personal-note and lyrics buttons sit at the right of the title cell, vertically centred (as in the catalog). In the small view they stack in the actions column. -->
     {#if nBtn}
       <div class="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-2 max-mid:hidden">
@@ -200,6 +206,7 @@
       {:else}
         {@render nameText()}
       {/if}
+      {#if guestTags.length > 0}<div class="ml-2 flex max-w-[45%] shrink-0 flex-wrap items-center gap-1 max-mid:hidden">{@render guestTagsList()}</div>{/if}
     </div>
     {#if comment}<div class="min-w-0">{@render comment()}</div>{/if}
     {#if bubbles.length > 0}
@@ -209,11 +216,11 @@
             <span class="shrink-0 text-base">{@render icons(b.instruments)}</span>
             <span class="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_calc(100%-20px),transparent_100%)]">{b.name}</span>
           {/snippet}
-          {@const bCls = cn(bubbleCls, b.isGuest && 'border-dashed border-border')}
+          {@const bCls = cn(bubbleCls, b.isGuest && 'border-dashed border-border', b.tone)}
           {#if oncell}
-            <Badge role="button" tabindex={off.has(b.name) ? -1 : 0} aria-disabled={off.has(b.name)} class={cn(bCls, 'cursor-pointer justify-start', off.has(b.name) && offCls)} aria-label={cellLabel?.(b.name)} onclick={e => !off.has(b.name) && oncell(b.name, e.currentTarget)} onkeydown={e => { if ((e.key === 'Enter' || e.key === ' ') && !off.has(b.name)) { e.preventDefault(); oncell(b.name, e.currentTarget); } }} style={b.style}>{@render bubbleBody()}</Badge>
+            <Badge role="button" tabindex={off.has(b.name) ? -1 : 0} aria-disabled={off.has(b.name)} class={cn(bCls, 'cursor-pointer justify-start', off.has(b.name) && offCls)} aria-label={cellLabel?.(b.name)} onclick={e => !off.has(b.name) && oncell(b.name, e.currentTarget)} onkeydown={e => { if ((e.key === 'Enter' || e.key === ' ') && !off.has(b.name)) { e.preventDefault(); oncell(b.name, e.currentTarget); } }}>{@render bubbleBody()}</Badge>
           {:else}
-            <Badge class={bCls} style={b.style}>{@render bubbleBody()}</Badge>
+            <Badge class={bCls}>{@render bubbleBody()}</Badge>
           {/if}
         {/each}
       </div>
@@ -233,30 +240,17 @@
         {/if}
       {/if}
 {/snippet}
-{#snippet cGuests()}
-    <div class="flex flex-wrap items-center gap-1.5">
-    {#each guestTags as g}
-        {@const gStage = stageOf(g.name)}
-        {@const gStyle = toneStyle(tone(gStage))}
-        {#if oncell}
-          <Badge role="button" tabindex={off.has(g.name) ? -1 : 0} aria-disabled={off.has(g.name)} class={cn(tagCls, 'cursor-pointer hover:brightness-95', off.has(g.name) && offCls)} aria-label={cellLabel?.(g.name)} onclick={e => !off.has(g.name) && oncell(g.name, e.currentTarget)} onkeydown={e => { if ((e.key === 'Enter' || e.key === ' ') && !off.has(g.name)) { e.preventDefault(); oncell(g.name, e.currentTarget); } }} style={gStyle}>{@render icons(g.instruments)} {g.name}</Badge>
-        {:else}
-          <Badge class={cn(tagCls)} style={gStyle}>{@render icons(g.instruments)} {g.name}</Badge>
-        {/if}
-    {/each}
-    </div>
-{/snippet}
 {#snippet cActions()}
   <!-- Closed at the bottom only when it is the last row (the next row or header always brings its own top border). The buttons fill the whole cell, all the same size, with a thin border between them: stacked (⋯, note, lyrics) in the small view; from the mid tier up only the ⋯ is here (note and lyrics sit in the title cell). -->
-  <div class="flex h-full flex-col border-t border-border max-mid:border-primary/30 min-mid:flex-row min-mid:justify-end">
-    <RowActions class={cn(cellBtn, 'border-b last:border-b-0 min-mid:order-last min-mid:border-b-0')} actions={rowActions} />
+  <div class="flex h-full flex-col border-t border-border max-mid:border-primary/30 min-mid:flex-row min-mid:items-center min-mid:justify-end min-mid:gap-2">
+    <RowActions inline="bare" class={cn(cellBtn, 'border-b last:border-b-0 min-mid:order-last min-mid:border-b-0')} actions={rowActions} />
     {#if personalNote && onpersonal}{@render rowButton($t.common.personalComment, '🤫', onpersonal)}{/if}
     {#if song.lyrics && onlyrics && !titleFirst}{@render rowButton($t.common.lyrics, '📝', () => onlyrics())}{/if}
   </div>
 {/snippet}
 
 <Table.Row
-  class={cn('song-row group/row cursor-default border-0 select-none hover:bg-transparent [&[draggable=true]]:cursor-grab [&[draggable=true]:active]:cursor-grabbing', rowClass, { played })}
+  class={cn('song-row group/row cursor-default border-0 select-none hover:bg-transparent draggable:cursor-grab [&[draggable=true]:active]:cursor-grabbing', rowClass, { played })}
   {...rowProps}
 >
   {#each row.getVisibleCells() as c (c.id)}
@@ -264,10 +258,11 @@
     {#if id.startsWith('m:')}
       {@const name = id.slice(2)}
       {@const role = song.musicians[name]}
-      {@const progBg = (role?.instruments?.length ?? 0) > 0 ? toneBg(tone(stageOf(name))) : null}
+      {@const progBg = (role?.instruments?.length ?? 0) > 0 ? stageCellClass(stageOf(name)) : null}
       <Table.Cell
-        class={cn(cell, colMeta(c.column).cls, progBg && 'min-mid:group-hover/row:bg-inherit', off.has(name) && 'opacity-40 grayscale')}
-        style={`${colMeta(c.column).style ?? ''};${progBg ? `background: ${progBg}` : ''}`}
+        class={progBg
+          ? cn(stageCell, progBg, colMeta(c.column).cls, off.has(name) && 'opacity-40 grayscale')
+          : cn(cell, !blockOver && !flags.has('subset-member') && !flags.has('subset-active-member') && c.getContext().table.getVisibleLeafColumns().filter(x => x.id.startsWith('m:')).findIndex(x => x.id === id) % 2 === 0 && 'bg-table-zebra-bg', colMeta(c.column).cls, off.has(name) && 'opacity-40 grayscale')}
       ><FlexRender content={c.column.columnDef.cell} context={{ ...c.getContext(), snippets }} /></Table.Cell>
     {:else}
       <!-- The buttons column has no line between rows (the buttons have their own borders); every other column does. -->
@@ -276,5 +271,5 @@
   {/each}
 </Table.Row>
 {#if below}
-  <Table.Row class="border-0 hover:bg-transparent"><Table.Cell class="bg-card px-2 py-[7px] whitespace-normal" {colspan}>{@render below()}</Table.Cell></Table.Row>
+  <Table.Row class="border-0 hover:bg-transparent"><Table.Cell class="bg-card px-2 py-1.75 whitespace-normal" {colspan}>{@render below()}</Table.Cell></Table.Row>
 {/if}

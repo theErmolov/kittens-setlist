@@ -18,7 +18,7 @@
 {#snippet navLink(href: string, label: string, active: boolean, external = false)}
   <NavigationMenu.Item>
     <NavigationMenu.Link {href} {active} {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-      class="px-3 py-2 text-[0.85rem] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-(--secondary-soft) data-active:text-primary-ink data-active:hover:bg-(--secondary-soft)">
+      class="px-3 py-2 text-body font-semibold text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-primary-soft data-active:text-primary-ink data-active:hover:bg-primary-soft">
       {label}{#if external}&nbsp;<span aria-hidden="true">↗</span>{/if}
     </NavigationMenu.Link>
   </NavigationMenu.Item>

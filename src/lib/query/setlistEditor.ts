@@ -7,8 +7,8 @@ import * as api from '$lib/api';
 import { keys, setlistQuery } from './queries';
 import type { Song } from '$lib/types';
 
-/** The editor's setlist query: always refetched on focus/poll (the store's smart merge skips no-ops). */
-export const editorSetlistQuery = (id: string) => ({ ...setlistQuery(id), staleTime: 0 });
+/** The editor's setlist query: served from cache on open; the editor's own poll keeps it current. */
+export const editorSetlistQuery = (id: string) => setlistQuery(id);
 
 /** PATCH the author's private note on an entry (returns nothing). */
 export function useUpdatePersonalEntryComment() {

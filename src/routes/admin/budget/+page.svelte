@@ -14,9 +14,9 @@
   import { Button } from '$components/ui/button';
   import { Badge } from '$components/ui/badge';
   import { Card } from '$components/ui/card';
-  import * as Table from '$components/ui/table';
   import { getCoreRowModel, getSortedRowModel, type ColumnDef } from '@tanstack/table-core';
   import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
   import * as Empty from '$components/ui/empty';
   import RowActions, { type RowAction } from '$components/shared/RowActions.svelte';
   import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
@@ -46,7 +46,7 @@
     if (!$currentUser?.isAdmin) goto(`${base}/backlog`);
   });
 
-  const kindColor = { income: 'bg-success text-success-ink', expense: 'bg-danger text-danger-ink', debt: 'bg-warning text-warning-ink' } as const;
+  const kindColor = { income: 'bg-success-soft text-success-ink', expense: 'bg-danger-soft text-danger-ink', debt: 'bg-warning-soft text-warning-ink' } as const;
 
   const setlistName = (id?: string) => setlists.find(s => s.id === id)?.name;
 
@@ -118,9 +118,9 @@
 </script>
 
 {#snippet stat(label: string, value: string, accent = false, neg = false)}
-  <Card class="card min-w-0 flex-[1_1_110px] gap-1 rounded-[10px] p-3 {accent ? 'accent border-primary bg-(--secondary-soft)' : ''}">
-    <span class="card-lbl text-[0.78rem] text-muted-foreground">{label}</span>
-    <span class="card-val text-[1.1rem] font-bold {neg ? 'neg text-danger-ink' : ''}">{value}</span>
+  <Card class="card min-w-0 flex-[1_1_110px] gap-1 rounded-soft p-3 {accent ? 'accent border-primary bg-primary-soft' : ''}">
+    <span class="card-lbl text-small text-muted-foreground">{label}</span>
+    <span class="card-val text-title-sm font-bold {neg ? 'neg text-danger-ink' : ''}">{value}</span>
   </Card>
 {/snippet}
 
@@ -132,21 +132,21 @@
     <!-- Dashboard: Наличка + Переводы = На руках − Долги = Баланс -->
     <div class="dash mb-5 flex flex-wrap items-center gap-2">
       {@render stat($t.budget.dash.cash, formatEUR(totals.cash, $lang))}
-      <span class="op shrink-0 text-[1.2rem] font-bold text-muted-foreground">+</span>
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">+</span>
       {@render stat($t.budget.dash.transfer, formatEUR(totals.transfer, $lang))}
-      <span class="op shrink-0 text-[1.2rem] font-bold text-muted-foreground">=</span>
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">=</span>
       {@render stat($t.budget.dash.onHand, formatEUR(totals.onHand, $lang), true)}
-      <span class="op shrink-0 text-[1.2rem] font-bold text-muted-foreground">−</span>
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">−</span>
       {@render stat($t.budget.dash.debts, formatEUR(totals.debts, $lang), false, true)}
-      <span class="op shrink-0 text-[1.2rem] font-bold text-muted-foreground">=</span>
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">=</span>
       {@render stat($t.budget.dash.balance, formatEUR(totals.balance, $lang), true, totals.balance < 0)}
     </div>
 
     <!-- Add buttons -->
     <div class="toolbar mb-3.5 flex flex-wrap items-center gap-2">
-      <Button variant="outline" class="btn-add income flex-auto border-l-4 border-l-success-ink px-3.5 text-[0.88rem] font-semibold" onclick={() => bs().openAdd('income')}>{$t.budget.addIncome}</Button>
-      <Button variant="outline" class="btn-add expense flex-auto border-l-4 border-l-danger-ink px-3.5 text-[0.88rem] font-semibold" onclick={() => bs().openAdd('expense')}>{$t.budget.addExpense}</Button>
-      <Button variant="outline" class="btn-add debt flex-auto border-l-4 border-l-warning-ink px-3.5 text-[0.88rem] font-semibold" onclick={() => bs().openAdd('debt')}>{$t.budget.addDebt}</Button>
+      <Button variant="outline" class="btn-add income flex-auto border-l-4 border-l-success-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('income')}>{$t.budget.addIncome}</Button>
+      <Button variant="outline" class="btn-add expense flex-auto border-l-4 border-l-danger-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('expense')}>{$t.budget.addExpense}</Button>
+      <Button variant="outline" class="btn-add debt flex-auto border-l-4 border-l-warning-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('debt')}>{$t.budget.addDebt}</Button>
     </div>
 
     <!-- Entries -->
@@ -156,50 +156,36 @@
       </Empty.Root>
     {:else}
       <div class="mb-7">
-        <Table.Root class="rows max-mid:[&_tbody]:grid max-mid:[&_tbody]:gap-[3px] max-mid:[&_thead]:hidden">
-          <Table.Header>
-            {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-              <Table.Row>
-                {#each headerGroup.headers as header (header.id)}
-                  <Table.Head aria-sort={header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined}>
-                    {#if header.column.getCanSort()}
-                      <button type="button" class="inline-flex cursor-pointer items-center gap-1 font-[inherit] uppercase tracking-[inherit] hover:text-foreground" onclick={header.column.getToggleSortingHandler()}>
-                        <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
-                        <span aria-hidden="true">{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}</span>
-                      </button>
-                    {:else}
-                      <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
-                    {/if}
-                  </Table.Head>
-                {/each}
-              </Table.Row>
-            {/each}
-          </Table.Header>
-          <Table.Body>
-            {#each table.getRowModel().rows as row (row.id)}
-              {@const e = row.original}
-              <Table.Row class="row max-mid:flex max-mid:flex-wrap max-mid:items-center max-mid:gap-x-3 max-mid:px-3 max-mid:py-2 {e.kind === 'debt' && e.paid ? 'paid opacity-55' : ''}">
-                {#each row.getVisibleCells() as cell (cell.id)}
-                  <Table.Cell class="max-mid:not-last:border-r-0 max-mid:p-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
-                    <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
-                  </Table.Cell>
-                {/each}
-              </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
+        <DataTableView
+          {table}
+          class="rows table-stack"
+          rowClass={row => `row max-mid:flex max-mid:flex-wrap max-mid:items-center max-mid:gap-x-3 max-mid:px-3 max-mid:py-2 ${row.original.kind === 'debt' && row.original.paid ? 'paid opacity-55' : ''}`}
+          cellClass="max-mid:not-last:border-r-0 max-mid:p-0"
+          headProps={header => ({ 'aria-sort': header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined })}
+        >
+          {#snippet head(header)}
+            {#if header.column.getCanSort()}
+              <button type="button" class="inline-flex cursor-pointer items-center gap-1 font-[inherit] uppercase tracking-[inherit] hover:text-foreground" onclick={header.column.getToggleSortingHandler()}>
+                <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+                <span aria-hidden="true">{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}</span>
+              </button>
+            {:else}
+              <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+            {/if}
+          {/snippet}
+        </DataTableView>
       </div>
     {/if}
 
     <!-- Report -->
     <div class="report border-t pt-4">
       <div class="report-head mb-3 flex items-center justify-between gap-2.5">
-        <h2 class="text-[1.1rem]">{$t.budget.report}</h2>
-        <Button variant="outline" class="px-[18px] text-[0.88rem]" onclick={generateReport}>{$t.budget.generateReport}</Button>
+        <h2 class="text-title-sm">{$t.budget.report}</h2>
+        <Button variant="outline" class="px-4.5 text-body" onclick={generateReport}>{$t.budget.generateReport}</Button>
       </div>
       {#if $reportText}
-        <Card class="mb-3 gap-0 rounded-[10px] p-3.5"><pre class="whitespace-pre-wrap font-[inherit] text-[0.9rem]">{$reportText}</pre></Card>
-        <Button class="px-[18px] text-[0.88rem] font-semibold" onclick={copyReport}>{$copied ? $t.budget.copied : $t.budget.copy}</Button>
+        <Card class="mb-3 gap-0 rounded-soft p-3.5"><pre class="whitespace-pre-wrap font-[inherit] text-body-lg">{$reportText}</pre></Card>
+        <Button class="px-4.5 text-body font-semibold" onclick={copyReport}>{$copied ? $t.budget.copied : $t.budget.copy}</Button>
       {/if}
     </div>
   {/if}
@@ -221,18 +207,18 @@
 
 {#snippet dateCell(e: BudgetEntry)}{fmtDate(e.date)}{/snippet}
 {#snippet kindCell(e: BudgetEntry)}
-  <Badge class="badge {e.kind} {kindColor[e.kind]} h-auto rounded-md px-[7px] py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.03em]">{$t.budget.kind[e.kind]}</Badge>
+  <Badge class="badge {e.kind} {kindColor[e.kind]} h-auto rounded-md px-1.75 py-0.5 text-micro font-bold uppercase tracking-[0.03em]">{$t.budget.kind[e.kind]}</Badge>
 {/snippet}
 {#snippet whoCell(e: BudgetEntry)}<span class="row-who">{who(e)}</span>{/snippet}
 {#snippet whatCell(e: BudgetEntry)}
   <span class="block">{e.kind === 'expense' ? e.description || '' : ''}</span>
-  <span class="row-meta block text-[0.78rem] text-muted-foreground">
+  <span class="row-meta block text-small text-muted-foreground">
     {#if setlistName(e.setlistId)}{setlistName(e.setlistId)}{/if}{#if setlistName(e.setlistId) && e.comment} · {/if}{#if e.comment}{e.comment}{/if}
   </span>
 {/snippet}
 {#snippet methodCell(e: BudgetEntry)}
   {#if e.kind === 'income' || e.kind === 'expense'}
-    <Badge variant="secondary" class="chip h-auto px-2 py-0.5 text-[0.72rem] font-normal text-muted-foreground">{e.method === 'cash' ? $t.budget.methodCash : $t.budget.methodTransfer}</Badge>
+    <Badge variant="secondary" class="chip h-auto px-2 py-0.5 text-tiny font-normal text-muted-foreground">{e.method === 'cash' ? $t.budget.methodCash : $t.budget.methodTransfer}</Badge>
   {/if}
 {/snippet}
 {#snippet amountCell(e: BudgetEntry)}
@@ -242,9 +228,9 @@
 {/snippet}
 {#snippet paidCell(e: BudgetEntry)}
   {#if e.kind === 'debt' && e.paid}
-    <Badge variant="secondary" class="bg-success text-success-ink">{$t.budget.paid}</Badge>
+    <Badge variant="secondary" class="bg-success-soft text-success-ink">{$t.budget.paid}</Badge>
   {/if}
 {/snippet}
 {#snippet actionsCell(e: BudgetEntry)}
-  <RowActions actions={rowActions(e)} />
+  <RowActions inline actions={rowActions(e)} />
 {/snippet}

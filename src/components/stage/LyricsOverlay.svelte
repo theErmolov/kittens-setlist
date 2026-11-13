@@ -388,18 +388,18 @@
   <Dialog.Content
     showCloseButton={false}
     interactOutsideBehavior="ignore"
-    class="top-0 left-0 z-[200] flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-background p-0 ring-0 sm:max-w-none"
+    class="top-0 left-0 z-200 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-background p-0 ring-0 mid:max-w-none"
   >
-    <div class="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-4 py-3 min-[601px]:flex-nowrap min-[601px]:gap-3">
+    <div class="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-4 py-3 mid:flex-nowrap mid:gap-3">
       <IconButton icon="✕" label={$t.common.close} onclick={onclose} />
       <div class="flex min-w-0 flex-1 items-baseline gap-2">
         <Dialog.Title class="truncate text-base font-bold">{song.title}</Dialog.Title>
-        <Dialog.Description class="truncate text-[0.85rem] text-muted-foreground">{song.artist}</Dialog.Description>
+        <Dialog.Description class="truncate text-body text-muted-foreground">{song.artist}</Dialog.Description>
       </div>
       {#if $hasPagination}
-        <span class="shrink-0 whitespace-nowrap text-[0.85rem] text-muted-foreground">{$currentPage + 1} / {totalPages}</span>
+        <span class="shrink-0 whitespace-nowrap text-body text-muted-foreground">{$currentPage + 1} / {totalPages}</span>
       {/if}
-      <div class="flex shrink-0 items-center gap-2 max-[600px]:w-full max-[600px]:flex-wrap max-[600px]:justify-end">
+      <div class="flex shrink-0 items-center gap-2 max-mid:w-full max-mid:flex-wrap max-mid:justify-end">
         {#if originalKey}
           <IconButton icon="🚫" label={$hideChords ? $t.stage.showChords : $t.stage.hideChords} class={pressedOn} pressed={$hideChords} onpressedchange={() => toggleChords()} />
         {/if}
@@ -425,17 +425,17 @@
                 {#snippet child({ props })}
                   <Button {...props} variant="outline" class="gap-1.5 font-bold" title={$t.stage.transpose} aria-label={$t.stage.transpose}>
                     <span class="font-mono" style:min-width="{maxKeyLength}ch">{targetKey}</span>
-                    <span class="min-w-[3ch] font-mono text-[1.05rem] font-normal tabular-nums text-muted-foreground" style:visibility={$transpose === 0 ? 'hidden' : 'visible'}>{$transpose > 0 ? `+${$transpose}` : $transpose}</span>
+                    <span class="min-w-[3ch] font-mono text-lead font-normal tabular-nums text-muted-foreground" class:invisible={$transpose === 0}>{$transpose > 0 ? `+${$transpose}` : $transpose}</span>
                   </Button>
                 {/snippet}
               </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="end" class="z-[300] w-auto min-w-[190px] p-0">
+              <DropdownMenu.Content align="end" class="z-300 w-auto min-w-47.5 p-0">
                 {#each Array.from({ length: 12 }, (_, i) => i) as offset}
                   <DropdownMenu.Item
-                    class="gap-2.5 rounded-none border-b px-3 py-[7px] text-[0.88rem] last:border-b-0 {offset === $transpose ? 'bg-muted' : ''}"
+                    class="gap-2.5 rounded-none border-b px-3 py-1.75 text-body last:border-b-0 {offset === $transpose ? 'bg-muted' : ''}"
                     onSelect={() => { set({ transpose: offset, dropdownOpen: false }); scheduleSaveTranspose(offset); }}
                   >
-                    <span class="min-w-[28px] font-bold tabular-nums {offset === $transpose ? 'text-primary-ink' : 'text-muted-foreground'}">{offset > 0 ? `+${offset}` : offset}</span>
+                    <span class="min-w-7 font-bold tabular-nums {offset === $transpose ? 'text-primary-ink' : 'text-muted-foreground'}">{offset > 0 ? `+${offset}` : offset}</span>
                     <span class="font-mono">{transposeChord(originalKey, offset)}</span>
                   </DropdownMenu.Item>
                 {/each}
@@ -450,27 +450,29 @@
     <div class="relative flex-1 overflow-x-hidden overflow-y-auto py-4 pl-5" bind:this={lyricsBodyEl} style:padding-right="{$hasPagination ? PAGE_BTN_WIDTH : BODY_PAD_R}px">
       <div
         class="grid items-start gap-x-8 leading-[1.6]"
+        class:grid-cols-1={$columns <= 1}
+        class:grid-cols-2={$columns > 1}
         style:font-family={FONT_FAMILY}
         style:font-size="{effectiveFontSize}px"
-        style:grid-template-columns={$columns > 1 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)'}
       >
         {#each visibleColumns as column}
           <div class="min-w-0">
             {#each column as pair}
               <div class="break-inside-avoid">
                 {#if pair.chordLine !== null}
-                  <span class="block min-h-[1.6em] font-bold whitespace-pre text-primary-ink">{pair.chordLine || ' '}</span>
+                  <span class="block min-h-[1.6em] font-bold whitespace-pre text-lyrics-chord">{pair.chordLine || ' '}</span>
                 {/if}
-                <span class="block min-h-[1.6em] whitespace-pre text-foreground">{pair.lyricLine || ' '}</span>
+                <span class="block min-h-[1.6em] whitespace-pre text-lyrics-text">{pair.lyricLine || ' '}</span>
               </div>
             {/each}
           </div>
         {/each}
       </div>
       {#if $hasPagination}
-        <div class="absolute top-0 right-0 bottom-0 z-10 flex w-24 flex-col items-center justify-center gap-4">
-          <IconButton icon="←" label={$t.stage.prevPage} onclick={prevPage} disabled={$currentPage === 0} />
-          <IconButton icon="→" label={$t.stage.nextPage} onclick={nextPage} disabled={$currentPage >= totalPages - 1} />
+        <!-- As on main: a full-height strip of two big purple buttons. -->
+        <div class="absolute top-0 right-0 bottom-0 z-10 flex w-24 flex-col">
+          <button type="button" aria-label={$t.stage.prevPage} class="flex flex-1 items-center justify-center border-b border-lyrics-pager-divider bg-lyrics-pager text-[2.5rem] leading-none text-lyrics-pager-ink transition-colors hover:not-disabled:bg-lyrics-pager-hover disabled:cursor-default disabled:opacity-25" onclick={prevPage} disabled={$currentPage === 0}>←</button>
+          <button type="button" aria-label={$t.stage.nextPage} class="flex flex-1 items-center justify-center bg-lyrics-pager text-[2.5rem] leading-none text-lyrics-pager-ink transition-colors hover:not-disabled:bg-lyrics-pager-hover disabled:cursor-default disabled:opacity-25" onclick={nextPage} disabled={$currentPage >= totalPages - 1}>→</button>
         </div>
       {/if}
     </div>

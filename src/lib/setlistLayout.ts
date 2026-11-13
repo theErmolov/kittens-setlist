@@ -133,6 +133,25 @@ export function moveSubsetBlockBy(
   return moveSubsetBlock(layout, subsetId, blocks[target].subset.id);
 }
 
+/** Copies the layout and removes the entry stored under `sourceKey` from the copy; null when it is not found. */
+function detachEntry(input: SetlistLayoutItem[], sourceKey: string): { layout: SetlistLayoutItem[]; sourceEntry: SetlistEntry } | null {
+  const layout = input.map(item => item.kind === 'subset'
+    ? { ...item, subset: { ...item.subset }, entries: [...item.entries] }
+    : { ...item }
+  );
+  const sourceLocation = findEntryLocation(layout, sourceKey);
+  if (!sourceLocation) return null;
+
+  let sourceEntry: SetlistEntry | null = null;
+  if (sourceLocation.memberIndex >= 0 && sourceLocation.item.kind === 'subset') {
+    sourceEntry = sourceLocation.item.entries.splice(sourceLocation.memberIndex, 1)[0];
+  } else if (sourceLocation.item.kind === 'entry') {
+    sourceEntry = sourceLocation.item.entry;
+    layout.splice(sourceLocation.layoutIndex, 1);
+  }
+  return sourceEntry ? { layout, sourceEntry } : null;
+}
+
 /**
  * Moves a song or pause. Songs dropped on a subset member join that subset;
  * pauses dropped there snap to the nearer edge of the complete block.
@@ -144,21 +163,9 @@ export function moveLayoutEntry(
   side: 'before' | 'after',
 ): SetlistLayoutItem[] {
   if (sourceKey === targetKey) return input;
-  const layout = input.map(item => item.kind === 'subset'
-    ? { ...item, subset: { ...item.subset }, entries: [...item.entries] }
-    : { ...item }
-  );
-  const sourceLocation = findEntryLocation(layout, sourceKey);
-  if (!sourceLocation) return input;
-
-  let sourceEntry: SetlistEntry | null = null;
-  if (sourceLocation.memberIndex >= 0 && sourceLocation.item.kind === 'subset') {
-    sourceEntry = sourceLocation.item.entries.splice(sourceLocation.memberIndex, 1)[0];
-  } else if (sourceLocation.item.kind === 'entry') {
-    sourceEntry = sourceLocation.item.entry;
-    layout.splice(sourceLocation.layoutIndex, 1);
-  }
-  if (!sourceEntry) return input;
+  const detached = detachEntry(input, sourceKey);
+  if (!detached) return input;
+  const { layout, sourceEntry } = detached;
 
   if (targetKey === 'end') {
     layout.push({ kind: 'entry', entry: sourceEntry });
@@ -193,21 +200,9 @@ export function moveLayoutEntryToSubset(
   subsetId: string,
   side: 'before' | 'after',
 ): SetlistLayoutItem[] {
-  const layout = input.map(item => item.kind === 'subset'
-    ? { ...item, subset: { ...item.subset }, entries: [...item.entries] }
-    : { ...item }
-  );
-  const sourceLocation = findEntryLocation(layout, sourceKey);
-  if (!sourceLocation) return input;
-
-  let sourceEntry: SetlistEntry | null = null;
-  if (sourceLocation.memberIndex >= 0 && sourceLocation.item.kind === 'subset') {
-    sourceEntry = sourceLocation.item.entries.splice(sourceLocation.memberIndex, 1)[0];
-  } else if (sourceLocation.item.kind === 'entry') {
-    sourceEntry = sourceLocation.item.entry;
-    layout.splice(sourceLocation.layoutIndex, 1);
-  }
-  if (!sourceEntry) return input;
+  const detached = detachEntry(input, sourceKey);
+  if (!detached) return input;
+  const { layout, sourceEntry } = detached;
 
   const targetIndex = layout.findIndex(item => item.kind === 'subset' && item.subset.id === subsetId);
   if (targetIndex < 0) return input;

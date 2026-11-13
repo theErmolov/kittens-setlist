@@ -33,6 +33,8 @@ PUBLIC_API_URL=https://bw1e6cey18.execute-api.eu-central-1.amazonaws.com/prod
 
 Then `npm install && npm run dev`.
 
+**Dev-only mock API (config toggle):** add `VITE_DEV_MOCK=1` to `.env` to replace the backend with in-browser mock data (`src/lib/dev/mockApi.ts`, loaded from `src/hooks.client.ts`). You are logged in as a mock admin, so every page incl. `/admin` works without Telegram or the real API; writes are acknowledged but not persisted. It only works under `npm run dev` — production builds never include it. Remove the line (or set it to `0`) to use the real backend.
+
 ## Local dev auth
 
 Telegram widget only works on `kittens.band`. Workaround:
@@ -60,11 +62,19 @@ curl -o static/emoji/{codepoint}.svg \
 
 Find the codepoint from the emoji character (e.g. `U+1F3B8` → `1f3b8`). Drop variation selectors (`U+FE0F`).
 
+## Colours — MANDATORY RULE
+
+**Never hard-code a colour** (hex, `rgb()`, `hsl()`, `bg-[#…]`, `style="color: …"`) in a `.svelte`/`.ts` file — `test/no-hardcoded-colors.test.mjs` fails on it (only the SVG artwork in `LogoCat`/`TelegramIcon` is exempt). All colours are tokens in `src/app.css`, in two layers (documented in its header): the **palette** (`--palette-<role>-{solid,on-solid,soft,ink,border}` for primary, secondary, success, warning, danger, info, neutral, violet) and **context tokens** that reference it (`--vibe-*`, `--stage-*`, `--pct-*`, `--category-*`, `--set-*`, `--break-*`, `--table-*`, `--lyrics-*`, …).
+- Use the Tailwind utilities generated from them: `bg-success-soft text-success-ink`, `bg-vibe-on-bg`, `border-category-top-border`, `text-set-accent`.
+- A translucent token over a surface (set rows, break rows, stage-coloured cells) is the `tint-<token>` utility (`tint-set-header-bg`, `tint-break-bg`, `tint-stage-ready-bg`; add `tint-on-bg` when it sits on the page background) — never a hand-written gradient.
+- Need a new colour? Add a context token **in both themes** (`:root, [data-theme="light"]` and `[data-theme="dark"]`, or the shared block when it is identical) plus its `--color-*` line in `@theme inline`; reference a palette value when one fits, a literal only when the context has its own.
+- Do not fight the shadcn kit with `!`, `dark:` duplicates or `[&>td]:` overrides: fix the component in `src/components/ui` once (it is our code).
+
 ## Screen sizes (breakpoints)
 
 Three tiers matching real devices, defined once as theme variables in `src/app.css` (`--breakpoint-mid: 1025px`, `--breakpoint-big: 1367px`): **small** (phones and iPads in portrait; bottom action bars, compact two-line rows), **mid** (iPads in landscape and small laptops; top bar, rows still compact, time column hidden) and **big** (desktop).
 - Tailwind: `max-mid:` (small only), `mid:` / `min-mid:` (mid and up), `max-big:` (small + mid), `big:` / `min-big:`; the `compact:` variant means small or very short screens.
-- JS: `below('mid')` / `below('big')` from `$lib/breakpoints` (reads the same theme variables). Never hard-code widths like 700/1024.
+- JS: `below('mid')` / `below('big')` from `$lib/breakpoints` (reads the same theme variables). Never hard-code widths like 700/1024, and never use Tailwind's default `sm:`/`md:`/`lg:` or `max-[Npx]:`/`min-[Npx]:` variants or `@media (max-width: …)` — only the tiers above (`@media (width < theme(--breakpoint-mid))` in CSS).
 
 ## UI standards — apply to every new page and form
 

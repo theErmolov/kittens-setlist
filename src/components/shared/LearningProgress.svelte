@@ -15,39 +15,37 @@
   } = $props();
   const stages: LearningStage[] = ['queue', 'structure', 'mastering', 'ready'];
   const segments: LearningStage[] = ['structure', 'mastering', 'ready'];
+  // A filled segment is the stage's solid colour with a card-coloured seam; `stage-*-solid` come from app.css.
   const fills: Partial<Record<LearningStage, string>> = {
-    structure: 'border-danger-ink/40 bg-danger hover:bg-danger',
-    mastering: 'border-warning-ink/40 bg-warning hover:bg-warning',
-    ready: 'border-success-ink/40 bg-success hover:bg-success',
+    structure: 'border-card bg-stage-structure-solid hover:bg-stage-structure-solid',
+    mastering: 'border-card bg-stage-mastering-solid hover:bg-stage-mastering-solid',
+    ready: 'border-card bg-stage-ready-solid hover:bg-stage-ready-solid',
   };
   const filled = (stage: LearningStage) => value !== 'queue' && stages.indexOf(value) >= stages.indexOf(stage);
 
-  // Hover preview (pure CSS, no state): hovering a segment fills it and every segment before it with its tone; later segments show empty.
-  // `group-has-[[data-stage=x]:hover]/pg` = "this group currently contains the hovered segment of stage x". Classes are written out in full so Tailwind can see them.
-  const preview: Record<string, string> = {
-    structure:
-      'group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:border-danger-ink/40 group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:bg-danger ' +
-      'group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:border-warning-ink/40 group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:bg-warning ' +
-      'group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:border-success-ink/40 group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:bg-success',
-    mastering:
-      'group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:border-border group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:bg-background ' +
-      'group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:border-warning-ink/40 group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:bg-warning ' +
-      'group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:border-success-ink/40 group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:bg-success',
-    ready:
-      'group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:border-border group-has-[[data-stage=structure]:hover:not(:disabled)]/pg:bg-background ' +
-      'group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:border-border group-has-[[data-stage=mastering]:hover:not(:disabled)]/pg:bg-background ' +
-      'group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:border-success-ink/40 group-has-[[data-stage=ready]:hover:not(:disabled)]/pg:bg-success',
-  };
+  // Hover preview (pure CSS, no state): pointing at a segment shows the result of clicking it — that segment and every one before it in its tone, the rest empty.
+  // `over-<stage>:` (a variant defined in app.css) = "the group currently contains the hovered, enabled segment of that stage". Classes are written out in full so Tailwind can see them.
+  const solid = (stage: LearningStage) => ({
+    structure: 'over-structure:border-card over-structure:bg-stage-structure-solid',
+    mastering: 'over-mastering:border-card over-mastering:bg-stage-mastering-solid',
+    ready: 'over-ready:border-card over-ready:bg-stage-ready-solid',
+  })[stage as 'structure' | 'mastering' | 'ready'];
+  const empty = (stage: LearningStage) => ({
+    structure: 'over-structure:border-border over-structure:bg-background',
+    mastering: 'over-mastering:border-border over-mastering:bg-background',
+    ready: 'over-ready:border-border over-ready:bg-background',
+  })[stage as 'structure' | 'mastering' | 'ready'];
+  const preview = (seg: LearningStage) => segments.map(h => segments.indexOf(seg) <= segments.indexOf(h) ? solid(h) : empty(h)).join(' ');
 </script>
 
-<ButtonGroup.Root class="group/pg shrink-0" aria-label={`${name} · ${$t.song.progress}`}>
+<ButtonGroup.Root data-stage-group class="shrink-0" aria-label={`${name} · ${$t.song.progress}`}>
   {#each segments as stage (stage)}
     <IconButton
       icon=""
       data-stage={stage}
       label={`${name} · ${$t.progress[stage].replace(/^\S+\s/, '')}`}
       {disabled}
-      class="w-12 {filled(stage) ? fills[value] : ''} {preview[stage]}"
+      class="h-8.5 min-h-8.5 w-12 {filled(stage) ? fills[value] : ''} {preview(stage)}"
       onclick={() => onchange(value === stage ? 'queue' : stage)}
     />
   {/each}

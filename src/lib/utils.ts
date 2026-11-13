@@ -1,6 +1,14 @@
 import { clsx, type ClassValue } from 'clsx';
-import { pctTone, toneStyle, toneInk } from './palette.ts';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+/** tailwind-merge that knows the app's custom type scale (`--text-*`) and radius (`--radius-soft`) from app.css, so `text-small` and `text-muted-foreground` are not mistaken for each other. */
+const twMerge = extendTailwindMerge({ extend: { classGroups: { 'font-size': [{ text: ['micro', 'tiny', 'caption', 'small', 'body', 'body-lg', 'lead', 'title-sm', 'title', 'glyph'] }], rounded: [{ rounded: ['soft'] }], leading: [{ leading: ['compact'] }] } } });
+
+/** Strips a leading emoji / drag-handle glyph and whitespace from a label ("🎛️ Filters" → "Filters"). */
+export const stripLeadingEmoji = (text: string) => text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D⠿\s]+/u, '');
+
+/** ISO date (YYYY-MM-DD) from numeric year, 1-based month and day. */
+export const isoDate = (year: number, month: number, day: number) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 /** Class-name helper used by the shadcn-svelte components. */
 export function cn(...inputs: ClassValue[]) {
@@ -32,10 +40,12 @@ export function progressPct(
   return Math.round(total / active.length);
 }
 
-/** Inline CSS style string for a progress percentage bubble. */
-export function pctBubbleStyle(pct: number): string {
-  const tone = pctTone(pct);
-  return `${toneStyle(tone)}; border: 1px solid color-mix(in srgb, ${toneInk(tone)} 45%, transparent)`;
+/** Classes for a progress percentage bubble: 100 = green outline, >=75 = yellow, >0 = red, 0 = gray (the `--pct-*` tokens). */
+export function pctBubbleClass(pct: number): string {
+  return pct === 100 ? 'border-pct-full-border bg-pct-full-bg text-pct-full-ink'
+    : pct >= 75 ? 'border-pct-high-border bg-pct-high-bg text-pct-high-ink'
+    : pct > 0 ? 'border-pct-low-border bg-pct-low-bg text-pct-low-ink'
+    : 'border-pct-none-border bg-pct-none-bg text-pct-none-ink';
 }
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
@@ -50,12 +60,8 @@ export const INSTRUMENT_ICONS: Record<Instrument, string> = new Proxy(KNOWN_INST
   get: (target, key) => target[key as Instrument] ?? '🎵',
 });
 
-export function formatAuditSummary(summary: string): string {
-  return summary.replace(
-    /\b(guitar|bass|drums|keys|cajon|violin|saxophone|trumpet|percussion|vocals)\b/g,
-    (m) => INSTRUMENT_ICONS[m as Instrument] ?? m,
-  );
-}
+/** Minutes an entry takes in a setlist: a break's length, a song's length (5 when unknown). */
+export const entryMinutes = (e: { breakMinutes?: number; song?: { lengthMinutes?: number } }): number => e.breakMinutes ?? e.song?.lengthMinutes ?? 5;
 
 export function sortInstruments(instruments: Instrument[]): Instrument[] {
   return [...instruments].sort((a, b) => INSTRUMENT_ORDER.indexOf(a) - INSTRUMENT_ORDER.indexOf(b));
@@ -111,18 +117,23 @@ export function addMinutes(time: string, minutes: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-export function isEventLongOver(date?: string, startTime?: string): boolean {
-  if (!date) return false;
+/** Milliseconds from now until the event starts (negative once it has started); null without a valid date. */
+function msUntilStart(date?: string, startTime?: string): number | null {
+  if (!date) return null;
   const start = new Date(`${date}T${startTime ?? '00:00'}`);
-  if (isNaN(start.getTime())) return false;
-  return Date.now() - start.getTime() > 24 * 60 * 60 * 1000;
+  return isNaN(start.getTime()) ? null : start.getTime() - Date.now();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function isEventLongOver(date?: string, startTime?: string): boolean {
+  const ms = msUntilStart(date, startTime);
+  return ms !== null && -ms > DAY_MS;
 }
 
 export function isEventFarFuture(date?: string, startTime?: string): boolean {
-  if (!date) return false;
-  const start = new Date(`${date}T${startTime ?? '00:00'}`);
-  if (isNaN(start.getTime())) return false;
-  return start.getTime() - Date.now() > 24 * 60 * 60 * 1000;
+  const ms = msUntilStart(date, startTime);
+  return ms !== null && ms > DAY_MS;
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────

@@ -69,20 +69,6 @@ export async function deleteSong(id: string): Promise<void> {
   await req(`/songs/${id}`, { method: 'DELETE' });
 }
 
-export async function updateSongProgress(songId: string, musicianName: string, stage: LearningStage): Promise<Song> {
-  return req(`/songs/${songId}/progress`, { method: 'PATCH', body: JSON.stringify({ musicianName, stage }) });
-}
-
-export async function updateEntryProgress(
-  setlistId: string, order: number, musicianName: string,
-  stage: LearningStage, songId: string, isPermanent: boolean
-): Promise<Setlist> {
-  return req(`/setlists/${setlistId}/entry-progress`, {
-    method: 'PATCH',
-    body: JSON.stringify({ order, musicianName, stage, songId, isPermanent }),
-  });
-}
-
 // ─── Setlists ─────────────────────────────────────────────────────────────────
 
 export async function getSetlists(): Promise<Setlist[]> {
@@ -256,10 +242,6 @@ export async function updatePersonalSongComment(songId: string, comment: string)
 
 export async function updatePersonalEntryComment(setlistId: string, songId: string, comment: string): Promise<void> {
   await req(`/setlists/${setlistId}/personal-comment`, { method: 'PATCH', body: JSON.stringify({ songId, comment }) });
-}
-
-export async function updateSetlistComment(setlistId: string, comment: string): Promise<Setlist> {
-  return req(`/setlists/${setlistId}/comment`, { method: 'PATCH', body: JSON.stringify({ comment }) });
 }
 
 // Rehearsals — approved admins and writers only, including reads.

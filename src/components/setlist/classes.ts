@@ -4,11 +4,11 @@
 export const chip =
   'border border-border font-medium text-muted-foreground ' +
   'hover:border-primary hover:bg-transparent hover:text-primary-ink ' +
-  'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground ' +
-  'data-[state=on]:hover:bg-primary data-[state=on]:hover:text-primary-foreground';
+  'on:border-primary on:bg-primary on:text-primary-foreground ' +
+  'on:hover:bg-primary on:hover:text-primary-foreground';
 /** Pressed colour for icon toggles (filled with the secondary colour). */
 export const pressedOn =
-  'data-[state=on]:border-secondary data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
+  'on:border-secondary on:bg-secondary on:text-secondary-foreground on:hover:bg-secondary/90';
 
 /* ── Song table (setlist editor + rehearsal page): shadcn Table + Tailwind ───────────── */
 

@@ -9,11 +9,11 @@
   import * as Tooltip from '$components/ui/tooltip';
   import * as Item from '$components/ui/item';
   import { songTableWrap } from '../classes';
-  import { cn, formatDuration } from '$lib/utils';
+  import { cn, formatDuration, entryMinutes } from '$lib/utils';
   import { createSvelteTable } from '$components/ui/data-table';
   import { getCoreRowModel } from '@tanstack/table-core';
   import SongTableHead from '../SongTableHead.svelte';
-  import { songColumns, songVisibility, hasGuests, type SongTableRow } from '../songColumns';
+  import { songColumns, songVisibility, type SongTableRow } from '../songColumns';
   import LinkifiedText from '$components/shared/LinkifiedText.svelte';
   import Note from '$components/shared/Note.svelte';
   import SongEntryRow from '../SongEntryRow.svelte';
@@ -125,7 +125,7 @@
     let offset = 0;
     for (const entry of data.sortedEntries) {
       map.set(entryKey(entry), addMinutes(data.meta.startTime, offset));
-      offset += entry.breakMinutes ?? (entry.song?.lengthMinutes ?? 5);
+      offset += entryMinutes(entry);
     }
     return map;
   });
@@ -133,15 +133,14 @@
 
   // ── Data Table: shared song columns, rows are view-models (song / subset header / hint / divider / break) ──
   const columnVisibility = sel(s => s.columnVisibility);
-  const maxIcons = $derived(Object.fromEntries(data.allMusicians.map(n => [n, Math.max(1, ...data.entries.map(e => e.song?.musicians[n]?.instruments.length ?? 0))])));
-  const columns = $derived(songColumns(data.allMusicians, { num: numHeader, song: songHeader, guests: $t.editor.guestsColumn, time: $t.editor.timeColumn }, maxIcons));
+  const columns = $derived(songColumns(data.allMusicians, { num: numHeader, song: songHeader, time: $t.editor.timeColumn }));
   const tableRows = $derived(renderItems.map((item): SongTableRow<RenderItem> => ({
     id: renderItemKey(item),
     kind: item.kind === 'entry' ? (item.entry.songId ? 'song' : 'break') : item.kind,
     item,
   })));
   $effect.pre(() => {
-    const next = songVisibility(data.allMusicians, data.columnMusicians, !!data.meta.startTime, $canWrite && ($dragEnabled || $activeSubsetId !== null), hasGuests(data.displayEntries.flatMap(e => e.song ? [e.song] : []), data.allMusicians));
+    const next = songVisibility(data.allMusicians, data.columnMusicians, !!data.meta.startTime, $canWrite && ($dragEnabled || $activeSubsetId !== null));
     if (JSON.stringify(next) !== JSON.stringify(st().columnVisibility)) actions.patch({ columnVisibility: next });
   });
   const table = createSvelteTable<SongTableRow<RenderItem>>({
@@ -163,7 +162,7 @@
     return () => { mobile.removeEventListener('change', update); mid.removeEventListener('change', update); };
   });
   const shownCols = $derived(table.getVisibleLeafColumns().filter(c =>
-    !(($tier !== 'wide' && c.id === 'time') || ($tier === 'mobile' && (c.id === 'guests' || c.id.startsWith('m:'))))).map(c => c.id));
+    !(($tier !== 'wide' && c.id === 'time') || ($tier === 'mobile' && (c.id.startsWith('m:'))))).map(c => c.id));
   const totalCols = $derived(shownCols.length);
   const dragCol = $derived(shownCols.includes('drag')), timeCol = $derived(shownCols.includes('time'));
 
@@ -310,9 +309,9 @@
         top: '-10000px',
         padding: '10px 14px',
         borderRadius: '8px',
-        background: 'var(--t-accent-bg)',
-        color: 'var(--t-accent-ink)',
-        border: '2px solid var(--t-accent-ink)',
+        background: 'var(--palette-primary-solid)',
+        color: 'var(--palette-primary-ink)',
+        border: '2px solid var(--palette-primary-ink)',
         font: '600 14px system-ui, sans-serif',
         whiteSpace: 'nowrap',
       });
@@ -447,8 +446,8 @@
 </script>
 
 {#snippet numHeader()}
-  <span class="flex items-center justify-start gap-1.5">#
-    <VibeBadge vibe={data.meta.vibe} class="h-4 px-1.5 py-0 text-[0.65rem]" />
+  <span class="flex items-center justify-start gap-1">#
+    <VibeBadge vibe={data.meta.vibe} class="h-4 px-1 py-0 text-micro" />
   </span>
 {/snippet}
 
@@ -494,7 +493,7 @@
               {@const active = $activeSubsetId === item.subset.id}
               {@const canDragHeader = $canWrite && !data.isFiltered && $dragEnabled && !active}
               <Table.Row
-                class="group/sh border-0 select-none hover:bg-transparent [&[draggable=true]]:cursor-grab max-mid:cursor-pointer"
+                class="group/sh border-0 select-none hover:bg-transparent draggable:cursor-grab max-mid:cursor-pointer"
                 draggable={canDragHeader}
                 data-subset-header
                 data-subset-block-id={item.subset.id}
@@ -507,17 +506,17 @@
                 <Table.Cell
                   colspan={totalCols}
                   class={cn(
-                    'w-full border-t border-border p-0',
-                    active ? 'bg-[color-mix(in_srgb,var(--accent)_75%,var(--card))]' : 'bg-(--set-row) min-mid:group-hover/sh:bg-[color-mix(in_srgb,var(--set-row),var(--text)_6%)]',
+                    'w-full border-t-2 border-set-accent p-0',
+                    active ? 'tint-set-header-active-bg' : 'tint-set-header-bg min-mid:group-hover/sh:tint-set-header-hover-bg',
                     $draggedSubsetId === item.subset.id && 'opacity-40',
                     $overSubsetId === item.subset.id && $draggedSubsetId !== item.subset.id && 'bg-muted ring-1 ring-inset ring-border',
                   )}
                 >
-                  <Item.Root class="min-h-10 flex-nowrap gap-2 rounded-none border-0 py-1 pr-2 pl-2.5 text-[0.86rem] max-mid:min-h-8 max-mid:flex-wrap max-mid:gap-x-2 max-mid:gap-y-0">
-                    {#if $canWrite && $dragEnabled}<span class="text-base text-muted-foreground opacity-60 max-mid:hidden">⠿</span>{/if}
+                  <Item.Root class="min-h-10 flex-nowrap gap-2 rounded-none border-0 py-1 pr-2 pl-2.5 text-body max-mid:min-h-8 max-mid:flex-wrap max-mid:gap-x-2 max-mid:gap-y-0">
+                    {#if $canWrite && $dragEnabled}<span class="text-base text-set-accent opacity-55 max-mid:hidden">⠿</span>{/if}
                     {#if $canWrite && active}
                       <Input
-                        class="w-auto min-w-[180px] border-border bg-card font-bold aria-invalid:border-danger-solid max-mid:min-w-0 max-mid:flex-1"
+                        class="w-auto min-w-45 border-border bg-control-bg font-bold aria-invalid:border-danger max-mid:min-w-0 max-mid:flex-1"
                         value={$draftSubsetName}
                         oninput={(e) => actions.patch({ draftSubsetName: e.currentTarget.value })}
                         required
@@ -527,15 +526,14 @@
                         onkeydown={(e) => { if (e.key === 'Enter') actions.finishSubsetEdit(); }}
                       />
                     {:else}
-                      <Item.Title class="text-[0.95rem] font-black text-foreground"><span class="no-tint" aria-hidden="true">⏭</span> {item.subset.name}</Item.Title>
+                      <Item.Title class="text-body-lg font-bold text-set-accent"><span class="no-tint" aria-hidden="true">⏭</span> {item.subset.name}</Item.Title>
                     {/if}
-                    <Badge variant="secondary" class="bg-card/60 px-2 text-[0.8rem] font-normal text-foreground/80 max-mid:mr-auto">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</Badge>
+                    <Badge variant="secondary" class="bg-transparent px-2 text-small font-normal text-muted-foreground max-mid:mr-auto">{$t.editor.subsetSongs(entriesInSubset(item.subset.id))}</Badge>
                     {#if $canWrite && !active}
                       <!-- Full height of the header bar (cancels its padding), square, no outline. -->
                       <Item.Actions class="-my-1 -mr-2 ml-auto self-stretch max-mid:hidden">
-                        <RowActions class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
+                        <RowActions inline="bare" class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
                           { icon: '✏️', label: $t.editor.subsetEdit, onselect: () => actions.openSubsetEdit(item.subset) },
-                          { icon: '🗑', label: $t.editor.subsetDissolve, destructive: true, separatorBefore: true, onselect: () => actions.dissolveSubset(item.subset.id) },
                         ]} />
                       </Item.Actions>
                     {/if}
@@ -545,7 +543,7 @@
             {:else if item.kind === 'hint'}
               <Table.Row class="border-0 hover:bg-transparent">
                 <Table.Cell colspan={totalCols} class="w-full bg-card p-0">
-                  <Item.Root class="rounded-none border-0 px-2.5 py-2 text-[0.8rem] text-muted-foreground max-mid:flex-wrap">
+                  <Item.Root class="rounded-none border-0 px-2.5 py-2 text-small text-muted-foreground max-mid:flex-wrap">
                     <Item.Content class="max-mid:basis-full"><span class="whitespace-normal">{$t.editor.subsetHint}</span></Item.Content>
                     <Item.Actions class="hidden max-mid:flex">
                       <Button variant="outline" onclick={() => actions.moveSubsetBy(item.subset.id, -1)} disabled={subsetPos(item.subset.id) <= 0}>{$t.editor.subsetUp}</Button>
@@ -560,7 +558,7 @@
               </Table.Row>
             {:else if item.kind === 'divider'}
               <Table.Row class="border-0 hover:bg-transparent">
-                <Table.Cell colspan={totalCols} class="border-t px-2.5 py-1 text-[0.72rem] font-bold tracking-[0.05em] text-muted-foreground uppercase">{$t.editor.subsetRest}</Table.Cell>
+                <Table.Cell colspan={totalCols} class="border-t px-2.5 py-1 text-tiny font-bold tracking-wider text-muted-foreground uppercase">{$t.editor.subsetRest}</Table.Cell>
               </Table.Row>
             {:else}
               {@const entry = item.entry}
@@ -623,19 +621,19 @@
                           onsave={(v) => saveEntryComment(entry.order, v)}
                         />
                       {:else if entry.comment}
-                        <span class="block truncate text-[0.94rem] text-muted-foreground italic max-mid:whitespace-normal" title={entry.comment}><LinkifiedText text={entry.comment} /></span>
+                        <span class="block truncate text-body-lg text-muted-foreground italic max-mid:whitespace-normal" title={entry.comment}><LinkifiedText text={entry.comment} /></span>
                       {/if}
                     {/snippet}
                   </SongEntryRow>
                 {/if}
               {:else}
                 {@const breakCell = cn(
-                  'py-2 not-last:border-r-0 border-y border-dashed border-border bg-info first:border-l last:border-r last:pr-[7px] min-mid:group-hover/br:border-primary',
+                  'py-2 not-last:border-r-0 border-y border-dashed border-border tint-break-bg first:border-l last:border-r last:pr-1.75 min-mid:group-hover/br:border-primary',
                   isDragging && 'opacity-35',
                   isOver && 'outline-2 -outline-offset-1 outline-dotted outline-primary',
                 )}
                 <Table.Row
-                  class="break-row group/br cursor-default border-0 select-none hover:bg-transparent [&[draggable=true]]:cursor-grab"
+                  class="break-row group/br cursor-default border-0 select-none hover:bg-transparent draggable:cursor-grab"
                   draggable={canDrag}
                   data-row-key={key}
                   ondragstart={canDrag ? (() => actions.startEntryDrag(key)) : undefined}
@@ -644,8 +642,8 @@
                 >
                   {#if dragCol}<Table.Cell class={cn(breakCell, 'w-6 touch-none py-2 text-center text-base text-muted-foreground select-none')} onpointerdown={$dragEnabled ? (e => startTouchReorder(e, key)) : undefined}>{#if $canWrite && $dragEnabled}<span class="drag-handle block opacity-40 min-mid:group-hover/br:opacity-100">⠿</span>{/if}</Table.Cell>{/if}
                   <Table.Cell class={cn(breakCell, 'w-7 py-2')}></Table.Cell>
-                  {#if timeCol}<Table.Cell class={cn(breakCell, 'w-[42px] py-2 text-right text-[0.72rem] text-muted-foreground')}>{entryTimes.get(entryKey(entry)) ?? ''}</Table.Cell>{/if}
-                  <Table.Cell colspan={totalCols - 1 - (dragCol ? 1 : 0) - (timeCol ? 1 : 0)} class={cn(breakCell, 'py-0 pr-0 text-[0.82rem] whitespace-normal text-muted-foreground last:border-r-0 last:pr-0')}>
+                  {#if timeCol}<Table.Cell class={cn(breakCell, 'w-10.5 py-2 text-right text-tiny text-muted-foreground')}>{entryTimes.get(entryKey(entry)) ?? ''}</Table.Cell>{/if}
+                  <Table.Cell colspan={totalCols - 1 - (dragCol ? 1 : 0) - (timeCol ? 1 : 0)} class={cn(breakCell, 'py-0 pr-0 text-small whitespace-normal text-muted-foreground last:border-r-0 last:pr-0')}>
                     <Item.Root class="flex-nowrap items-stretch gap-1.5 border-0 p-0">
                       <Item.Media class="self-center leading-none">⏸</Item.Media>
                       <!-- Two lines: the break length, then its comment. -->
@@ -661,9 +659,9 @@
                             <Button variant="ghost" aria-label={$t.editor.cancel} onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: null }); }}>✕</Button>
                           </div>
                         {:else if $canWrite}
-                          <Button variant="ghost" class="h-auto w-fit px-0 py-0 text-[0.82rem] font-normal text-muted-foreground italic hover:bg-transparent" onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: entry.order }); }}>{$t.editor.breakLabel(entry.breakMinutes!)}</Button>
+                          <Button variant="ghost" class="h-auto w-fit px-0 py-0 text-small font-normal text-muted-foreground italic hover:bg-transparent" onclick={(e) => { e.stopPropagation(); actions.patch({ editingBreakOrder: entry.order }); }}>{$t.editor.breakLabel(entry.breakMinutes!)}</Button>
                         {:else}
-                          <span class="text-[0.82rem] text-muted-foreground italic">{$t.editor.breakLabel(entry.breakMinutes!)}</span>
+                          <span class="text-small text-muted-foreground italic">{$t.editor.breakLabel(entry.breakMinutes!)}</span>
                         {/if}
                         {#if $canWrite}
                           <CommentInput
@@ -672,13 +670,13 @@
                             class="font-semibold text-foreground not-italic"
                           />
                         {:else}
-                          <span class="block truncate text-[0.94rem] font-semibold text-foreground" title={entry.comment}><LinkifiedText text={entry.comment ?? ''} /></span>
+                          <span class="block truncate text-body-lg font-semibold text-foreground" title={entry.comment}><LinkifiedText text={entry.comment ?? ''} /></span>
                         {/if}
                       </Item.Content>
                       {#if $canWrite}
                         <!-- Full height of the break row, the same size and style as the ⋯ of the song rows. -->
                         <Item.Actions class="self-stretch">
-                          <RowActions class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
+                          <RowActions inline="bare" class="h-auto min-h-10 w-10 self-stretch rounded-none" actions={[
                             { icon: '✏️', label: $t.common.edit, onselect: () => actions.patch({ editingBreakOrder: entry.order }) },
                             { icon: '🗑', label: $t.editor.remove, destructive: true, separatorBefore: true, onselect: () => handleRemoveBreak(entry.order) },
                           ]} />

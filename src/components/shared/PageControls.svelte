@@ -14,16 +14,16 @@
   let { start, end, children, label }: { start?: Snippet; end?: Snippet; children?: Snippet; label?: string } = $props();
 </script>
 
-<div class="sticky top-14 z-10 border-b bg-card shadow-[0_2px_6px_rgba(0,0,0,0.06)] sm:h-14">
-  <NavigationMenu.Root viewport={false} aria-label={label} class="w-full max-w-none justify-start px-3 py-2 sm:h-full sm:py-0 [&>div]:w-full sm:[&>div]:h-full">
-    <NavigationMenu.List class="w-full flex-wrap justify-between gap-x-3 gap-y-1.5 sm:h-full sm:flex-nowrap">
-      <li class="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:overflow-hidden">
+<div class="sticky top-14 z-10 border-b bg-bar-bg shadow-bar mid:h-14">
+  <NavigationMenu.Root viewport={false} aria-label={label} class="w-full max-w-none justify-start px-3 py-2 mid:h-full mid:py-0 [&>div]:w-full mid:[&>div]:h-full">
+    <NavigationMenu.List class="w-full flex-wrap justify-between gap-x-3 gap-y-1.5 mid:h-full mid:flex-nowrap">
+      <li class="flex min-w-0 flex-wrap items-center gap-2 mid:flex-nowrap mid:overflow-hidden">
         <ul class="contents">
           {@render start?.()}
           {@render children?.()}
         </ul>
       </li>
-      <li class="ml-auto flex flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:flex-nowrap">
+      <li class="ml-auto flex flex-wrap items-center justify-end gap-2 mid:shrink-0 mid:flex-nowrap">
         <ul class="contents">
           {@render end?.()}
         </ul>

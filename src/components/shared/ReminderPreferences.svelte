@@ -11,7 +11,6 @@
   const prefs = createQuery(() => ({
     ...notificationPreferencesQuery(),
     enabled: $currentUser?.status === 'approved' && !!$currentUser.telegramId,
-    staleTime: 0,
   }));
   const update = useUpdateNotificationPreferences();
   const enabled = $derived(prefs.data?.enabled ?? true);
@@ -27,7 +26,7 @@
       <!-- Controlled: the visible state always follows the server value (reverts on failure). -->
       <Switch id="{id}-reminders" bind:checked={() => enabled, v => update.mutate(v)} disabled={loading || update.isPending} />
 <!-- «Напоминать / мне в [Telegram]» on two lines at every size (the full text stays as the tooltip). -->
-      <Label for="{id}-reminders" title={$rt.personalReminders} class="cursor-pointer text-[0.82rem] leading-[1.15] font-normal whitespace-nowrap {loading || update.isPending ? 'opacity-50' : ''}"><span class="flex flex-col">{$rt.remindShort}<span class="inline-flex items-center gap-1">{$rt.remindShortMe} <TelegramIcon class="size-3.5 shrink-0" /></span></span></Label>
+      <Label for="{id}-reminders" title={$rt.personalReminders} class="cursor-pointer text-small leading-compact font-normal whitespace-nowrap {loading || update.isPending ? 'opacity-50' : ''}"><span class="flex flex-col">{$rt.remindShort}<span class="inline-flex items-center gap-1">{$rt.remindShortMe} <TelegramIcon class="size-3.5 shrink-0" /></span></span></Label>
     </div>
     {#if error}<p class="mt-2 text-destructive" role="alert">{error}</p>{/if}
   </div>

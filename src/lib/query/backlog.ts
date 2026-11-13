@@ -21,7 +21,6 @@ export const backlogSongsQuery = (intervalMs: number) => queryOptions({
     if (cached && backlogPoll.isPaused() && !document.hidden) return cached;
     return api.getSongs();
   },
-  staleTime: 0,
   refetchInterval: pollUnlessDenied(intervalMs),
   refetchIntervalInBackground: false,
 });
@@ -63,6 +62,12 @@ export function useDeleteBacklogSong() {
 }
 
 /** Writes a song edited elsewhere (lyrics overlay) into the cached list. */
+/** Loads the song from the backend and writes it into the cached list, so the edit dialog never opens on a stale copy (readiness is changed from other pages too). Falls back to the cached copy on failure. */
+export async function refreshBacklogSong(id: string): Promise<void> {
+  const fresh = await api.getSong(id);
+  if (fresh) patchBacklogSong(fresh);
+}
+
 export function patchBacklogSong(updated: Song): void {
   queryClient.setQueryData<Song[]>(keys.songs, old => (old ?? []).map(s => s.id === updated.id ? updated : s));
 }

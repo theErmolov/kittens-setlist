@@ -18,6 +18,7 @@
  * the editor root component, so the actions stay free of API/query-client access.
  */
 import { createStore } from 'zustand/vanilla';
+import { playsInSong } from '$lib/musicianStats';
 import type { Setlist, SetlistEntry, SetlistSubset, Song, LearningStage } from '$lib/types';
 import { sortSubset } from '$lib/subsetSort';
 import { progressPct, STAGE_PCT } from '$lib/utils';
@@ -57,7 +58,6 @@ interface EditorData {
 interface EditorUi {
   showAddModal: boolean;
   showSetlistOnlyModal: boolean;
-  showBreakPicker: boolean;
   editingBreakOrder: number | null;
   /** songId of the entry being edited / whose lyrics are open (the entry comes from the setlist query). */
   editingEntryId: string | null;
@@ -151,11 +151,7 @@ export function filterEntries(sorted: SetlistEntry[], f: EntryFilter): SetlistEn
   if (f.selectedMusician) {
     const m = f.selectedMusician;
     entries = entries
-      .filter(e => {
-        if (!e.song) return false; // hide breaks when musician filter active
-        const role = e.song.musicians[m];
-        return role && role.instruments.length > 0;
-      })
+      .filter(e => playsInSong(e.song, m)) // also hides breaks while the musician filter is active
       .sort((a, b) => STAGE_PCT[entryStage(a, m)] - STAGE_PCT[entryStage(b, m)]);
   }
   if (f.filterNotReady) {
@@ -224,7 +220,7 @@ export const metaOf = (s: Setlist): SetlistMeta => ({ name: s.name, date: s.date
 const emptyMeta = (): SetlistMeta => ({ name: '', date: '', startTime: '', vibe: false, comment: '' });
 
 const initialUi = (): EditorUi => ({
-  showAddModal: false, showSetlistOnlyModal: false, showBreakPicker: false,
+  showAddModal: false, showSetlistOnlyModal: false,
   editingBreakOrder: null, editingEntryId: null, lyricsViewEntryId: null,
   selectedMusician: null, filterNotReady: false, filterText: '', filterOpen: false,
   activeSubsetId: null, draftSubsetName: '',

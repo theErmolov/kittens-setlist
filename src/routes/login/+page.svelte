@@ -93,12 +93,12 @@
 </script>
 
 <div class="login-page flex min-h-screen items-center justify-center bg-background">
-  <Card class="card w-full max-w-[360px] items-center gap-4 rounded-2xl px-10 py-12">
+  <Card class="card w-full max-w-90 items-center gap-4 rounded-2xl px-10 py-12">
     <LogoCat size={72} />
     <h1 class="text-center text-[1.4rem] font-extrabold text-primary-ink">{$t.login.title}</h1>
 
     {#if showWidget}
-      <p class="subtitle text-center text-[0.95rem] text-muted-foreground">{$t.login.subtitle}</p>
+      <p class="subtitle text-center text-body-lg text-muted-foreground">{$t.login.subtitle}</p>
       <div id="tg-widget" class="widget-wrap flex min-h-12 justify-center"></div>
       {#if $status === 'loading'}
         <LoadingCat />
@@ -106,7 +106,7 @@
     {:else if $status === 'pending'}
       <Alert class="status-msg text-center">
         <AlertDescription class="text-base text-foreground">{$t.login.pending}</AlertDescription>
-        <AlertDescription class="hint text-[0.85rem]">{$t.login.pendingHint}</AlertDescription>
+        <AlertDescription class="hint text-body">{$t.login.pendingHint}</AlertDescription>
       </Alert>
     {:else if $status === 'rejected'}
       <Alert variant="destructive" class="status-msg rejected text-center"><AlertDescription class="text-base">{$t.login.rejected}</AlertDescription></Alert>

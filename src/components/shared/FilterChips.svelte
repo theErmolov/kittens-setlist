@@ -2,18 +2,22 @@
   import type { Category } from '$lib/types';
   import { t } from '$lib/i18n';
   import { Toggle } from '$components/ui/toggle';
+  import { cn } from '$lib/utils';
 
   let {
     selected,
     onchange,
     counts,
-    chipClass: extra = ''
+    chipClass: extra = '',
+    iconOnlyOnMid = false
   }: {
     selected: Set<Category>;
     onchange: (v: Set<Category>) => void;
     counts?: Record<Category, number>;
     /** Extra classes for every chip (e.g. a denser size). */
     chipClass?: string;
+    /** Hide the category names on mid-size screens too (below that they are always hidden), leaving icon and count. */
+    iconOnlyOnMid?: boolean;
   } = $props();
 
   function toggle(cat: Category) {
@@ -32,11 +36,12 @@
     return i === -1 ? { icon: text, label: '' } : { icon: text.slice(0, i), label: text.slice(i) };
   }
 
-  const chipClass = 'chip px-3.5 text-[0.82rem] font-medium text-muted-foreground hover:border-primary hover:bg-transparent hover:text-primary-ink max-md:px-2.5 ';
+  const chipClass = 'px-3.5 text-small font-medium text-muted-foreground hover:border-primary hover:bg-transparent hover:text-primary-ink max-mid:px-2.5 ';
+  /** The selected chip of each category: solid category colour, white text (hover keeps it). */
   const activeColors: Record<Category, string> = {
-    top: 'data-[state=on]:border-warning-ink data-[state=on]:bg-warning data-[state=on]:text-warning-ink data-[state=on]:hover:bg-warning/80 data-[state=on]:hover:text-warning-ink',
-    mid: 'data-[state=on]:border-info-ink data-[state=on]:bg-info data-[state=on]:text-info-ink data-[state=on]:hover:bg-info/80 data-[state=on]:hover:text-info-ink',
-    low: 'data-[state=on]:border-success-ink data-[state=on]:bg-success data-[state=on]:text-success-ink data-[state=on]:hover:bg-success/80 data-[state=on]:hover:text-success-ink',
+    top: 'on:border-transparent on:bg-category-top-active-bg on:text-category-top-active-ink on:hover:border-transparent on:hover:bg-category-top-active-bg on:hover:text-category-top-active-ink',
+    mid: 'on:border-transparent on:bg-category-mid-active-bg on:text-category-mid-active-ink on:hover:border-transparent on:hover:bg-category-mid-active-bg on:hover:text-category-mid-active-ink',
+    low: 'on:border-transparent on:bg-category-low-active-bg on:text-category-low-active-ink on:hover:border-transparent on:hover:bg-category-low-active-bg on:hover:text-category-low-active-ink',
   };
 </script>
 
@@ -44,7 +49,7 @@
   <Toggle
     type="button"
     variant="outline"
-    class="{chipClass} {extra} chip-all data-[state=on]:border-primary-ink data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:text-primary-foreground data-[state=on]:hover:bg-primary/90"
+    class="{chipClass} {extra} on:border-transparent on:bg-primary on:text-primary-foreground on:hover:text-primary-foreground on:hover:bg-primary/90"
     pressed={selected.size === 0}
     onPressedChange={selectAll}
   >
@@ -56,11 +61,11 @@
     <Toggle
       type="button"
       variant="outline"
-      class="{chipClass} {extra} chip-{cat} {activeColors[cat]}"
+      class="{chipClass} {extra} {activeColors[cat]}"
       pressed={selected.has(cat)}
       onPressedChange={() => toggle(cat)}
     >
-      {icon}<span class="cat-label max-md:hidden">{label}</span>{countStr}
+      {icon}<span class={cn('max-mid:hidden', iconOnlyOnMid && 'mid:max-big:hidden')}>{label}</span>{countStr}
     </Toggle>
   {/each}
 </div>

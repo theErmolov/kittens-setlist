@@ -9,7 +9,8 @@ import { musiciansQuery, songsQuery } from '$lib/query/queries';
 import { editorSetlistQuery } from '$lib/query/setlistEditor';
 import { useStore } from '$lib/store/bridge';
 import { setlistEditorStore, sortEntries, filterEntries, isFilterActive, effectiveLayout, metaOf, type EditorState, type SetlistMeta } from '$lib/store/setlistEditor';
-import { songReadiness } from '$lib/utils';
+import { songReadiness, entryMinutes } from '$lib/utils';
+import { countByMusician, guestMusicianNames } from '$lib/musicianStats';
 import type { SetlistEntry } from '$lib/types';
 
 export function useEditorData() {
@@ -38,35 +39,16 @@ export function useEditorData() {
   const columnMusicians = $derived(allMusicians.filter(name =>
     entries.some(entry => (entry.song?.musicians[name]?.instruments?.length ?? 0) > 0)
   ));
-  const guestNames = $derived.by(() => {
-    const seen = new Set<string>();
-    for (const entry of sortedEntries) {
-      if (!entry.song) continue;
-      for (const [name, role] of Object.entries(entry.song.musicians)) {
-        if (!permanentNames.has(name) && role.instruments.length > 0) seen.add(name);
-      }
-    }
-    return [...seen].sort();
-  });
+  const guestNames = $derived(guestMusicianNames(sortedEntries.map(e => e.song), permanentNames));
   const filter = $derived({ selectedMusician: selectedMusicianS.current, filterNotReady: filterNotReadyS.current, filterText: filterTextS.current });
   const isFiltered = $derived(isFilterActive(filter));
   const displayEntries = $derived(filterEntries(sortedEntries, filter));
   const songCount = $derived(sortedEntries.filter(e => e.songId).length);
-  const totalMinutes = $derived(sortedEntries.reduce((s, e) => s + (e.breakMinutes ?? (e.song?.lengthMinutes ?? 5)), 0));
+  const totalMinutes = $derived(sortedEntries.reduce((s, e) => s + entryMinutes(e), 0));
   const readyCount = $derived(
     sortedEntries.filter(e => e.song && songReadiness(e.song.musicians, e.progress ?? {}, new Set()) === 'ready').length
   );
-  const musicianCounts = $derived.by(() => {
-    const counts: Record<string, number> = {};
-    for (const name of [...allMusicians, ...guestNames]) {
-      counts[name] = sortedEntries.filter(e => {
-        if (!e.song) return false;
-        const role = e.song.musicians[name];
-        return role && role.instruments.length > 0;
-      }).length;
-    }
-    return counts;
-  });
+  const musicianCounts = $derived(countByMusician(sortedEntries.map(e => e.song), [...allMusicians, ...guestNames]));
   const existingIds = $derived(new Set(entries.map(e => e.songId).filter((id): id is string => !!id)));
 
   return {

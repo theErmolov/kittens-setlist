@@ -29,6 +29,8 @@ interface BacklogState {
   setCompact: (v: boolean) => void;
   /** Song ids (the song itself comes from the catalog query). */
   editingSongId: string | null;
+  /** The song whose fresh server copy has been loaded into the cache; the edit dialog opens only then. */
+  editFreshId: string | null;
   addToSetlistSongId: string | null;
   lyricsViewSongId: string | null;
   /** Requests handled by SongTable (which owns the mutations). */
@@ -38,11 +40,8 @@ interface BacklogState {
   setSearch: (v: string) => void;
   setCategoryFilter: (v: Set<Category>) => void;
   toggleMusician: (name: string) => void;
-  setSelectedMusicians: (v: string[]) => void;
-  setSelectedInstruments: (v: Instrument[]) => void;
   setFilterOpen: (v: boolean) => void;
   toggleBarOpen: () => void;
-  toggleCategory: (c: Category) => void;
   resetFilters: () => void;
   toggleInstrument: (inst: Instrument) => void;
   toggleShowProgress: () => void;
@@ -53,6 +52,7 @@ interface BacklogState {
   setSorting: (v: SortingState) => void;
   setShowAddModal: (v: boolean) => void;
   setEditingSong: (id: string | null) => void;
+  setEditFresh: (id: string | null) => void;
   setAddToSetlistSong: (id: string | null) => void;
   setLyricsViewSong: (id: string | null) => void;
   requestAdd: (id: string | null) => void;
@@ -76,6 +76,7 @@ export const backlogStore = createStore<BacklogState>((set, get) => ({
   compact: false,
   setCompact: compact => set({ compact }),
   editingSongId: null,
+  editFreshId: null,
   addToSetlistSongId: null,
   lyricsViewSongId: null,
   addRequest: null,
@@ -83,10 +84,7 @@ export const backlogStore = createStore<BacklogState>((set, get) => ({
 
   setSearch: search => set({ search }),
   setCategoryFilter: categoryFilter => set({ categoryFilter }),
-  setSelectedMusicians: v => set({ selectedMusicians: new Set(v) }),
-  setSelectedInstruments: v => set({ selectedInstruments: new Set(v) }),
   setFilterOpen: filterOpen => set({ filterOpen }),
-  toggleCategory: c => set(s => ({ categoryFilter: toggled(s.categoryFilter, c) })),
   resetFilters: () => set({ search: '', showArchived: false, categoryFilter: new Set(), selectedMusicians: new Set(), selectedInstruments: new Set() }),
   toggleMusician: name => set(s => ({ selectedMusicians: toggled(s.selectedMusicians, name) })),
   toggleInstrument: inst => set(s => ({ selectedInstruments: toggled(s.selectedInstruments, inst) })),
@@ -98,7 +96,8 @@ export const backlogStore = createStore<BacklogState>((set, get) => ({
   toggleSort: id => set(s => ({ sorting: [{ id, desc: s.sorting[0]?.id === id ? !s.sorting[0].desc : false }] })),
   setSorting: sorting => set({ sorting }),
   setShowAddModal: showAddModal => set({ showAddModal }),
-  setEditingSong: editingSongId => set({ editingSongId }),
+  setEditingSong: editingSongId => set({ editingSongId, editFreshId: null }),
+  setEditFresh: editFreshId => set({ editFreshId }),
   setAddToSetlistSong: addToSetlistSongId => set({ addToSetlistSongId }),
   setLyricsViewSong: lyricsViewSongId => set({ lyricsViewSongId }),
   requestAdd: addRequest => set({ addRequest }),
@@ -139,7 +138,6 @@ interface SongEditState {
   setGuestInstruments: (id: number, instruments: Instrument[]) => void;
   setProgress: (name: string, stage: LearningStage) => void;
   setGuestName: (id: number, value: string) => void;
-  toggleGuestInstrument: (id: number, inst: Instrument) => void;
   setGuestProgress: (id: number, stage: LearningStage) => void;
   removeGuest: (id: number) => void;
   setSaving: (v: boolean) => void;
@@ -220,11 +218,6 @@ export const songEditStore = createStore<SongEditState>((set) => ({
     if (isLast && value.trim()) rows = [...rows, mkGuest()];
     return { guestRows: rows };
   }),
-  toggleGuestInstrument: (id, inst) => set(s => ({
-    guestRows: s.guestRows.map(r => r.id !== id ? r : {
-      ...r, instruments: r.instruments.includes(inst) ? r.instruments.filter(i => i !== inst) : [...r.instruments, inst],
-    }),
-  })),
   setGuestProgress: (id, progress) => set(s => ({ guestRows: s.guestRows.map(r => r.id === id ? { ...r, progress } : r) })),
   removeGuest: id => set(s => {
     let rows = s.guestRows.filter(r => r.id !== id);

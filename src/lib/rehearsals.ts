@@ -1,3 +1,4 @@
+import { isoDate } from './utils.ts';
 import type { Rehearsal, RehearsalSong, Setlist, Song, LearningStage } from './types';
 
 export const rehearsalSongKey = (song: Pick<RehearsalSong, 'songId' | 'sourceSetlistId'>): string =>
@@ -16,7 +17,7 @@ export function rehearsalReadiness(song: Song, attendees?: string[]): number | n
 }
 
 export function localDate(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return isoDate(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 export function isUpcoming(rehearsal: Rehearsal, now = new Date()): boolean {

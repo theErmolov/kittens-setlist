@@ -51,8 +51,8 @@
   const setlistLabel = (s: { name: string; date?: string }) => `${s.name}${s.date ? ` · ${formatDate(s.date, $lang)}` : ''}`;
   const setlistTriggerText = $derived(!$setlistId ? $rt.noSetlist : currentSetlist ? setlistLabel(currentSetlist) : $rt.unavailableSetlist);
   // Same look as the song edit modal: muted uppercase labels, 1rem app-font controls on the page background.
-  const labelClass = 'text-[.82rem] font-semibold uppercase tracking-[.04em] text-muted-foreground leading-normal';
-  const field = 'rounded-md bg-background px-[9px] text-base md:text-base dark:bg-background font-normal normal-case tracking-normal';
+  const labelClass = 'text-small font-semibold uppercase tracking-[.04em] text-muted-foreground leading-normal';
+  const field = 'rounded-md bg-background px-2.25 text-base mid:text-base font-normal normal-case tracking-normal';
   async function save(event: SubmitEvent) {
     event.preventDefault();
     const s = form.getState();
@@ -72,9 +72,9 @@
   <Dialog.Content
     aria-describedby={undefined}
     onOpenAutoFocus={event => event.preventDefault()}
-    class="rehearsal-dialog flex h-[min(820px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden rounded-2xl bg-card p-[22px] sm:max-w-[min(1100px,calc(100%-2rem))] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-dvw max-mid:max-w-none! max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:p-4"
+    class="rehearsal-dialog flex h-[min(820px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden rounded-2xl bg-card p-5.5 mid:max-w-[min(1100px,calc(100%-2rem))] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-dvw max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:p-4"
   >
-    <Dialog.Title class="mb-5 shrink-0 text-[1.2rem] font-bold leading-normal">{title ?? $rt.new}</Dialog.Title>
+    <Dialog.Title class="mb-5 shrink-0 text-title font-bold leading-normal">{title ?? $rt.new}</Dialog.Title>
     <form onsubmit={save} class="flex min-h-0 flex-1 flex-col">
         {#snippet details()}
           <Field.Group class="min-w-0 gap-3.5">
@@ -121,14 +121,14 @@
             </Field.Field>
             <Field.Field class="gap-1.5">
               <Field.Label for="rehearsal-note" class={labelClass}>{$rt.note}</Field.Label>
-              <Textarea id="rehearsal-note" value={$note} oninput={event => patch({ note: event.currentTarget.value })} rows={6} maxlength={4000} class="{field} field-sizing-fixed min-h-36 resize-none py-[9px]" />
+              <Textarea id="rehearsal-note" value={$note} oninput={event => patch({ note: event.currentTarget.value })} rows={6} maxlength={4000} class="{field} field-sizing-fixed min-h-36 resize-none py-2.25" />
             </Field.Field>
           </Field.Group>
         {/snippet}
       <Field.Set class="m-0 min-h-0 min-w-0 flex-1 gap-0 overflow-hidden border-0 p-0 [@media(max-height:550px)]:overflow-y-auto max-mid:overflow-y-auto max-mid:overscroll-contain" disabled={$busy}>
         <RehearsalSelection {details} />
       </Field.Set>
-      <Dialog.Footer class="m-0 mt-3 shrink-0 flex-col gap-2 rounded-none border-t bg-transparent p-0 pt-3 sm:flex-col">
+      <Dialog.Footer class="m-0 mt-3 shrink-0 flex-col gap-2 rounded-none border-t bg-transparent p-0 pt-3 mid:flex-col">
         {#if $error}<Alert variant="destructive" class="py-1.5"><AlertDescription>{$error}</AlertDescription></Alert>{/if}
         <div class="flex justify-end gap-2">
           <Button type="button" variant="outline" onclick={onclose} disabled={$busy}>{$rt.cancel}</Button>

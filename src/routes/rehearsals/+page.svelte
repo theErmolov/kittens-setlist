@@ -13,15 +13,14 @@
   import { isUpcoming, localDate } from '$lib/rehearsals';
   import { cn } from '$lib/utils';
   import { formatDate } from '$lib/utils';
-  import { parseDate, type DateValue } from '@internationalized/date';
   import { rehearsalsQuery, setlistsQuery, musiciansQuery, songsQuery } from '$lib/query/queries';
+  import { prefetchRehearsals } from '$lib/query/prefetch';
   import { useCreateRehearsal } from '$lib/query/rehearsals';
   import { useStore } from '$lib/store/bridge';
   import { rehearsalListStore as list } from '$lib/store/rehearsals';
   import { Button } from '$components/ui/button';
-  import { Card } from '$components/ui/card';
   import { Alert, AlertDescription } from '$components/ui/alert';
-  import { Calendar, Day as CalendarDay } from '$components/ui/calendar';
+  import EventCalendar from '$components/shared/EventCalendar.svelte';
   import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from '$components/ui/empty';
   import { isPastRehearsal, rehearsalTime, timeChip } from '$components/rehearsals/classes';
   import IconButton from '$components/shared/IconButton.svelte';
@@ -54,12 +53,9 @@
   const monthLabel = $derived(new Intl.DateTimeFormat($lang === 'ru' ? 'ru-RU' : 'en-GB', { month: 'long', year: 'numeric' }).format($month));
   // Calendar <-> store bridge: the selected day and the visible month live in the Zustand list store.
   const countByDate = $derived(rehearsals.toSorted((a, b) => a.startTime.localeCompare(b.startTime)).reduce((acc, r) => { (acc[r.date] ??= []).push(r); return acc; }, {} as Record<string, typeof rehearsals>));
-  const today = localDate();
-  const calendarValue = $derived($selectedDate ? parseDate($selectedDate) : undefined);
   // Keep the calendar on the month shown by the store, even when the selected day lives in another month.
   const monthIso = $derived(localDate($month));
-  const placeholderValue = $derived(parseDate($selectedDate && $selectedDate.slice(0, 7) === monthIso.slice(0, 7) ? $selectedDate : monthIso));
-  const toIso = (d: DateValue) => `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+  const placeholderIso = $derived($selectedDate && $selectedDate.slice(0, 7) === monthIso.slice(0, 7) ? $selectedDate : monthIso);
   let handledNew = false;
   $effect(() => {
     if ($authLoading) return;
@@ -69,6 +65,12 @@
     if (loading || error || handledNew || !enabled) return;
     handledNew = true;
     if (page.url.searchParams.get('new') === '1') openNew({ date: $selectedDate ?? undefined, setlistId: page.url.searchParams.get('setlist') ?? undefined });
+  });
+  // Once the page is shown, warm the upcoming rehearsals, and the most recent past ones.
+  $effect(() => {
+    if (loading || error) return;
+    const past = rehearsals.filter(r => !isUpcoming(r)).sort((a, b) => `${b.date} ${b.startTime}`.localeCompare(`${a.date} ${a.startTime}`));
+    prefetchRehearsals(upcoming.map(r => r.id), past.map(r => r.id));
   });
   function load() { queries.filter(q => q.isError).forEach(q => q.refetch()); }
   function plan() { openNew({ date: $selectedDate ?? undefined }); }
@@ -85,72 +87,59 @@
   {/snippet}
   {#snippet end()}
     <PageControlsDivider />
-    <NavigationMenu.Item class="min-w-0"><ReminderPreferences /></NavigationMenu.Item><NavigationMenu.Item><IconButton icon="➕" variant="default" label={$rt.new} onclick={plan} disabled={loading || !!error} /></NavigationMenu.Item>{/snippet}
+    <NavigationMenu.Item class="min-w-0"><ReminderPreferences /></NavigationMenu.Item><NavigationMenu.Item><IconButton text={$rt.new.replace(/^\+\s*/, '')} icon="➕" variant="default" label={$rt.new}  onclick={plan} disabled={loading || !!error} /></NavigationMenu.Item>{/snippet}
 </PageControls>
 </div>
-<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] grid-cols-[1fr_auto_1fr] items-center gap-2 border-t bg-card px-3 max-mid:grid">
+<div class="fixed inset-x-0 bottom-0 z-40 hidden safe-bar grid-cols-[1fr_auto_1fr] items-center gap-2 border-t bg-card px-3 max-mid:grid">
   <span></span>
   <IconButton variant="default" icon="➕" label={$rt.new} onclick={plan} disabled={loading || !!error} />
   <div class="flex justify-start"><ReminderPreferences /></div>
 </div>
 {/if}
-<div class="w-full px-3 pt-3 pb-4 max-mid:px-2.5 max-mid:pb-[52px]">
+<div class="w-full px-3 pt-3 pb-4 max-mid:px-2.5 max-mid:pb-[calc(52px+env(safe-area-inset-bottom))]">
   {#if loading}<LoadingCat />
   {:else if error}
     <Alert variant="destructive" class="flex items-center justify-between gap-3"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={load}>{$rt.retry}</Button></Alert>
   {:else}
     <div class="grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] items-start gap-6 max-mid:grid-cols-1 max-mid:gap-4">
-      <Card class="min-w-0 gap-3 p-4 max-[600px]:p-2" aria-label={monthLabel} role="region">
-        <div class="relative [--cell-size:--spacing(12)] max-[600px]:[--cell-size:--spacing(11)]">
-          <ButtonRow class="absolute top-[calc((var(--cell-size)-40px)/2)] right-[calc(var(--cell-size)+8px)] z-10">
+      <EventCalendar
+        items={countByDate}
+        selected={$selectedDate}
+        onselect={iso => { if (iso) { const [y, m, d] = iso.split('-').map(Number); selectDay(new Date(y, m - 1, d)); } else clearDay(); }}
+        placeholder={placeholderIso}
+        onplaceholderchange={iso => { const [y, m] = iso.split('-').map(Number); setMonth(new Date(y, m - 1, 1)); }}
+        lang={$lang}
+        label={monthLabel}
+        prevLabel={$rt.previous}
+        nextLabel={$rt.next}
+        dayLabel={(iso, sessions) => `${formatDate(iso, $lang)} · ${sessions.length}`}
+      >
+        {#snippet toolbar()}
+          <ButtonRow>
             <IconButton icon="↩️" label={$rt.clearDay} onclick={clearDay} class={$selectedDate ? '' : 'invisible'} disabled={!$selectedDate} />
             <IconButton icon="📆" label={$rt.today} onclick={goToday} />
           </ButtonRow>
-        <Calendar
-          type="single"
-          bind:value={() => calendarValue, v => { if (v) selectDay(new Date(v.year, v.month - 1, v.day)); else clearDay(); }}
-          bind:placeholder={() => placeholderValue, v => { if (v) setMonth(new Date(v.year, v.month - 1, 1)); }}
-          fixedWeeks
-          prevLabel={$rt.previous}
-          nextLabel={$rt.next}
-          weekStartsOn={1}
-          locale={$lang === 'ru' ? 'ru-RU' : 'en-GB'}
-          class="w-full bg-transparent p-0 [--cell-size:--spacing(12)] max-[600px]:[--cell-size:--spacing(11)] [&_[data-calendar-header]]:justify-start [&_[data-calendar-header]]:pl-[calc(var(--cell-size)+8px)] [&_[data-calendar-header]]:capitalize [&_[role=gridcell]]:flex [&_[role=gridcell]]:h-auto [&_[role=gridcell]]:w-auto [&_[role=gridcell]]:flex-1 [&_th]:w-auto [&_th]:flex-1"
-        >
-          {#snippet day({ day: date })}
-            {@const iso = toIso(date)}
-            {@const sessions = countByDate[iso] ?? []}
-            {@const past = iso < today}
-            {@const isToday = iso === today}
-            <CalendarDay
-              class={cn('group/day mx-auto h-auto min-h-(--cell-size) w-[calc(100%-4px)] justify-start gap-1 py-1.5 data-outside-month:opacity-45',
-                past ? 'bg-neutral/70 text-neutral-ink' : 'bg-card text-foreground ring-1 ring-border ring-inset',
-                isToday && 'bg-primary/40 font-bold text-primary-ink ring-2 ring-primary-ink')}
-              aria-label={`${formatDate(iso, $lang)} · ${sessions.length}`}
-            >
-              <span class="leading-none">{date.day}</span>
-              {#if sessions.length}
-                <span class="flex w-full flex-col items-center gap-0.5">
-                  {#each sessions.slice(0, 3) as session (session.id)}
-                    <span class={cn('inline-flex w-full max-w-[52px] items-center justify-center rounded border px-0.5 text-[.62rem] leading-[1.35] tabular-nums', timeChip(isPastRehearsal(session), session.cancelled), 'group-data-[selected]/day:border-primary-foreground/60 group-data-[selected]/day:text-primary-foreground')}>{session.startTime.slice(0, 5)}</span>
-                  {/each}
-                  {#if sessions.length > 3}<span class="text-[.62rem] leading-none text-muted-foreground group-data-[selected]/day:text-primary-foreground">+{sessions.length - 3}</span>{/if}
-                </span>
-              {/if}
-            </CalendarDay>
-          {/snippet}
-        </Calendar>
-        </div>
-      </Card>
+        {/snippet}
+        {#snippet dayContent({ items: sessions })}
+          {#if sessions.length}
+            <span class="flex w-full flex-col items-center gap-0.5">
+              {#each sessions.slice(0, 3) as session (session.id)}
+                <span class={cn('inline-flex w-full max-w-13 items-center justify-center rounded border px-0.5 text-micro leading-[1.35] tabular-nums', timeChip(isPastRehearsal(session), session.cancelled), 'group-data-selected/day:border-primary-foreground/60 group-data-selected/day:text-primary-foreground')}>{session.startTime.slice(0, 5)}</span>
+              {/each}
+              {#if sessions.length > 3}<span class="text-micro leading-none text-muted-foreground group-data-selected/day:text-primary-foreground">+{sessions.length - 3}</span>{/if}
+            </span>
+          {/if}
+        {/snippet}
+      </EventCalendar>
       <section class="min-w-0" aria-live="polite">
         {#if $selectedDate}
           <h2 class="mb-3 text-base font-bold">{formatDate($selectedDate, $lang)}</h2>
           {#if daySessions.length}<RehearsalList rehearsals={daySessions} />
-          {:else}<Empty class="border"><EmptyHeader><EmptyTitle class="text-[.9rem] font-normal text-muted-foreground">{$rt.noSessions}</EmptyTitle></EmptyHeader><EmptyContent><Button variant="outline" size="sm" onclick={plan}>{$rt.new}</Button></EmptyContent></Empty>{/if}
+          {:else}<Empty class="border"><EmptyHeader><EmptyTitle class="text-body-lg font-normal text-muted-foreground">{$rt.noSessions}</EmptyTitle></EmptyHeader><EmptyContent><Button variant="outline" size="sm" onclick={plan}>{$rt.new}</Button></EmptyContent></Empty>{/if}
         {:else}
           <h2 class="mb-3 text-base font-bold">{$rt.upcoming}</h2>
           {#if upcoming.length}<RehearsalList rehearsals={upcoming} />
-          {:else}<Empty class="border py-4"><EmptyHeader><EmptyTitle class="text-[.9rem] font-normal text-muted-foreground">{$rt.noUpcoming}</EmptyTitle></EmptyHeader></Empty>{/if}
+          {:else}<Empty class="border py-4"><EmptyHeader><EmptyTitle class="text-body-lg font-normal text-muted-foreground">{$rt.noUpcoming}</EmptyTitle></EmptyHeader></Empty>{/if}
         {/if}
       </section>
     </div>

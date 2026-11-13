@@ -4,9 +4,9 @@
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { Card } from '$components/ui/card';
   import { Badge } from '$components/ui/badge';
-  import * as Table from '$components/ui/table';
   import { getCoreRowModel, type ColumnDef } from '@tanstack/table-core';
-  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { createSvelteTable, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
   import * as Empty from '$components/ui/empty';
   import { Alert } from '$components/ui/alert';
   import { lang, t } from '$lib/i18n';
@@ -77,46 +77,27 @@
   }
 </script>
 
-<Card class="online-panel mb-5 gap-0 rounded-[10px] px-4 py-3.5" aria-labelledby="online-title" role="region">
-  <h2 id="online-title" class="mb-2.5 flex items-center gap-2 text-[0.9rem] font-semibold">{$t.admin.onlineTitle}{#if !loading && !failed} <Badge variant="secondary" class="count">{peopleCount}</Badge>{/if}</h2>
+<Card class="online-panel mb-5 gap-0 rounded-soft px-4 py-3.5" aria-labelledby="online-title" role="region">
+  <h2 id="online-title" class="mb-2.5 flex items-center gap-2 text-body-lg font-semibold">{$t.admin.onlineTitle}{#if !loading && !failed} <Badge variant="secondary" class="count">{peopleCount}</Badge>{/if}</h2>
   {#if loading}
     <LoadingCat />
   {:else if failed}
-    <Alert variant="destructive" class="border-0 bg-transparent p-0 text-[0.82rem]" role="status">{$t.admin.onlineUnavailable}</Alert>
+    <Alert variant="destructive" class="border-0 bg-transparent p-0 text-small" role="status">{$t.admin.onlineUnavailable}</Alert>
   {:else if rows.length === 0}
-    <Empty.Root class="border-0 p-2"><Empty.Header><Empty.Description class="text-[0.78rem] leading-normal">{$t.admin.onlineEmpty}</Empty.Description></Empty.Header></Empty.Root>
+    <Empty.Root class="border-0 p-2"><Empty.Header><Empty.Description class="text-small leading-normal">{$t.admin.onlineEmpty}</Empty.Description></Empty.Header></Empty.Root>
   {:else}
     <div>
-      <Table.Root class="max-[760px]:[&_thead]:hidden max-[760px]:[&_tbody]:grid max-[760px]:[&_tbody]:gap-[3px]">
-        <Table.Header>
-          {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-            <Table.Row>
-              {#each headerGroup.headers as header (header.id)}
-                <Table.Head><FlexRender content={header.column.columnDef.header} context={header.getContext()} /></Table.Head>
-              {/each}
-            </Table.Row>
-          {/each}
-        </Table.Header>
-        <Table.Body>
-          {#each table.getRowModel().rows as row (row.id)}
-            <Table.Row class="max-[760px]:grid max-[760px]:grid-cols-2">
-              {#each row.getVisibleCells() as cell (cell.id)}
-                <Table.Cell class="whitespace-normal [overflow-wrap:anywhere] max-[760px]:not-last:border-r-0"><FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} /></Table.Cell>
-              {/each}
-            </Table.Row>
-          {/each}
-        </Table.Body>
-      </Table.Root>
+      <DataTableView {table} class="table-stack" rowClass={() => 'max-mid:grid max-mid:grid-cols-2'} cellClass="whitespace-normal wrap-anywhere max-mid:not-last:border-r-0" />
     </div>
   {/if}
-  <p class="mt-2.5 text-[0.78rem] leading-normal text-muted-foreground">{$t.admin.onlineHint}</p>
+  <p class="mt-2.5 text-small leading-normal text-muted-foreground">{$t.admin.onlineHint}</p>
 </Card>
 
 {#snippet userCell(row: OnlineRow)}
-  <span class="flex min-w-0 items-center gap-[7px] text-[0.85rem]"><span class="size-1.5 shrink-0 rounded-full bg-success-ink" aria-hidden="true"></span>{row.name}</span>
+  <span class="flex min-w-0 items-center gap-1.75 text-body"><span class="size-1.5 shrink-0 rounded-full bg-success-ink" aria-hidden="true"></span>{row.name}</span>
 {/snippet}
 {#snippet scopeCell(row: OnlineRow)}{row.room === 'backlog' ? $t.nav.backlog : $t.admin.onlineSetlist}{/snippet}
 {#snippet roomCell(row: OnlineRow)}
-  <a class="text-[0.8rem] text-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" href={roomHref(row.room)}>{roomLabel(row.room)}{#if row.tabs > 1}{' ×'}{row.tabs}{/if}</a>
+  <a class="text-small text-primary-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" href={roomHref(row.room)}>{roomLabel(row.room)}{#if row.tabs > 1}{' ×'}{row.tabs}{/if}</a>
 {/snippet}
 {#snippet seenCell(row: OnlineRow)}{row.lastSeen ? new Date(row.lastSeen).toLocaleTimeString($lang === 'ru' ? 'ru-RU' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}{/snippet}

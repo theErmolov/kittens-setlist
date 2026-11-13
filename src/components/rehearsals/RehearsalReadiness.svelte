@@ -7,7 +7,7 @@
 <Tooltip.Root>
   <Tooltip.Trigger>
     {#snippet child({ props })}
-      <PctBadge {...props} {value} class="text-[.68rem]" />
+      <PctBadge {...props} {value} class="text-micro" />
     {/snippet}
   </Tooltip.Trigger>
   <Tooltip.Content>{label}</Tooltip.Content>

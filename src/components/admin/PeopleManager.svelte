@@ -5,9 +5,9 @@
   import { Input } from '$components/ui/input';
   import * as Select from '$components/ui/select';
   import { Toggle } from '$components/ui/toggle';
-  import * as Table from '$components/ui/table';
   import { getCoreRowModel, type ColumnDef } from '@tanstack/table-core';
-  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import { createSvelteTable, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
   import { Alert } from '$components/ui/alert';
   import { Card } from '$components/ui/card';
   import * as Empty from '$components/ui/empty';
@@ -62,10 +62,10 @@
   // Data Table: rows are the users in their stored display order; the cells are snippets below.
   const cellBase = 'min-w-0';
   const columns = $derived<ColumnDef<User>[]>([
-    { id: 'person', header: $t.admin.person, meta: { cellClass: `identity ${cellBase} whitespace-normal max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(personCell, row.original) },
-    { id: 'role', header: $t.admin.role, meta: { cellClass: `role-cell ${cellBase} max-[760px]:self-start max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(roleCell, row.original) },
-    { id: 'musician', header: $t.musicians.title, meta: { cellClass: `musician-cell ${cellBase} whitespace-normal max-[760px]:col-span-2 max-[760px]:min-h-[30px] max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(musicianCell, row.original) },
-    { id: 'actions', header: '', meta: { cellClass: `actions-cell ${cellBase} w-16 max-[760px]:self-start max-[760px]:p-0` }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
+    { id: 'person', header: $t.admin.person, meta: { cellClass: `identity ${cellBase} whitespace-normal max-mid:p-0` }, cell: ({ row }) => renderSnippet(personCell, row.original) },
+    { id: 'role', header: $t.admin.role, meta: { cellClass: `role-cell ${cellBase} max-mid:self-start max-mid:p-0` }, cell: ({ row }) => renderSnippet(roleCell, row.original) },
+    { id: 'musician', header: $t.musicians.title, meta: { cellClass: `musician-cell ${cellBase} whitespace-normal max-mid:col-span-2 max-mid:min-h-7.5 max-mid:p-0` }, cell: ({ row }) => renderSnippet(musicianCell, row.original) },
+    { id: 'actions', header: '', meta: { cellClass: `actions-cell ${cellBase} w-16 max-mid:self-start max-mid:p-0` }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
   ]);
   const table = createSvelteTable<User>({
     get data() { return orderedUsers; },
@@ -276,15 +276,15 @@
 
 <OnlineUsersPanel />
 
-<section class="people-section mb-7 max-[760px]:mb-[18px]">
-  <div class="people-title mb-2.5 flex items-center justify-end max-[760px]:mb-2 max-[760px]:gap-2">
-    <Button class="add-musician px-3 text-[0.79rem] font-semibold max-[760px]:px-2 max-[760px]:text-[0.7rem]" onclick={() => ps().startStandalone()}>{$t.musicians.addBtn}</Button>
+<section class="people-section mb-7 max-mid:mb-4.5">
+  <div class="people-title mb-2.5 flex items-center justify-end max-mid:mb-2 max-mid:gap-2">
+    <Button class="add-musician px-3 text-small font-semibold max-mid:px-2 max-mid:text-tiny" onclick={() => ps().startStandalone()}>{$t.musicians.addBtn}</Button>
   </div>
 
-  {#if $error}<Alert variant="destructive" class="error mb-2 border-0 bg-transparent p-0 text-[0.82rem]">{$t.common.requestFailed}</Alert>{/if}
+  {#if $error}<Alert variant="destructive" class="error mb-2 border-0 bg-transparent p-0 text-small">{$t.common.requestFailed}</Alert>{/if}
 
   {#if $editorKind === 'standalone'}
-    <Card class="standalone-editor mb-2.5 gap-0 rounded-[10px] p-3">
+    <Card class="standalone-editor mb-2.5 gap-0 rounded-soft p-3">
       {@render MusicianEditor()}
     </Card>
   {/if}
@@ -295,39 +295,25 @@
     </Empty.Root>
   {:else}
     <div class="people-table">
-      <Table.Root class="max-[760px]:block max-[760px]:[&_tbody]:grid max-[760px]:[&_tbody]:gap-[3px] max-[760px]:[&_thead]:hidden">
-        <Table.Header>
-          {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-            <Table.Row class="people-header">
-              {#each headerGroup.headers as header (header.id)}
-                <Table.Head>
-                  <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
-                </Table.Head>
-              {/each}
-            </Table.Row>
-          {/each}
-        </Table.Header>
-        <Table.Body>
-          {#each table.getRowModel().rows as row (row.id)}
-            {@const user = row.original}
-            <Table.Row
-              class="people-row max-[760px]:grid max-[760px]:grid-cols-[minmax(0,1fr)_auto_auto] max-[760px]:gap-x-1.5 max-[760px]:gap-y-[7px] max-[760px]:px-[9px] max-[760px]:py-2 {$dragOverId === user.id && $dragId !== user.id ? 'drag-over shadow-[inset_0_2px_var(--accent)]' : ''}"
-              role="group"
-              draggable={$canDrag && Boolean(user.musicianName) && !$editorKind}
-              ondragstart={$canDrag && user.musicianName ? () => ps().setDrag(user.id) : undefined}
-              ondragover={$canDrag && user.musicianName ? (event: DragEvent) => onDragOver(event, user.id) : undefined}
-              ondrop={$canDrag && user.musicianName ? onDrop : undefined}
-              ondragend={$canDrag && user.musicianName ? () => ps().resetDrag() : undefined}
-            >
-              {#each row.getVisibleCells() as cell (cell.id)}
-                <Table.Cell class="max-[760px]:not-last:border-r-0 {(cell.column.columnDef.meta as { cellClass?: string } | undefined)?.cellClass ?? ''}">
-                  <FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
-                </Table.Cell>
-              {/each}
-            </Table.Row>
-          {/each}
-        </Table.Body>
-      </Table.Root>
+      <DataTableView
+        {table}
+        class="max-mid:block table-stack"
+        headRowClass="people-header"
+        cellClass="max-mid:not-last:border-r-0"
+        rowClass={row => `people-row max-mid:grid max-mid:grid-cols-[minmax(0,1fr)_auto_auto] max-mid:gap-x-1.5 max-mid:gap-y-1.75 max-mid:px-2.25 max-mid:py-2 ${$dragOverId === row.original.id && $dragId !== row.original.id ? 'drag-over shadow-[inset_0_2px_var(--primary)]' : ''}`}
+        rowProps={row => {
+          const user = row.original;
+          const draggable = $canDrag && Boolean(user.musicianName);
+          return {
+            role: 'group',
+            draggable: draggable && !$editorKind,
+            ondragstart: draggable ? () => ps().setDrag(user.id) : undefined,
+            ondragover: draggable ? (event: DragEvent) => onDragOver(event, user.id) : undefined,
+            ondrop: draggable ? onDrop : undefined,
+            ondragend: draggable ? () => ps().resetDrag() : undefined,
+          };
+        }}
+      />
     </div>
   {/if}
 </section>
@@ -341,17 +327,17 @@
 />
 
 {#snippet personCell(user: User)}
-                <div class="flex min-w-0 items-center gap-[9px] max-[760px]:gap-[7px]">
+                <div class="flex min-w-0 items-center gap-2.25 max-mid:gap-1.75">
                   {#if $canDrag && user.musicianName}<span class="drag-handle cursor-grab select-none text-muted-foreground opacity-55" title={$t.admin.dragToReorder}>⠿</span>{/if}
-                  {#if user.photoUrl}<img class="avatar size-9 shrink-0 rounded-full max-[760px]:size-8" src={user.photoUrl} alt="" />{/if}
-                  <div class="identity-text flex min-w-0 flex-col items-start gap-0.5 max-[760px]:gap-0">
-                    <span class="name text-[0.9rem] font-semibold [overflow-wrap:anywhere] max-[760px]:text-[0.82rem]">{displayName(user)}</span>
-                    {#if !user.telegramId}<span class="hint text-[0.78rem] text-muted-foreground">{$t.admin.noTelegramAccess}</span>{/if}
-                    {#if user.username}<span class="hint text-[0.78rem] text-muted-foreground max-[760px]:text-[0.7rem] max-[760px]:leading-[1.1]">@{user.username}</span>{/if}
+                  {#if user.photoUrl}<img class="avatar size-9 shrink-0 rounded-full max-mid:size-8" src={user.photoUrl} alt="" />{/if}
+                  <div class="identity-text flex min-w-0 flex-col items-start gap-0.5 max-mid:gap-0">
+                    <span class="name text-body-lg font-semibold wrap-anywhere max-mid:text-small">{displayName(user)}</span>
+                    {#if !user.telegramId}<span class="hint text-small text-muted-foreground">{$t.admin.noTelegramAccess}</span>{/if}
+                    {#if user.username}<span class="hint text-small text-muted-foreground max-mid:text-tiny max-mid:leading-[1.1]">@{user.username}</span>{/if}
                     {#if user.isAdmin}
-                      <Badge variant="secondary" class="badge admin-badge bg-primary px-1.5 text-[0.65rem] font-bold uppercase text-primary-foreground-ink max-[760px]:px-[5px] max-[760px]: max-[760px]:text-[0.56rem]">{$t.admin.adminBadge}</Badge>
+                      <Badge variant="secondary" class="badge admin-badge bg-primary px-1.5 text-micro font-bold uppercase text-primary-foreground-ink max-mid:px-1.25 max-mid:text-micro">{$t.admin.adminBadge}</Badge>
                     {:else if user.telegramId}
-                      <Badge variant="secondary" class="badge status px-1.5 text-[0.65rem] font-bold uppercase max-[760px]:px-[5px] max-[760px]: max-[760px]:text-[0.56rem] {user.status === 'pending' ? 'pending bg-warning text-warning-ink' : user.status === 'rejected' ? 'rejected bg-danger text-danger-ink' : 'bg-success text-success-ink'}">{statusLabel(user)}</Badge>
+                      <Badge variant="secondary" class="badge status px-1.5 text-micro font-bold uppercase max-mid:px-1.25 max-mid:text-micro {user.status === 'pending' ? 'pending bg-warning-soft text-warning-ink' : user.status === 'rejected' ? 'rejected bg-danger-soft text-danger-ink' : 'bg-success-soft text-success-ink'}">{statusLabel(user)}</Badge>
                     {/if}
                   </div>
                 </div>
@@ -361,7 +347,7 @@
                 {#if user.telegramId && !user.isAdmin}
                   {@const role = $roleSelections[user.id] ?? user.role ?? 'reader'}
                   <Select.Root type="single" value={role} disabled={$saving === user.id} onValueChange={v => handleRoleChange(user, v as UserRole)}>
-                    <Select.Trigger class="role-select bg-card text-[0.82rem] max-md:text-base" aria-label={$t.admin.role}>{roleLabel(role)}</Select.Trigger>
+                    <Select.Trigger class="role-select bg-control-bg text-small max-mid:text-base" aria-label={$t.admin.role}>{roleLabel(role)}</Select.Trigger>
                     <Select.Content>
                       <Select.Item value="writer" label={$t.admin.roleWriter} />
                       <Select.Item value="reader" label={$t.admin.roleReader} />
@@ -372,7 +358,7 @@
 
 {#snippet actionsCell(user: User)}
   {@const actions = rowActions(user)}
-  {#if actions.length}<RowActions {actions} disabled={$saving === user.id} />{/if}
+  {#if actions.length}<RowActions inline {actions} disabled={$saving === user.id} />{/if}
 {/snippet}
 
 {#snippet musicianCell(user: User)}
@@ -380,24 +366,24 @@
                   {@render MusicianEditor()}
                 {:else if user.musicianName}
                   <div class="flex min-w-0 items-center justify-between gap-2">
-                    <div class="musician-summary flex min-w-0 flex-wrap items-center gap-[9px] max-[760px]:gap-[7px]">
-                      <span class="musician-name text-[0.9rem] font-semibold [overflow-wrap:anywhere] max-[760px]:text-[0.82rem]">{user.musicianName}</span>
-                      <span class="instrument-list flex flex-wrap items-center gap-1 max-[760px]:gap-[3px] max-[760px]:text-[0.95rem]">
+                    <div class="musician-summary flex min-w-0 flex-wrap items-center gap-2.25 max-mid:gap-1.75">
+                      <span class="musician-name text-body-lg font-semibold wrap-anywhere max-mid:text-small">{user.musicianName}</span>
+                      <span class="instrument-list flex flex-wrap items-center gap-1 max-mid:gap-0.75 max-mid:text-body-lg">
                         {#if user.defaultInstruments?.length}
                           {#each user.defaultInstruments as instrument}
                             <span title={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</span>
                           {/each}
                         {:else}
-                          <span class="hint text-[0.78rem] text-muted-foreground">{$t.musicians.free}</span>
+                          <span class="hint text-small text-muted-foreground">{$t.musicians.free}</span>
                         {/if}
                       </span>
                     </div>
                   </div>
                 {:else if user.status === 'pending'}
-                  <div class="approval-musician flex w-full min-w-0 flex-col items-start gap-[7px]">
+                  <div class="approval-musician flex w-full min-w-0 flex-col items-start gap-1.75">
                     {@render musicianSelect($approvalMusicianSelections[user.id] ?? '', v => ps().setApprovalSelection(user.id, v), $t.admin.accessOnly, true)}
                     {#if $approvalMusicianSelections[user.id] === '__new__'}
-                      <Input class="bg-card text-[0.82rem] max-md:text-base" value={$approvalMusicianNames[user.id] ?? ''} oninput={event => ps().setApprovalName(user.id, event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
+                      <Input class="bg-control-bg text-small max-mid:text-base" value={$approvalMusicianNames[user.id] ?? ''} oninput={event => ps().setApprovalName(user.id, event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
                       {@render instrumentToggles($approvalMusicianInstruments[user.id] ?? [], instrument => ps().toggleApprovalInstrument(user.id, instrument))}
                     {/if}
                   </div>
@@ -407,7 +393,7 @@
 {#snippet musicianSelect(value: string, onChange: (value: string) => void, noneLabel: string, withNew: boolean)}
   {@const current = value || NONE}
   <Select.Root type="single" value={current} onValueChange={v => onChange(v === NONE ? '' : v)}>
-    <Select.Trigger class="musician-select w-full bg-card text-[0.82rem] max-md:text-base" aria-label={$t.musicians.title}>
+    <Select.Trigger class="musician-select w-full bg-control-bg text-small max-mid:text-base" aria-label={$t.musicians.title}>
       {current === NONE ? noneLabel : current === '__new__' ? $t.admin.newMusician : `${$t.admin.mergeMusician}: ${musicians.find(m => m.id === current)?.musicianName ?? ''}`}
     </Select.Trigger>
     <Select.Content>
@@ -423,19 +409,19 @@
 {#snippet instrumentToggles(selected: Instrument[], toggle: (instrument: Instrument) => void)}
   <div class="instrument-buttons flex flex-wrap gap-2">
     {#each allInstruments as instrument}
-      <Toggle variant="outline" class="instrument-btn p-0 data-[state=on]:border-primary-ink data-[state=on]:bg-primary data-[state=on]:text-primary-foreground hover:data-[state=on]:bg-primary/90"
+      <Toggle variant="outline" class="instrument-btn p-0 on:border-primary-ink on:bg-primary on:text-primary-foreground hover:on:bg-primary/90"
         pressed={selected.includes(instrument)} onPressedChange={() => toggle(instrument)} title={$t.instrument[instrument]} aria-label={$t.instrument[instrument]}>{INSTRUMENT_ICONS[instrument]}</Toggle>
     {/each}
   </div>
 {/snippet}
 
 {#snippet MusicianEditor()}
-  <div class="musician-editor flex w-full min-w-0 flex-col items-start gap-[7px]">
+  <div class="musician-editor flex w-full min-w-0 flex-col items-start gap-1.75">
     {#if $editorKind === 'attach' && mergeTargets.length > 0}
       {@render musicianSelect($draftMergeTargetId, v => ps().setDraftMergeTarget(v), $t.admin.newMusician, false)}
     {/if}
     {#if !$draftMergeTargetId}
-      <Input class="bg-card text-[0.82rem] max-md:text-base" value={$draftName} oninput={event => ps().setDraftName(event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
+      <Input class="bg-control-bg text-small max-mid:text-base" value={$draftName} oninput={event => ps().setDraftName(event.currentTarget.value)} placeholder={$t.musicians.name} aria-label={$t.musicians.name} />
       {@render instrumentToggles($draftInstruments, instrument => ps().toggleDraftInstrument(instrument))}
     {/if}
     <ButtonRow class="editor-actions">

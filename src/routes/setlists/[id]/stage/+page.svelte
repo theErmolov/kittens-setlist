@@ -1,13 +1,11 @@
 <script lang="ts">
+  import NotFound from '$components/shared/NotFound.svelte';
   import { browser } from '$app/environment';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
-  import * as Empty from '$components/ui/empty';
-  import { Button } from '$components/ui/button';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import { base } from '$app/paths';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import StageView from '$components/stage/StageView.svelte';
+  import SetlistStage from '$components/stage/SetlistStage.svelte';
   import { t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
   import { musiciansQuery } from '$lib/query/queries';
@@ -38,14 +36,7 @@
 {#if loading}
   <LoadingCat />
 {:else if setlistQ.data}
-  <StageView setlistId={id} />
+  <SetlistStage setlistId={id} />
 {:else}
-  <Empty.Root class="m-4 py-[60px]">
-    <Empty.Header>
-      <Empty.Title class="text-base font-normal text-muted-foreground">{$t.notFound.message}</Empty.Title>
-    </Empty.Header>
-    <Empty.Content>
-      <Button variant="link" href="{base}/setlists">{$t.notFound.back}</Button>
-    </Empty.Content>
-  </Empty.Root>
+  <NotFound backLabel={$t.notFound.back} />
 {/if}

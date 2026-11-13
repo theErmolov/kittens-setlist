@@ -4,10 +4,11 @@
    * musician chips in the middle, the lyrics button (when there is a text) in the top right corner.
    */
   import { fade } from 'svelte/transition';
+  import SongName from '$components/shared/SongName.svelte';
   import type { Song, LearningStage } from '$lib/types';
   import { t } from '$lib/i18n';
   import { cn, sortInstruments, INSTRUMENT_ICONS } from '$lib/utils';
-  import { STAGE_TONE, toneStyle } from '$lib/palette';
+  import { STAGE_BADGE } from '$lib/palette';
   import { useStore } from '$lib/store/bridge';
   import { backlogStore } from '$lib/store/backlog';
   import { Badge } from '$components/ui/badge';
@@ -22,7 +23,7 @@
   const chips = $derived([
     ...names.filter(name => song.musicians[name]?.instruments?.length).map(name => ({ name, instruments: sortInstruments(song.musicians[name].instruments), guest: false })),
     ...guestTags(song, names).map(g => ({ ...g, guest: true })),
-  ].map(c => ({ ...c, style: toneStyle(STAGE_TONE[(song.progress?.[c.name] ?? 'queue') as LearningStage] ?? 'neutral') })));
+  ].map(c => ({ ...c, tone: STAGE_BADGE[(song.progress?.[c.name] ?? 'queue') as LearningStage] ?? STAGE_BADGE.queue })));
 </script>
 
 <div
@@ -33,7 +34,7 @@
   onkeydown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onrowclick(); } }}
 >
   {#if flashAdded}
-    <span transition:fade={{ duration: 250 }} class="pointer-events-none absolute inset-0 z-5 flex items-center justify-center bg-success/80 text-[1.7rem] font-extrabold text-success-ink" aria-hidden="true">✓</span>
+    <span transition:fade={{ duration: 250 }} class="pointer-events-none absolute inset-0 z-5 flex items-center justify-center bg-add-flash-bg text-glyph font-extrabold text-add-flash-ink" aria-hidden="true">✓</span>
   {/if}
   <div class="relative min-w-0 flex-1 overflow-hidden px-2 py-2">
     <!-- No ⋯ menu: tapping the card opens the editor. The lyrics button sits in the top right corner; the title line makes room for it, so the chips below always get the full width. Comments are intentionally not shown in this view. -->
@@ -45,16 +46,12 @@
     <!-- The type badge sits left of the title (not in its own column), leaving the whole width to the names. -->
     <div class={cn('flex items-center gap-2 leading-tight', song.lyrics && 'min-h-10 pr-11')}>
       <span class="shrink-0"><CatCell {song} {names} /></span>
-      <span class="min-w-0">
-        <span class="text-[1.08rem] font-normal">{song.artist}</span>
-        <span class="mx-1 text-muted-foreground">–</span>
-        <span class="text-[1.08rem] font-semibold">{song.title}</span>
-      </span>
+      <SongName artist={song.artist} title={song.title} />
     </div>
     {#if chips.length > 0}
       <div class="mt-1.5 grid grid-cols-3 gap-1">
         {#each chips as c (c.name)}
-          <Badge class={cn('flex w-full min-w-0 gap-[3px] pr-1.5 pl-[3px] text-[0.82rem] font-normal', c.guest && 'border-dashed border-border')} style={c.style}>
+          <Badge class={cn('flex w-full min-w-0 gap-0.75 pr-1.5 pl-0.75 text-small font-normal', c.guest && 'border-dashed border-border', c.tone)}>
             <span class="shrink-0 text-base">{#each c.instruments as inst (inst)}<span>{INSTRUMENT_ICONS[inst]}</span>{/each}</span>
             <span class="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,black_calc(100%-20px),transparent_100%)]">{c.name}</span>
           </Badge>

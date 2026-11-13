@@ -1,4 +1,6 @@
 <script lang="ts">
+  /** True under `npm run dev` with `VITE_DEV_MOCK=1` (see src/hooks.client.ts). */
+  const devMock = import.meta.env.DEV && import.meta.env.VITE_DEV_MOCK === '1';
   import { browser } from '$app/environment';
   import { page } from '$app/state';
   import { base } from '$app/paths';
@@ -10,6 +12,7 @@
   import { Button } from '$components/ui/button';
   import * as NavigationMenu from '$components/ui/navigation-menu';
   import * as Tooltip from '$components/ui/tooltip';
+  import IconButton from '$components/shared/IconButton.svelte';
   import RowActions from '$components/shared/RowActions.svelte';
   import { Alert } from '$components/ui/alert';
   import { lang, t } from '$lib/i18n';
@@ -117,15 +120,17 @@
 {/snippet}
 
 {#snippet navItem(href: string, active: boolean, icon: string, label: string, inIcon?: import('svelte').Snippet, after?: import('svelte').Snippet, external = false)}
-  <NavigationMenu.Item class="h-full max-[900px]:min-w-0 max-[900px]:flex-1">
+  <NavigationMenu.Item class="h-full max-mid:min-w-0 max-mid:flex-1">
     <NavigationMenu.Link
       {href}
       active={active}
-      class="h-full gap-[5px] rounded-none px-3.5 text-[0.95rem] font-medium text-muted-foreground hover:bg-(--secondary-soft) hover:text-foreground focus:bg-transparent focus-visible:ring-inset data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground data-active:focus:bg-primary max-[900px]:w-full max-[900px]:justify-center max-[900px]:p-0 max-[900px]:text-[1.2rem]"
+      class="h-full gap-1.25 rounded-none px-3.5 text-body-lg font-medium text-muted-foreground hover:bg-primary-soft hover:text-foreground focus:bg-transparent focus-visible:ring-inset data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground data-active:focus:bg-primary max-mid:w-full max-mid:justify-center max-mid:p-0 max-mid:text-title"
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
     >
-      <span class="link-icon relative shrink-0 text-base leading-none max-[900px]:text-[1.25rem]">{icon}{@render inIcon?.()}</span>
-      <span class="link-label max-[900px]:hidden">{label}</span>
+      <span class="link-icon relative shrink-0 text-base leading-none max-mid:text-[1.25rem]">{icon}{@render inIcon?.()}</span>
+      <span class="link-label max-mid:hidden">{label}</span>
+      <!-- A link that leaves the app gets the same ↗ as the admin tabs. -->
+      {#if external}<span class="text-muted-foreground max-mid:hidden" aria-hidden="true">↗</span>{/if}
       {@render after?.()}
     </NavigationMenu.Link>
   </NavigationMenu.Item>
@@ -135,7 +140,7 @@
   {#if $presenceIndicator.scope === scope && $presenceIndicator.state !== 'off'}
     {@const alone = $presenceIndicator.state === 'alone'}
     {#snippet dot(props: Record<string, unknown>)}
-      <span {...props} class="presence-dot absolute bottom-[-6px] left-1/2 size-[5px] -translate-x-1/2 rounded-full {alone ? 'alone bg-warning-ink animate-[presence-pulse-alone_1.8s_ease-out_infinite]' : 'bg-success-ink animate-[presence-pulse_1.8s_ease-out_infinite]'}"></span>
+      <span {...props} class="presence-dot absolute bottom-[-6px] left-1/2 size-1.25 -translate-x-1/2 rounded-full {alone ? 'alone bg-presence-alone animate-[presence-pulse-alone_1.8s_ease-out_infinite]' : 'bg-presence-online animate-[presence-pulse_1.8s_ease-out_infinite]'}"></span>
     {/snippet}
     {@render tip(presenceTitle, dot)}
   {/if}
@@ -143,57 +148,39 @@
 
 {#snippet backlogDot()}{@render presenceDot('backlog')}{/snippet}
 {#snippet setlistDot()}{@render presenceDot('setlist')}{/snippet}
-{#snippet pendingDot()}{#if hasPending}<span class="pending-dot size-2 shrink-0 animate-[pending-pulse_1.6s_ease-out_infinite] rounded-full bg-danger-solid"></span>{/if}{/snippet}
-
-<!-- Very light accent tint for EVERY emoji (img.emoji): a duotone — shadows map to --tint-lo, highlights to --tint-hi — so shapes keep their detail but all emoji read as one accent-coloured set. -->
-<svg width="0" height="0" aria-hidden="true" style="position:absolute">
-  <filter id="tint-primary" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
-    <feColorMatrix type="saturate" values="0" result="gray" />
-    <feFlood style="flood-color: var(--tint-hi)" result="hi" />
-    <feFlood style="flood-color: var(--tint-lo)" result="lo" />
-    <feBlend in="gray" in2="hi" mode="multiply" result="light" />
-    <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
-    <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
-    <!-- Very light tint: only ~25% duotone mixed into the original colours. -->
-    <feComposite in="duo" in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.25" k3="0.75" k4="0" result="mixed" />
-    <feComposite in="mixed" in2="SourceAlpha" operator="in" />
-  </filter>
-  <!-- Icons on a solid accent fill (selected tab, primary buttons): the same duotone mapped to light colours, so they read as a lighter tint with their detail intact. -->
-  <filter id="tint-on-primary" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
-    <feColorMatrix type="saturate" values="0" result="gray" />
-    <feFlood style="flood-color: var(--tint-on-hi)" result="hi" />
-    <feFlood style="flood-color: var(--tint-on-lo)" result="lo" />
-    <feBlend in="gray" in2="hi" mode="multiply" result="light" />
-    <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
-    <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
-    <feComposite in="duo" in2="SourceAlpha" operator="in" />
-  </filter>
-  <!-- A medium-light violet duotone (lighter than the standard tint, not as white as the on-fill one): the wrench on the secondary buttons. -->
-  <filter id="tint-light" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
-    <feColorMatrix type="saturate" values="0" result="gray" />
-    <feFlood style="flood-color: var(--tint-light-hi)" result="hi" />
-    <feFlood style="flood-color: var(--tint-light-lo)" result="lo" />
-    <feBlend in="gray" in2="hi" mode="multiply" result="light" />
-    <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
-    <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
-    <feComposite in="duo" in2="SourceAlpha" operator="in" />
-  </filter>
+{#snippet pendingDot()}{#if hasPending}<span class="pending-dot size-2 shrink-0 animate-[pending-pulse_1.6s_ease-out_infinite] rounded-full bg-danger"></span>{/if}{/snippet}
+<!-- Light duotone tints for icons sitting on accent fills (the base accent tint on plain emoji is gone: they keep their native colours). -->
+<svg width="0" height="0" aria-hidden="true" class="absolute">
+  <!-- Duotone filters: "tint-on-primary" for icons on a solid accent fill (selected tab, primary buttons; light colours, detail intact), "tint-light" for a medium-light violet (the wrench on the secondary buttons). -->
+  {#each [['tint-on-primary', 'icon-on-primary'], ['tint-light', 'icon-on-secondary']] as [id, vars] (id)}
+    <filter {id} color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+      <feColorMatrix type="saturate" values="0" result="gray" />
+      <feFlood style="flood-color: var(--{vars}-hi)" result="hi" />
+      <feFlood style="flood-color: var(--{vars}-lo)" result="lo" />
+      <feBlend in="gray" in2="hi" mode="multiply" result="light" />
+      <feComposite in="gray" in2="lo" operator="arithmetic" k1="-1" k2="0" k3="1" k4="0" result="dark" />
+      <feComposite in="light" in2="dark" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="duo" />
+      <feComposite in="duo" in2="SourceAlpha" operator="in" />
+    </filter>
+  {/each}
 </svg>
 <Tooltip.Provider delayDuration={150}>
 <header class="nav sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-card pr-3 pl-4 transition-colors max-mid:gap-2.5 max-mid:pl-2.5">
   <Tooltip.Root>
     <Tooltip.Trigger>
       {#snippet child({ props })}
-        <a {...props} href="{base}/backlog" aria-label={$t.common.brandLines.join(' ')} class="nav-brand flex items-center text-foreground no-underline">
+        <a {...props} href="{base}/backlog" aria-label={$t.common.brandLines.join(' ')} class="nav-brand relative flex items-center text-foreground no-underline">
           <LogoCat size={52} />
+          <!-- Dev only (VITE_DEV_MOCK=1): the backend is replaced by mock data. -->
+          {#if devMock}<span class="pointer-events-none absolute inset-x-0 bottom-0 mx-auto w-fit rounded-sm bg-primary px-1 text-micro leading-none font-bold tracking-wider text-primary-foreground uppercase">mock</span>{/if}
         </a>
       {/snippet}
     </Tooltip.Trigger>
     <Tooltip.Content side="bottom" align="start" sideOffset={6} arrowClasses="hidden" class="border bg-card px-3 py-2 text-foreground">
-      <span class="brand-text flex flex-col leading-[1.15]">
-        <span class="brand-ru mb-[3px] text-[0.72rem] font-medium uppercase tracking-[0.05em] text-muted-foreground">{$t.common.brandLines[0]}</span>
-        <span class="brand-ru text-[0.72rem] font-medium uppercase tracking-[0.05em] text-muted-foreground">{$t.common.brandLines[1]}</span>
-        <span class="brand-en text-[1.1rem] font-extrabold tracking-[-0.01em] text-primary-ink">{$t.common.brandLines[2]}</span>
+      <span class="brand-text flex flex-col leading-compact">
+        <span class="brand-ru mb-0.75 text-tiny font-medium uppercase tracking-wider text-muted-foreground">{$t.common.brandLines[0]}</span>
+        <span class="brand-ru text-tiny font-medium uppercase tracking-wider text-muted-foreground">{$t.common.brandLines[1]}</span>
+        <span class="brand-en text-title-sm font-extrabold tracking-[-0.01em] text-primary-ink">{$t.common.brandLines[2]}</span>
       </span>
     </Tooltip.Content>
   </Tooltip.Root>
@@ -210,16 +197,23 @@
       {@render navItem('https://media.kittens.band', false, '📷', $t.nav.media, undefined, undefined, true)}
     </NavigationMenu.List>
   </NavigationMenu.Root>
-  <!-- Language, theme and logout behind one settings button (opens a bottom drawer). -->
-  <RowActions drawer variant="outline" icon="⚙️" label={$t.common.settings} actions={[
-    { icon: '🌐', label: $lang === 'ru' ? 'English' : 'Русский', onselect: toggleLang },
-    { icon: dark ? '☀️' : '🌙', label: $t.common.themeToggle, onselect: toggleTheme },
-    ...($navLoggedIn ? [{ icon: '🚪', label: $t.common.logout, destructive: true, separatorBefore: true, onselect: handleLogout }] : []),
-  ]} />
+  <!-- Big tier: language, theme and logout as separate icon buttons. Smaller screens: one settings button (bottom drawer). -->
+  <div class="hidden items-center gap-2 big:flex">
+    <IconButton icon={$lang.toUpperCase()} label={$lang === 'ru' ? 'English' : 'Русский'} class="text-body font-semibold" onclick={toggleLang} />
+    {#key dark}<IconButton icon={dark ? '☀️' : '🌙'} label={$t.common.themeToggle} onclick={toggleTheme} />{/key}
+    {#if $navLoggedIn}<IconButton icon="🚪" label={$t.common.logout} class="hover:border-destructive hover:text-destructive" onclick={handleLogout} />{/if}
+  </div>
+  <div class="big:hidden">
+    <RowActions drawer variant="outline" icon="⚙️" label={$t.common.settings} actions={[
+      { icon: '🌐', label: $lang === 'ru' ? 'English' : 'Русский', onselect: toggleLang },
+      { icon: dark ? '☀️' : '🌙', label: $t.common.themeToggle, onselect: toggleTheme },
+      ...($navLoggedIn ? [{ icon: '🚪', label: $t.common.logout, destructive: true, separatorBefore: true, onselect: handleLogout }] : []),
+    ]} />
+  </div>
 </header>
 
 {#if $accessDenied && path.startsWith('/admin')}
-  <Alert class="access-denied rounded-none border-x-0 border-t-0 bg-(--secondary-soft) px-4 py-2.5 text-center text-[0.88rem] font-semibold text-muted-foreground">{$t.common.accessDenied}</Alert>
+  <Alert class="access-denied rounded-none border-x-0 border-t-0 bg-primary-soft px-4 py-2.5 text-center text-body font-semibold text-muted-foreground">{$t.common.accessDenied}</Alert>
 {/if}
 {@render children()}
 </Tooltip.Provider>

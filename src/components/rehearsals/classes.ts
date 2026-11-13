@@ -15,7 +15,7 @@ export const timeText = (past: boolean) =>
 /** Time chip in a calendar cell: filled purple; past = darker/dimmer purple fill, still readable white text. */
 export const timeChip = (past: boolean, cancelled: boolean) =>
   cancelled
-    ? 'border-transparent bg-danger text-danger-ink line-through'
+    ? 'border-transparent bg-danger-soft text-danger-ink line-through'
     : past
       ? 'border-transparent bg-[color-mix(in_oklab,var(--primary)_78%,black)] text-primary-foreground'
       : 'border-transparent bg-primary text-primary-foreground';

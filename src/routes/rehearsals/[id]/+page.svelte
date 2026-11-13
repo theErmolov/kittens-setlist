@@ -1,27 +1,18 @@
 <script lang="ts">
-  import SongEntryRow from '$components/setlist/SongEntryRow.svelte';
   import { Button } from '$components/ui/button';
+    import { countByMusician, playsInSong } from '$lib/musicianStats';
   import CommentInput from '$components/setlist/CommentInput.svelte';
   import { Alert, AlertDescription } from '$components/ui/alert';
-  import { Card, CardContent } from '$components/ui/card';
-  import { Empty, EmptyHeader, EmptyTitle } from '$components/ui/empty';
-  import * as AlertDialog from '$components/ui/alert-dialog';
-  import * as Table from '$components/ui/table';
-  import * as Breadcrumb from '$components/ui/breadcrumb';
-  import * as NavigationMenu from '$components/ui/navigation-menu';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
   import RowActions from '$components/shared/RowActions.svelte';
   import RehearsalFilter from '$components/rehearsals/RehearsalFilter.svelte';
-  import ButtonRow from '$components/shared/ButtonRow.svelte';
-  import { Badge } from '$components/ui/badge';
   import IconButton from '$components/shared/IconButton.svelte';
-  import PageControlsDivider from '$components/shared/PageControlsDivider.svelte';
-  import PageControls from '$components/shared/PageControls.svelte';
-  import DateTimeCrumb from '$components/shared/DateTimeCrumb.svelte';
-  import { isPastRehearsal, rehearsalTime } from '$components/rehearsals/classes';
-  import SongTableHead from '$components/setlist/SongTableHead.svelte';
-  import { songColumns, songVisibility, type SongTableRow } from '$components/setlist/songColumns';
-  import { createSvelteTable } from '$components/ui/data-table';
-  import { getCoreRowModel } from '@tanstack/table-core';
+  import { isPastRehearsal, rehearsalTime, timeText } from '$components/rehearsals/classes';
+  import StageView from '$components/stage/StageView.svelte';
+  import { Badge } from '$components/ui/badge';
+  import { pressedOn } from '$components/setlist/classes';
+  import StageRow, { type RosterCell } from '$components/stage/StageRow.svelte';
+  import { STAGE_BADGE } from '$lib/palette';
   import * as Popover from '$components/ui/popover';
   import { noteStore } from '$lib/store/shell';
   import { dragModeStore } from '$lib/store/drag';
@@ -39,14 +30,13 @@
   import { lang, t } from '$lib/i18n';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
   import { rehearsalReadiness, rehearsalSongKey, localDate, rehearsalCoverage } from '$lib/rehearsals';
-  import { cn, formatDate, INSTRUMENT_ICONS, orderMusicianNames } from '$lib/utils';
+  import { formatDate, orderMusicianNames } from '$lib/utils';
   import type { Rehearsal, RehearsalDraft, RehearsalSong, LearningStage } from '$lib/types';
   import { keys, rehearsalQuery, setlistsQuery, songsQuery, musiciansQuery } from '$lib/query/queries';
   import { useCreateRehearsal, useUpdateRehearsal, useDeleteRehearsal, useUpdateRehearsalProgress } from '$lib/query/rehearsals';
   import { useStore } from '$lib/store/bridge';
   import { rehearsalDetailStore as detail } from '$lib/store/rehearsals';
   import RehearsalForm from '$components/rehearsals/RehearsalForm.svelte';
-  import LyricsOverlay from '$components/stage/LyricsOverlay.svelte';
 
   const qc = useQueryClient();
   const id = $derived(page.params.id!);
@@ -87,7 +77,6 @@
   const setRehearsal = (value: Rehearsal) => qc.setQueryData(keys.rehearsal(untrack(() => id)), value);
   const linked = $derived(setlists.find(s => s.id === rehearsal?.setlistId));
   const activeAttendees = $derived(rehearsal?.attendees ?? []);
-  const plays = (item: RehearsalSong, name: string) => (item.song.musicians[name]?.instruments.length ?? 0) > 0;
   const participants = $derived($participantsS);
   const text = $derived($filterTextS.trim().toLowerCase());
   const filtering = $derived(participants.length > 0 || text !== '');
@@ -95,11 +84,10 @@
     ? [...(rehearsal?.songs ?? [])].sort((a, b) => (rehearsalReadiness(a.song, activeAttendees) ?? Infinity) - (rehearsalReadiness(b.song, activeAttendees) ?? Infinity))
     : rehearsal?.songs ?? []);
   // Participant filter: AND, like the backlog's musician filter.
-  const displayedSongs = $derived(filtering ? sortedSongs.filter(item => participants.every(name => plays(item, name)) && (!text || `${item.song.artist} ${item.song.title}`.toLowerCase().includes(text))) : sortedSongs);
+  const displayedSongs = $derived(filtering ? sortedSongs.filter(item => participants.every(name => playsInSong(item.song, name)) && (!text || `${item.song.artist} ${item.song.title}`.toLowerCase().includes(text))) : sortedSongs);
   const filterNames = $derived(orderMusicianNames(activeAttendees, musicians));
-  const filterCounts = $derived(Object.fromEntries(filterNames.map(name => [name, (rehearsal?.songs ?? []).filter(item => plays(item, name)).length])));
+  const filterCounts = $derived(countByMusician((rehearsal?.songs ?? []).map(item => item.song), filterNames));
   const activeFilterCount = $derived(participants.length + (text ? 1 : 0) + (readinessFirst ? 1 : 0));
-  const onClass = 'data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground data-[state=on]:hover:bg-secondary/90';
   // The API strips personal comments from rehearsals, so show the caller's own note from the source
   // setlist entry (or the backlog song), which both come back already personalised.
   function personalNote(item: RehearsalSong): string | undefined {
@@ -109,31 +97,26 @@
     return fromSetlist ?? catalog.find(song => song.id === item.songId)?.personalComment;
   }
   const permanentNames = $derived(musicians.map(m => m.name));
-  // Table columns = attending band musicians who play in at least one of the songs.
-  const columnMusicians = $derived(permanentNames.filter(name => displayedSongs.some(item => (item.song.musicians[name]?.instruments.length ?? 0) > 0)));
   const notComing = $derived([...new Set([...permanentNames, ...displayedSongs.flatMap(item => Object.keys(item.song.musicians))])].filter(name => !activeAttendees.includes(name)));
   const levelPickerS = useStore(detail, s => s.levelPicker);
-  const attendingMusicians = $derived(permanentNames.filter(name => activeAttendees.includes(name)));
-  // drag + number + song + musician columns + actions
-  const hasGuests = $derived(displayedSongs.some(item => Object.entries(item.song.musicians).some(([n, r]) => !permanentNames.includes(n) && r.instruments.length > 0)));
-
-  // Data Table: shared song columns; unused musician columns are hidden through the store's columnVisibility.
-  const columnVisibilityS = useStore(detail, s => s.columnVisibility);
-  const maxIcons = $derived(Object.fromEntries(permanentNames.map(n => [n, Math.max(1, ...displayedSongs.map(i => i.song.musicians[n]?.instruments.length ?? 0))])));
-  const columns = $derived(songColumns(permanentNames, { song: songHeader, guests: $t.editor.guestsColumn }, maxIcons));
-  const tableRows = $derived(displayedSongs.map((item): SongTableRow<RehearsalSong> => ({ id: rehearsalSongKey(item), kind: 'song', item })));
-  $effect.pre(() => {
-    const next = songVisibility(permanentNames, columnMusicians, false, $dragEnabled && !filtering, hasGuests);
-    if (JSON.stringify(next) !== JSON.stringify(st().columnVisibility)) patch({ columnVisibility: next });
-  });
-  const table = createSvelteTable<SongTableRow<RehearsalSong>>({
-    get data() { return tableRows; },
-    get columns() { return columns as never; },
-    state: { get columnVisibility() { return $columnVisibilityS; } },
-    onColumnVisibilityChange: (u) => patch({ columnVisibility: typeof u === 'function' ? u(st().columnVisibility) : u }),
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (r) => r.id,
-  });
+  // Roster pills of a song row: band musicians who play it (in roster order), then guests; pills are tinted by the learning stage and open the level picker.
+  function rosterCells(item: RehearsalSong, key: string): RosterCell[] {
+    const cells: RosterCell[] = [];
+    const guestNames = Object.keys(item.song.musicians).filter(name => !permanentNames.includes(name)).sort((a, b) => a.localeCompare(b));
+    // As on the stage: one slot per band musician (empty when they do not play, so the columns line up), then the guests.
+    for (const name of [...permanentNames, ...guestNames]) {
+      const instruments = item.song.musicians[name]?.instruments ?? [];
+      if (!instruments.length) { if (permanentNames.includes(name)) cells.push({ name, instruments }); continue; }
+      cells.push({
+        name, instruments, guest: !permanentNames.includes(name),
+        tone: STAGE_BADGE[item.song.progress?.[name] ?? 'queue'] ?? STAGE_BADGE.queue,
+        off: !activeAttendees.includes(name),
+        label: `${name} · ${$t.song.progress}: ${item.song.title}`,
+        onclick: anchor => pickLevel(key, name, anchor),
+      });
+    }
+    return cells;
+  }
   const formInitial = $derived(rehearsal ? { ...rehearsal, attendees: activeAttendees, ...(repeating ? { date: localDate(), cancelled: false } : {}) } : {});
   let lastId = untrack(() => id);
   $effect(() => {
@@ -188,8 +171,7 @@
     if (!rehearsal || busy || rehearsal.cancelled || event.button !== 0) return;
     cancelDrag?.();
     const handle = event.currentTarget as HTMLButtonElement;
-    const source = handle.closest<HTMLTableRowElement>('tr[data-rehearsal-index]')!;
-    const sourceTable = source.closest('table')!;
+    const source = handle.closest<HTMLElement>('[data-rehearsal-index]')!;
     const rect = source.getBoundingClientRect();
     const offsetX = event.clientX - rect.left, offsetY = event.clientY - rect.top;
     let preview: HTMLElement | null = null;
@@ -207,42 +189,26 @@
     }
     function showPreview() {
       // Clone the actual row so readiness, notes and wrapping stay identical.
-      const sourceRows = [source, ...(source.nextElementSibling?.classList.contains('song-details-row') ? [source.nextElementSibling as HTMLTableRowElement] : [])];
-      const body = document.createElement('tbody');
-      for (const sourceRow of sourceRows) {
-        const clone = sourceRow.cloneNode(true) as HTMLTableRowElement;
-        clone.classList.remove('dragging', 'drag-over');
-        clone.removeAttribute('data-rehearsal-index');
-        clone.removeAttribute('id');
-        clone.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-        clone.querySelectorAll<HTMLElement>('td').forEach(cell => { cell.style.opacity = '1'; cell.style.outline = 'none'; });
-        const originalCells = [...sourceRow.cells];
-        [...clone.cells].forEach((cell, i) => {
-          const width = originalCells[i]?.getBoundingClientRect().width ?? 0;
-          if (width > 0 && sourceRow === source) Object.assign(cell.style, { boxSizing: 'border-box', width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` });
-        });
-        const originalFields = sourceRow.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
-        clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select').forEach((field, i) => {
-          field.value = originalFields[i].value;
-          if (field instanceof HTMLInputElement && originalFields[i] instanceof HTMLInputElement) field.checked = originalFields[i].checked;
-        });
-        body.append(clone);
-      }
-      const table = sourceTable.cloneNode(false) as HTMLTableElement;
-      const tableStyle = getComputedStyle(sourceTable);
-      Object.assign(table.style, {
-        margin: '0', width: `${rect.width}px`, minWidth: `${rect.width}px`, maxWidth: `${rect.width}px`,
-        tableLayout: 'fixed', borderCollapse: tableStyle.borderCollapse, borderSpacing: tableStyle.borderSpacing,
-        pointerEvents: 'none', boxShadow: '0 8px 24px color-mix(in srgb, currentColor 22%, transparent)',
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.classList.remove('opacity-35', 'bg-muted', 'ring-1', 'ring-inset', 'ring-border');
+      clone.removeAttribute('data-rehearsal-index');
+      clone.removeAttribute('id');
+      clone.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+      const originalFields = source.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select');
+      clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select').forEach((field, i) => {
+        field.value = originalFields[i].value;
+        if (field instanceof HTMLInputElement && originalFields[i] instanceof HTMLInputElement) field.checked = originalFields[i].checked;
       });
-      table.append(body);
-      // The song-table wrapper gives the cloned rows the same styles as the real table.
+      Object.assign(clone.style, {
+        width: `${rect.width}px`, minWidth: `${rect.width}px`, maxWidth: `${rect.width}px`, margin: '0',
+        background: 'var(--card)', boxShadow: '0 8px 24px color-mix(in srgb, currentColor 22%, transparent)',
+      });
       preview = document.createElement('div');
       preview.className = 'drag-preview';
       preview.setAttribute('aria-hidden', 'true');
       preview.inert = true;
       Object.assign(preview.style, { position: 'fixed', zIndex: '200', pointerEvents: 'none', left: '0', top: '0', font: getComputedStyle(source).font });
-      preview.append(table);
+      preview.append(clone);
       document.body.append(preview);
     }
     function scroll() {
@@ -366,12 +332,12 @@
       collisionPadding={8}
       trapFocus={false}
       aria-label={`${$levelPickerS.name} · ${$t.song.progress}`}
-      class="w-max max-w-[calc(100vw-16px)] flex-row items-center gap-2.5 rounded-[10px] px-2.5 py-2"
+      class="w-max max-w-[calc(100vw-16px)] flex-row items-center gap-2.5 rounded-soft px-2.5 py-2"
       onOpenAutoFocus={e => e.preventDefault()}
       onCloseAutoFocus={e => e.preventDefault()}
       onInteractOutside={e => { if ($levelPickerS.anchor.contains(e.target as Node | null)) e.preventDefault(); }}
     >
-      <span class="px-1 text-[.8rem] font-semibold text-muted-foreground">{$levelPickerS.name}</span>
+      <span class="px-1 text-small font-semibold text-muted-foreground">{$levelPickerS.name}</span>
       <LearningProgress name={$levelPickerS.name} value={pickerItem.song.progress?.[$levelPickerS.name] ?? 'queue'} onchange={chooseLevel} disabled={busy || rehearsal?.cancelled || (pickerItem.sourceMissing && !catalog.some(s => s.id === pickerItem.songId))} />
     </Popover.Content>
   {/if}
@@ -380,10 +346,10 @@
 <PersonalNotePopover />
 
 {#snippet dragBtn()}
-  <span class="inline-flex" title={filtering ? $rt.filterDragHint : undefined}><IconButton icon="⠿" label={$t.common.dragMode} pressed={$dragEnabled} onpressedchange={() => dragModeStore.getState().toggle()} disabled={busy || !rehearsal || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null || filtering} /></span>
+  <span class="inline-flex" title={filtering ? $rt.filterDragHint : undefined}><IconButton text={$t.common.dragMode} icon="⠿" label={$t.common.dragMode} pressed={$dragEnabled} onpressedchange={() => dragModeStore.getState().toggle()}  disabled={busy || !rehearsal || rehearsal.cancelled || rehearsal.songs.length < 2 || dragIndex !== null || filtering} /></span>
 {/snippet}
 {#snippet actionsMenu()}
-  <RowActions disabled={busy} actions={[
+  <RowActions inline showText disabled={busy} actions={[
     { icon: '✏️', label: $rt.edit, onselect: () => patch({ repeating: false, showForm: true }) },
     { icon: '🔁', label: $rt.repeat, onselect: () => patch({ repeating: true, showForm: true }) },
     { icon: rehearsal!.cancelled ? '↩️' : '🚫', label: rehearsal!.cancelled ? $rt.restore : $rt.cancelSession, onselect: toggleCancelled },
@@ -391,157 +357,123 @@
   ]} />
 {/snippet}
 
-{#snippet songHeader()}
-  <span class="max-mid:hidden"><span class="text-[.85rem] font-bold text-foreground">{$rt.songs}</span> <span class="ml-1 text-muted-foreground">{rehearsal!.songs.filter(song => song.played).length}/{rehearsal!.songs.length}</span></span>
-{/snippet}
-
 {#if $canAccessRehearsals}
-{#if !loading && rehearsal}
-<!-- Desktop bar; on small screens the date header sits in the page and the controls in a bottom bar (as in the catalog). -->
-<div class="contents max-mid:hidden">
-<PageControls label={$rt.title}>
-  {#snippet start()}
-  <NavigationMenu.Item class="min-w-0 max-w-full">
-    <Breadcrumb.Root>
-      <Breadcrumb.List class="flex-nowrap items-center gap-1.5 sm:gap-1.5">
-        <Breadcrumb.Item class="shrink-0 max-mid:hidden"><Breadcrumb.Link href="{base}/rehearsals" class="inline-flex min-h-10 items-center">{$rt.title}</Breadcrumb.Link></Breadcrumb.Item>
-        <Breadcrumb.Separator class="max-mid:hidden" />
-        <Breadcrumb.Item class="min-w-0 flex-col items-start gap-0.5 py-0.5">
-          <DateTimeCrumb date={rehearsal.date} time={rehearsalTime(rehearsal)} past={isPastRehearsal(rehearsal)} />
-          {#if linked}
-            <Breadcrumb.Link href="{base}/setlists/{linked.id}" title="{$rt.setlist}: {linked.name}" aria-label="{$rt.setlist}: {linked.name}" class="block max-w-full text-[.85rem] leading-tight text-primary-ink max-sm:whitespace-nowrap sm:max-w-[34ch] sm:truncate"><span aria-hidden="true">🎪</span> {linked.name}</Breadcrumb.Link>
-          {:else if rehearsal.setlistId}
-            <span class="block max-w-full text-[.8rem] leading-tight text-muted-foreground max-sm:whitespace-nowrap sm:truncate" title="{$rt.setlist}: {$rt.unavailableSetlist}"><span aria-hidden="true">🎪</span> {$rt.unavailableSetlist}</span>
-          {/if}
-        </Breadcrumb.Item>
-      </Breadcrumb.List>
-    </Breadcrumb.Root>
-  </NavigationMenu.Item>
+{#if loading}
+  <LoadingCat />
+{:else if rehearsal}
+<StageView
+  backHref="{base}/rehearsals"
+  backLabel={$rt.title}
+  items={displayedSongs}
+  itemKey={rehearsalSongKey}
+  emptyText={rehearsal.songs.length ? undefined : $rt.emptySongs}
+  filterOpen={$filterOpenS}
+  filterActive={activeFilterCount > 0}
+  filterCount={activeFilterCount}
+  ontogglefilter={() => patch({ filterOpen: !$filterOpenS })}
+  mobileBar
+  lyrics={lyrics ? { song: lyrics.song, onclose: () => patch({ lyricsKey: null }), onsavetranspose: async song => song } : null}
+>
+  {#snippet title()}
+    <!-- Date + time (+ linked setlist) and the played/total counter. -->
+    <div class="flex min-w-0 flex-1 flex-col leading-tight">
+      <h1 class="m-0 flex flex-wrap items-baseline gap-x-2 text-lead font-bold whitespace-nowrap">
+        <span class={rehearsal.cancelled ? 'line-through' : ''}>{formatDate(rehearsal.date, $lang)}</span>
+        <span class={timeText(isPastRehearsal(rehearsal))}>{rehearsalTime(rehearsal)}</span>
+        <span class="text-body font-normal text-muted-foreground"><span class="sr-only">{$rt.songs} </span>{rehearsal.songs.filter(song => song.played).length}/{rehearsal.songs.length}</span>
+      </h1>
+      {#if linked}
+        <a href="{base}/setlists/{linked.id}" title="{$rt.setlist}: {linked.name}" aria-label="{$rt.setlist}: {linked.name}" class="block max-w-full truncate text-body text-primary-ink no-underline mid:max-w-[40ch]"><span aria-hidden="true">🎪</span> {linked.name}</a>
+      {:else if rehearsal.setlistId}
+        <span class="block max-w-full truncate text-small text-muted-foreground" title="{$rt.setlist}: {$rt.unavailableSetlist}"><span aria-hidden="true">🎪</span> {$rt.unavailableSetlist}</span>
+      {/if}
+    </div>
   {/snippet}
-  {#snippet end()}
-  <NavigationMenu.Item>
-    <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpenS} expanded={$filterOpenS} onpressedchange={v => patch({ filterOpen: v })}>
-      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
-    </IconButton>
-  </NavigationMenu.Item>
-  <NavigationMenu.Item>{@render dragBtn()}</NavigationMenu.Item>
-  <NavigationMenu.Item>{@render actionsMenu()}</NavigationMenu.Item>
+
+  {#snippet actions()}
+    <!-- Small screens: these live in the bottom bar below. -->
+    <div class="flex items-center gap-2 max-mid:hidden">
+      {@render dragBtn()}
+      {@render actionsMenu()}
+    </div>
   {/snippet}
-</PageControls>
-</div>
-<RehearsalFilter names={filterNames.filter(n => permanentNames.includes(n))} guests={filterNames.filter(n => !permanentNames.includes(n))} counts={filterCounts} />
-<div class="flex flex-col gap-0.5 border-b bg-(--table-selected) px-3 py-2 min-mid:hidden">
-  <DateTimeCrumb date={rehearsal.date} time={rehearsalTime(rehearsal)} past={isPastRehearsal(rehearsal)} />
-  {#if linked}
-    <a href="{base}/setlists/{linked.id}" class="block text-[.85rem] leading-tight text-primary-ink no-underline"><span aria-hidden="true">🎪</span> {linked.name}</a>
-  {:else if rehearsal.setlistId}
-    <span class="block text-[.8rem] leading-tight text-muted-foreground"><span aria-hidden="true">🎪</span> {$rt.unavailableSetlist}</span>
-  {/if}
-  <div class="mt-1 text-[.8rem] font-bold tracking-wide text-foreground uppercase">{$rt.songs} <span class="ml-1 font-normal text-muted-foreground">{rehearsal.songs.filter(song => song.played).length}/{rehearsal.songs.length}</span></div>
-</div>
-<div class="fixed inset-x-0 bottom-0 z-40 hidden h-[52px] items-center gap-2 border-t bg-card px-3 max-mid:grid grid-cols-[1fr_auto_1fr]">
+
+  {#snippet filterPanel()}
+    <RehearsalFilter names={filterNames.filter(n => permanentNames.includes(n))} guests={filterNames.filter(n => !permanentNames.includes(n))} counts={filterCounts} />
+  {/snippet}
+
+  {#snippet banner()}
+    {#if error}<Alert variant="destructive" class="m-2 flex w-auto items-center justify-between gap-2"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={reload} disabled={busy}>{$rt.reload}</Button></Alert>{/if}
+    {#if rehearsal.cancelled || rehearsal.location || rehearsal.note}
+      <div class="flex flex-col gap-0.5 border-b bg-table-selected-bg px-2 py-1 text-body-lg">
+        {#if rehearsal.cancelled}<p class="m-0 font-semibold text-danger-ink"><span aria-hidden="true">🚫</span> {$rt.cancelledHint}</p>{/if}
+        {#if rehearsal.location}<p class="m-0">{rehearsal.location}</p>{/if}
+        {#if rehearsal.note}<p class="m-0 text-body break-words whitespace-pre-wrap text-muted-foreground"><LinkifiedText text={rehearsal.note} /></p>{/if}
+      </div>
+    {/if}
+  {/snippet}
+
+  {#snippet row(item, index)}
+    {@const songKey = rehearsalSongKey(item)}
+    {@const pct = rehearsalReadiness(item.song, activeAttendees)}
+    {@const editable = !rehearsal!.cancelled}
+    {@const full = rehearsalReadiness(item.song)}
+    {@const personal = personalNote(item)}
+    {@const rowBtn = 'no-tint h-auto min-h-10 w-full rounded-none min-mid:w-14'}
+    {@const noteBtn = 'no-tint h-auto min-h-10 w-full rounded-none min-mid:w-16 min-mid:text-glyph'}
+    <StageRow
+      song={item.song}
+      position={index + 1}
+      played={!!item.played}
+      interactive={editable && !busy}
+      onclick={() => togglePlayed(item)}
+      titleLabel={`${item.played ? $rt.markUndone : $rt.markDone}: ${item.song.title}`}
+      onlyrics={() => patch({ lyricsKey: songKey })}
+      leadActive={$dragEnabled && !filtering}
+      cells={rosterCells(item, songKey)}
+      {pct}
+      pctTitle={`${$rt.sessionReadiness}: ${pct ?? '—'}${pct !== null ? '%' : ''} · ${$rt.fullReadiness}: ${full ?? '—'}${full !== null ? '%' : ''}`}
+      hasComment={!!(item.song.comment || editable || item.note || pct === null || item.sourceMissing)}
+      rowClass={[dragMoved && dragIndex === index && 'opacity-35', dragMoved && dropIndex === index && dragIndex !== index && 'bg-muted ring-1 ring-inset ring-border']}
+      rowProps={{ 'data-rehearsal-index': index }}
+    >
+      {#snippet lead()}
+        {#if $dragEnabled && !filtering}<Button variant="ghost" size="icon" class="drag-handle h-6 w-full min-mid:h-5 cursor-grab touch-none rounded-none text-inherit hover:bg-transparent hover:text-primary-ink active:cursor-grabbing disabled:cursor-default" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal!.cancelled} onclick={e => e.stopPropagation()} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</Button>{/if}
+      {/snippet}
+      {#snippet comment()}
+        <!-- Two comments: the song's setlist/catalog comment (read-only here) and this rehearsal's note (editable), plus hints. -->
+        {#if item.song.comment}<div class="text-muted-foreground"><LinkifiedText text={item.song.comment} /></div>{/if}
+        {#if editable}
+          <CommentInput value={item.note ?? ''} onsave={v => action({ songs: rehearsal!.songs.map(s => rehearsalSongKey(s) === songKey ? { ...s, note: v } : s) })} />
+        {:else if item.note}
+          <div class="text-muted-foreground italic"><LinkifiedText text={item.note} /></div>
+        {/if}
+        {#if pct === null}<p class="m-0 text-xs text-muted-foreground">{$rt.noPlayers}</p>{/if}
+        {#if item.sourceMissing}<p class="m-0 truncate text-xs text-muted-foreground" title={$rt.sourceMissing}>{$rt.sourceMissing}</p>{/if}
+      {/snippet}
+      {#snippet actions()}
+        {#if personal}<IconButton class={noteBtn} variant="secondary" icon="🤫" label={$t.common.personalComment} onclick={e => { e.stopPropagation(); patch({ levelPicker: null }); notePopoverStore.getState().toggle(songKey, personal, e.currentTarget as HTMLElement); }} />{/if}
+      {/snippet}
+      {#snippet endActions()}
+        <RowActions inline="bare" variant="outline" class={rowBtn} actions={[{ icon: '🗑️', label: $rt.remove, destructive: true, disabled: busy || !editable, onselect: () => action({ songs: rehearsal!.songs.filter(s => rehearsalSongKey(s) !== songKey) }) }]} />
+      {/snippet}
+    </StageRow>
+  {/snippet}
+</StageView>
+
+<!-- Small screens: filter | actions menu (centre) | drag, like the other pages' bottom bars. -->
+<div class="fixed right-0 bottom-0 left-0 z-21 hidden safe-bar-lg grid-cols-[1fr_auto_1fr] items-center gap-2 border-t bg-card px-2 max-mid:grid">
   <div class="flex justify-end gap-2">
-  <IconButton class="relative {activeFilterCount > 0 ? onClass : ''}" icon="🎛️" label={$t.backlog.filterBtn} pressed={$filterOpenS} onpressedchange={v => patch({ filterOpen: v })}>
-    {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-[0.65rem]">{activeFilterCount}</Badge>{/if}
-  </IconButton>
+    <IconButton class="relative {pressedOn}" icon="🎛️" label={$t.stage.filters} pressed={$filterOpenS || activeFilterCount > 0} expanded={$filterOpenS} onpressedchange={() => patch({ filterOpen: !$filterOpenS })}>
+      {#if activeFilterCount > 0}<Badge class="absolute top-0 right-0 h-4 min-w-4 justify-center px-1 text-micro">{activeFilterCount}</Badge>{/if}
+    </IconButton>
   </div>
   <div>{@render actionsMenu()}</div>
-  <div class="flex justify-start gap-2">{@render dragBtn()}</div>
+  <div class="flex justify-start">{@render dragBtn()}</div>
 </div>
+{:else if error}
+  <Alert variant="destructive" class="m-3 flex w-auto items-center justify-between gap-2"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={reload} disabled={busy}>{$rt.reload}</Button></Alert>
 {/if}
-<div class="p-0 max-mid:pb-[52px]">
-  {#if error}<Alert variant="destructive" class="m-3 flex w-auto items-center justify-between gap-2"><AlertDescription>{error}</AlertDescription><Button variant="outline" size="sm" onclick={reload} disabled={busy}>{$rt.reload}</Button></Alert>{/if}
-  {#if loading}<LoadingCat />
-  {:else if rehearsal}
-    <h1 class="sr-only">{formatDate(rehearsal.date, $lang)} {rehearsalTime(rehearsal)}</h1>
-    {#if rehearsal.cancelled || rehearsal.location || rehearsal.note}
-    <Card class="m-3">
-      <CardContent class="flex flex-col items-start gap-2">
-        {#if rehearsal.cancelled}<Alert><AlertDescription>{$rt.cancelledHint}</AlertDescription></Alert>{/if}
-        {#if rehearsal.location}<p class="m-0 text-base">{rehearsal.location}</p>{/if}
-        {#if rehearsal.note}<p class="m-0 text-[.9rem] break-words whitespace-pre-wrap"><LinkifiedText text={rehearsal.note} /></p>{/if}
-      </CardContent>
-    </Card>
-    {/if}
-    {#if !rehearsal.songs.length}<h2 class="m-3 text-base font-bold">{$rt.songs}</h2>{/if}
-    {#if !rehearsal.songs.length}<Empty class="border"><EmptyHeader><EmptyTitle class="text-base font-normal text-muted-foreground">{$rt.emptySongs}</EmptyTitle></EmptyHeader></Empty>{/if}
-    {#if rehearsal.songs.length}
-    <div>
-      <Table.Root>
-        <SongTableHead {table} offNames={notComing} />
-        <Table.Body class="[&_tr:last-child]:border-0">
-    {#each table.getRowModel().rows as row, index (row.id)}
-      {@const item = row.original.item}
-      {@const songKey = rehearsalSongKey(item)}
-      {@const pct = rehearsalReadiness(item.song, activeAttendees)}
-      {@const editable = !rehearsal.cancelled}
-      {@const full = rehearsalReadiness(item.song)}
-      <SongEntryRow
-        {row}
-        rowActions={[{ icon: '🗑️', label: $rt.remove, destructive: true, disabled: busy || !editable, onselect: () => action({ songs: rehearsal!.songs.filter(s => rehearsalSongKey(s) !== songKey) }) }]}
-        song={item.song}
-        number={index + 1}
-        {pct}
-        pctTitle={`${$rt.sessionReadiness}: ${pct ?? '—'}${pct !== null ? '%' : ''} · ${$rt.fullReadiness}: ${full ?? '—'}${full !== null ? '%' : ''}`}
-        played={!!item.played}
-        stageOf={name => item.song.progress?.[name] ?? 'queue'}
-        {permanentNames}
-        bubbleMusicians={permanentNames}
-        rowClass={{ dragging: dragMoved && dragIndex === index, 'drag-over': dragMoved && dropIndex === index && dragIndex !== index }}
-        rowProps={{ 'data-rehearsal-index': index }}
-        titleFirst
-        onlyrics={() => patch({ lyricsKey: songKey })}
-        personalNote={personalNote(item)}
-        onpersonal={anchor => { patch({ levelPicker: null }); notePopoverStore.getState().toggle(songKey, personalNote(item) ?? '', anchor); }}
-        ontitle={() => togglePlayed(item)}
-        titleLabel={`${item.played ? $rt.markUndone : $rt.markDone}: ${item.song.title}`}
-        titleDisabled={busy || rehearsal.cancelled}
-        disabledMusicians={notComing}
-        oncell={(name, anchor) => pickLevel(songKey, name, anchor)}
-        cellLabel={name => `${name} · ${$t.song.progress}: ${item.song.title}`}
-      >
-        {#snippet dragCell()}
-          {#if $dragEnabled && !filtering}<Button variant="ghost" size="icon" class="drag-handle w-full cursor-grab touch-none rounded-none text-inherit hover:bg-transparent hover:text-primary-ink active:cursor-grabbing disabled:cursor-default" aria-label={`${$rt.drag}: ${item.song.title}`} title={$rt.drag} disabled={busy || rehearsal!.cancelled} onpointerdown={event => startDrag(event, index)} onkeydown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorder(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } }}>⠿</Button>{/if}
-        {/snippet}
-        {#snippet comment()}
-          <!-- One line, two comments: LEFT = the song's setlist/catalog comment (read-only here), RIGHT = this rehearsal's note (editable). -->
-          <div class="flex min-w-0 items-center gap-3">
-            {#if item.song.comment}
-              <span class="block min-w-0 max-w-[45%] shrink-0 truncate text-[.85rem] text-muted-foreground" title={item.song.comment}><LinkifiedText text={item.song.comment} /></span>
-            {/if}
-            <div class="min-w-0 flex-1">
-              {#if editable}
-                <CommentInput value={item.note ?? ''} onsave={v => action({ songs: rehearsal!.songs.map(s => rehearsalSongKey(s) === songKey ? { ...s, note: v } : s) })} />
-              {:else if item.note}
-                <span class="block truncate text-[.85rem] text-muted-foreground italic"><LinkifiedText text={item.note} /></span>
-              {/if}
-            </div>
-          </div>
-        {/snippet}
-        {#snippet extras()}
-          {#if pct === null}<p class="mt-1 mb-0 text-xs whitespace-normal text-muted-foreground">{$rt.noPlayers}</p>{/if}
-          {#if item.sourceMissing}<p class="mt-1 mb-0 truncate text-xs text-muted-foreground" title={$rt.sourceMissing}>{$rt.sourceMissing}</p>{/if}
-        {/snippet}
-      </SongEntryRow>
-    {/each}
-        </Table.Body>
-      </Table.Root>
-    </div>
-    {/if}
-  {/if}
-</div>
 {#if showForm && rehearsal}<RehearsalForm title={repeating ? $rt.repeat : $rt.edit} initial={formInitial} onsubmit={saveForm} onclose={() => patch({ showForm: false })} />{/if}
-<AlertDialog.Root open={$confirmS !== null} onOpenChange={value => { if (!value) patch({ confirm: null }); }}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$confirmS === 'delete' ? $rt.delete : $rt.cancelSession}</AlertDialog.Title>
-      <AlertDialog.Description>{$confirmS === 'delete' ? $rt.deleteConfirm : $rt.cancelConfirm}</AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$rt.close}</AlertDialog.Cancel>
-      <AlertDialog.Action class={$confirmS === 'delete' ? 'bg-destructive text-white hover:bg-destructive/90' : ''} onclick={confirmed}>{$confirmS === 'delete' ? $rt.delete : $rt.cancelSession}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-{#if lyrics}<LyricsOverlay song={lyrics.song} onclose={() => patch({ lyricsKey: null })} onsavetranspose={async song => song} />{/if}
+<ConfirmDialog open={$confirmS !== null} title={$confirmS === 'delete' ? $rt.delete : $rt.cancelSession} description={$confirmS === 'delete' ? $rt.deleteConfirm : $rt.cancelConfirm} confirmLabel={$confirmS === 'delete' ? $rt.delete : $rt.cancelSession} cancelLabel={$rt.close} destructive={false} confirmClass={$confirmS === 'delete' ? 'bg-destructive text-white hover:bg-destructive/90' : ''} onopenchange={value => { if (!value) patch({ confirm: null }); }} onconfirm={confirmed} />
 {/if}

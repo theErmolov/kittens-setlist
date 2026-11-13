@@ -11,9 +11,11 @@
   import { cn } from '$lib/utils';
 
   let {
-    icon, label, variant = 'outline', pressed, expanded, onpressedchange, onclick, href, disabled = false, class: className, children, ...rest
+    icon, label, text, variant = 'outline', pressed, expanded, onpressedchange, onclick, href, disabled = false, class: className, children, ...rest
   }: {
     icon: string;
+    /** Visible text next to the icon on the big tier (the button widens); smaller tiers stay icon-only. */
+    text?: string;
     /** Tooltip text and aria-label (always required: the button has no visible text). */
     label: string;
     variant?: ButtonVariant;
@@ -33,7 +35,7 @@
   } = $props();
 
   // The filter button: its glyph is never tinted (it keeps its own colours on every fill) and it has no border.
-  const size = $derived(cn('size-10 min-w-10 p-0 text-lg leading-none', icon === '🎛️' && 'no-tint border-0', icon === '⠿' && 'border-0', variant === 'default' && 'border-0 bg-clip-border'));
+  const size = $derived(cn('size-10 min-w-10 p-0 text-lg leading-none', text && 'big:w-auto big:gap-2 big:px-3.5', icon === '🎛️' && 'no-tint border-0', icon === '⠿' && 'border-0', variant === 'default' && 'border-0 bg-clip-border'));
 </script>
 
 <Tooltip.Root>
@@ -41,11 +43,11 @@
     {#snippet child({ props })}
       {#if pressed !== undefined}
         <Toggle {...props} {...rest} variant="outline" {pressed} onPressedChange={onpressedchange} {disabled} aria-label={label} class={cn(size, className)}>
-          <span aria-hidden="true">{icon}</span>{@render children?.()}
+          <span aria-hidden="true">{icon}</span>{#if text}<span class="max-big:hidden text-sm font-semibold">{text}</span>{/if}{@render children?.()}
         </Toggle>
       {:else}
         <Button {...props} {...rest} {variant} {href} {onclick} {disabled} aria-label={label} aria-expanded={expanded} class={cn(size, className)}>
-          <span aria-hidden="true">{icon}</span>{@render children?.()}
+          <span aria-hidden="true">{icon}</span>{#if text}<span class="max-big:hidden text-sm font-semibold">{text}</span>{/if}{@render children?.()}
         </Button>
       {/if}
     {/snippet}

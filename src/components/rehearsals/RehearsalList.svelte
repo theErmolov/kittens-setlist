@@ -34,9 +34,9 @@
             <Item.Title class={cn('line-clamp-none flex w-full flex-wrap items-baseline gap-x-2', r.cancelled && 'line-through')}>
               <span class="font-semibold">{formatDate(r.date, $lang)}</span>
               <span class={cn('font-semibold', !r.cancelled && timeText(isPastRehearsal(r)))}>{rehearsalTime(r)}</span>
-              {#if r.cancelled}<Badge class="bg-danger text-danger-ink no-underline">{$rt.cancelled}</Badge>{/if}
+              {#if r.cancelled}<Badge class="bg-danger-soft text-danger-ink no-underline">{$rt.cancelled}</Badge>{/if}
             </Item.Title>
-            <Item.Description class="line-clamp-none flex flex-wrap gap-x-2 text-[.8rem]">
+            <Item.Description class="line-clamp-none flex flex-wrap gap-x-2 text-small">
               {#if name}<span class="text-primary-ink"><span aria-hidden="true">🎪</span> {name}</span>{/if}
               {#if people(r).length}
                 <span class="max-w-full truncate">{#each people(r) as p, i (p.name)}{#if i > 0}<span class="mx-1">·</span>{/if}<span class={p.absent ? 'line-through opacity-70' : ''}>{p.name}</span>{/each}</span>
@@ -44,7 +44,7 @@
             </Item.Description>
             {#if r.songs.length}
               <!-- The actual songs, as a bullet list (columns as room allows; always two on small screens, in a smaller font). -->
-              <ul class="m-0 mt-2 grid list-disc grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-6 gap-y-2 pl-5 text-[.85rem] marker:text-primary-ink max-mid:grid-cols-2 max-mid:gap-x-4 max-mid:pl-4 max-mid:text-[.72rem]" aria-label={$rt.colSongs}>
+              <ul class="m-0 mt-2 grid list-disc grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-6 gap-y-2 pl-5 text-body marker:text-primary-ink max-mid:grid-cols-2 max-mid:gap-x-4 max-mid:pl-4 max-mid:text-tiny" aria-label={$rt.colSongs}>
                 {#each r.songs as item, i (`${item.sourceSetlistId ?? ''}:${item.songId}:${i}`)}
                   <li class={cn('min-w-0 leading-tight', item.played && 'text-muted-foreground line-through')} title="{item.song.artist} – {item.song.title}">
                     <!-- Always two lines: the artist, then the song name; neither wraps (long text is cut with an ellipsis). -->

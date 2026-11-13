@@ -15,7 +15,7 @@
       {#each group.headers as header (header.id)}
         {@const id = header.column.id}
         {@const mi = id.startsWith('m:') ? group.headers.filter(h => h.column.id.startsWith('m:')).findIndex(h => h.column.id === id) : -1}
-        <Table.Head style={colMeta(header.column).style} class={cn(colMeta(header.column).headCls, mi >= 0 && offNames.includes(id.slice(2)) && 'opacity-40', mi >= 0 && 'text-center')}>
+        <Table.Head class={cn('bg-table-head-bg', mi >= 0 && mi % 2 === 0 && 'bg-table-zebra-bg', colMeta(header.column).headCls, mi >= 0 && offNames.includes(id.slice(2)) && 'opacity-40', mi >= 0 && 'text-center')}>
           <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
         </Table.Head>
       {/each}

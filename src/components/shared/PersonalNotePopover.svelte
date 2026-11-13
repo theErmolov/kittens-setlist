@@ -30,12 +30,12 @@
       onInteractOutside={e => { if ($open.anchor.contains(e.target as Node | null)) e.preventDefault(); }}
     >
       <div class="flex items-center justify-between gap-3">
-        <span class="text-[.8rem] font-semibold text-muted-foreground">{$open.icon ?? '🤫'} {$open.title ?? $t.common.personalComment}</span>
+        <span class="text-small font-semibold text-muted-foreground">{$open.icon ?? '🤫'} {$open.title ?? $t.common.personalComment}</span>
         {#if $open.onedit}
           <IconButton icon="✏️" label={$open.editLabel ?? $t.common.edit} onclick={() => { const edit = $open?.onedit; close(); edit?.(); }} />
         {/if}
       </div>
-      <p class="m-0 text-[.9rem] break-words whitespace-pre-wrap"><LinkifiedText text={$open.text} /></p>
+      <p class="m-0 text-body-lg break-words whitespace-pre-wrap"><LinkifiedText text={$open.text} /></p>
     </Popover.Content>
   {/if}
 </Popover.Root>

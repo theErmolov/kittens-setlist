@@ -11,6 +11,6 @@
 </script>
 
 <Badge
-  class={cn('cursor-default font-bold tracking-[0.04em] normal-case', vibe ? 'bg-success text-success-ink' : 'bg-warning text-warning-ink', className)}
+  class={cn('cursor-default font-bold tracking-[0.04em] normal-case', vibe ? 'bg-vibe-on-bg text-vibe-on-ink' : 'bg-vibe-off-bg text-vibe-off-ink', className)}
   title={$t.setlists.vibeTooltip}
 >{vibe ? $t.setlists.vibeOn : $t.setlists.vibeOff}</Badge>
