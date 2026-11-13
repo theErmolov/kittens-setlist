@@ -29,3 +29,8 @@ api/dist/
 
 # CLI
 .antigravitycli/
+
+# IDE
+.idea/
+
+src/lib/dev/mock-data.json

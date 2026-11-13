@@ -4,38 +4,49 @@
   import { base } from '$app/paths';
   import { lang, t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
-  import { getBudget, getSetlists, deleteBudgetEntry, updateBudgetEntry, getReceiptUrl } from '$lib/api';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { budgetQuery, setlistsQuery } from '$lib/query/queries';
+  import { useBudgetMutations } from '$lib/query/shell';
+  import { useStore } from '$lib/store/bridge';
+  import { budgetStore } from '$lib/store/shell';
   import { budgetTotals, buildBudgetReport, formatEUR } from '$lib/utils';
-  import type { BudgetEntry, BudgetKind, Setlist } from '$lib/types';
+  import type { BudgetEntry } from '$lib/types';
+  import { Button } from '$components/ui/button';
+  import { Badge } from '$components/ui/badge';
+  import { Card } from '$components/ui/card';
+  import { getCoreRowModel, getSortedRowModel, type ColumnDef } from '@tanstack/table-core';
+  import { createSvelteTable, FlexRender, renderSnippet } from '$components/ui/data-table';
+  import DataTableView from '$components/shared/DataTableView.svelte';
+  import * as Empty from '$components/ui/empty';
+  import RowActions, { type RowAction } from '$components/shared/RowActions.svelte';
+  import ConfirmDialog from '$components/shared/ConfirmDialog.svelte';
   import BudgetEntryModal from '$components/budget/BudgetEntryModal.svelte';
 
-  let entries = $state<BudgetEntry[]>([]);
-  let setlists = $state<Setlist[]>([]);
-  let loading = $state(true);
-  let dataLoaded = $state(false);
+  const isAdminUser = $derived(!$authLoading && $currentUser?.isAdmin === true);
+  const budget = createQuery(() => ({ ...budgetQuery(), enabled: isAdminUser }));
+  const setlistsResult = createQuery(() => ({ ...setlistsQuery(), enabled: isAdminUser }));
+  const mutations = useBudgetMutations();
 
-  let modalKind = $state<BudgetKind | null>(null);
-  let editEntry = $state<BudgetEntry | null>(null);
+  const modalKind = useStore(budgetStore, s => s.modalKind);
+  const reportText = useStore(budgetStore, s => s.reportText);
+  const copied = useStore(budgetStore, s => s.copied);
+  const deleteTarget = useStore(budgetStore, s => s.deleteTargetId);
+  const sorting = useStore(budgetStore, s => s.sorting);
+  const bs = budgetStore.getState;
 
-  let reportText = $state('');
-  let copied = $state(false);
+  const entries = $derived(budget.data ?? []);
+  const setlists = $derived(setlistsResult.data ?? []);
+  const loading = $derived(budget.isPending || setlistsResult.isPending);
 
   const totals = $derived(budgetTotals(entries));
-  const visible = $derived(
-    [...entries].sort((a, b) => b.date.localeCompare(a.date))
-  );
 
-  // Admin-only guard + data load (mirrors the admin page)
+  // Admin-only guard (mirrors the admin page)
   $effect(() => {
-    if ($authLoading || dataLoaded) return;
-    if (!$currentUser?.isAdmin) { goto(`${base}/backlog`); return; }
-    dataLoaded = true;
-    Promise.all([getBudget(), getSetlists()]).then(([b, s]) => {
-      entries = b;
-      setlists = s;
-      loading = false;
-    });
+    if ($authLoading) return;
+    if (!$currentUser?.isAdmin) goto(`${base}/backlog`);
   });
+
+  const kindColor = { income: 'bg-success-soft text-success-ink', expense: 'bg-danger-soft text-danger-ink', debt: 'bg-warning-soft text-warning-ink' } as const;
 
   const setlistName = (id?: string) => setlists.find(s => s.id === id)?.name;
 
@@ -45,177 +56,181 @@
     return new Intl.DateTimeFormat($lang === 'ru' ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
   }
 
-  function openAdd(kind: BudgetKind) { editEntry = null; modalKind = kind; }
-  function openEdit(e: BudgetEntry) { editEntry = e; modalKind = e.kind; }
-  function closeModal() { modalKind = null; editEntry = null; }
+  // Data Table: default sort is date descending; sorting state lives in budgetStore.
+  const who = (e: BudgetEntry) => e.kind === 'income' ? e.person || '—' : e.kind === 'expense' ? e.spentBy || '—' : e.creditor || '—';
+  const columns = $derived<ColumnDef<BudgetEntry>[]>([
+    { id: 'date', accessorFn: e => e.date, header: $t.budget.date, meta: { cellClass: 'whitespace-nowrap max-mid:basis-full' }, cell: ({ row }) => renderSnippet(dateCell, row.original) },
+    { id: 'kind', accessorFn: e => e.kind, header: $t.budget.cols.kind, enableSorting: false, cell: ({ row }) => renderSnippet(kindCell, row.original) },
+    { id: 'who', accessorFn: who, header: $t.budget.cols.who, enableSorting: false, cell: ({ row }) => renderSnippet(whoCell, row.original) },
+    { id: 'what', accessorFn: e => (e.kind === 'expense' ? e.description : '') ?? '', header: $t.budget.cols.what, enableSorting: false, meta: { cellClass: 'whitespace-normal max-mid:basis-full' }, cell: ({ row }) => renderSnippet(whatCell, row.original) },
+    { id: 'method', accessorFn: e => (e.kind === 'debt' ? '' : e.method), header: $t.budget.method, enableSorting: false, cell: ({ row }) => renderSnippet(methodCell, row.original) },
+    { id: 'amount', accessorFn: e => e.amount, header: $t.budget.amount, meta: { cellClass: 'text-right' }, cell: ({ row }) => renderSnippet(amountCell, row.original) },
+    { id: 'paid', accessorFn: e => (e.kind === 'debt' ? e.paid : false) ?? false, header: $t.budget.cols.paid, enableSorting: false, cell: ({ row }) => renderSnippet(paidCell, row.original) },
+    { id: 'actions', header: '', enableSorting: false, meta: { cellClass: 'w-16 max-mid:ml-auto' }, cell: ({ row }) => renderSnippet(actionsCell, row.original) },
+  ]);
+  const table = createSvelteTable<BudgetEntry>({
+    get data() { return entries; },
+    get columns() { return columns; },
+    getRowId: e => e.id,
+    state: { get sorting() { return $sorting; } },
+    onSortingChange: updater => bs().setSorting(updater),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
-  function onSaved(saved: BudgetEntry) {
-    const i = entries.findIndex(e => e.id === saved.id);
-    entries = i >= 0
-      ? entries.map(e => e.id === saved.id ? saved : e)
-      : [...entries, saved];
+  function rowActions(e: BudgetEntry): RowAction[] {
+    const out: RowAction[] = [];
+    if (e.kind === 'expense' && e.receiptKey) out.push({ icon: '🧾', label: $t.budget.viewReceipt.replace('🧾', '').trim(), onselect: () => openReceipt(e) });
+    if (e.kind === 'debt') out.push({ icon: e.paid ? '❌' : '✅', label: $t.budget.markPaid, onselect: () => void togglePaid(e) });
+    out.push({ icon: '✏️', label: $t.budget.edit, onselect: () => bs().openEdit(e) });
+    out.push({ icon: '🗑️', label: $t.budget.delete, destructive: true, separatorBefore: true, onselect: () => bs().setDeleteTarget(e.id) });
+    return out;
   }
 
-  async function handleDelete(e: BudgetEntry) {
-    if (!confirm($t.budget.deleteConfirm)) return;
-    await deleteBudgetEntry(e.id);
-    entries = entries.filter(x => x.id !== e.id);
+  async function handleDelete() {
+    const target = bs().deleteTargetId;
+    bs().setDeleteTarget(null);
+    if (target) await mutations.remove.mutateAsync(target);
   }
 
   async function togglePaid(e: BudgetEntry) {
     if (e.kind !== 'debt') return;
-    const updated = await updateBudgetEntry({
+    await mutations.update.mutateAsync({
       ...e,
       paid: !e.paid,
       ...(e.paid ? {} : { paidAt: new Date().toISOString() }),
     });
-    entries = entries.map(x => x.id === updated.id ? updated : x);
   }
 
-  async function openReceipt(e: BudgetEntry) {
-    const url = await getReceiptUrl(e.id);
-    window.open(url, '_blank');
+  function openReceipt(e: BudgetEntry) {
+    mutations.openReceipt.mutate(e.id);
   }
 
   function generateReport() {
-    reportText = buildBudgetReport(entries, setlists, Date.now(), $lang);
-    copied = false;
+    bs().setReport(buildBudgetReport(entries, setlists, Date.now(), $lang));
   }
 
   async function copyReport() {
-    await navigator.clipboard.writeText(reportText);
-    copied = true;
-    setTimeout(() => { copied = false; }, 1500);
+    await navigator.clipboard.writeText($reportText);
+    bs().setCopied(true);
+    setTimeout(() => { bs().setCopied(false); }, 1500);
   }
 </script>
+
+{#snippet stat(label: string, value: string, accent = false, neg = false)}
+  <Card class="card min-w-0 flex-[1_1_110px] gap-1 rounded-soft p-3 {accent ? 'accent border-primary bg-primary-soft' : ''}">
+    <span class="card-lbl text-small text-muted-foreground">{label}</span>
+    <span class="card-val text-title-sm font-bold {neg ? 'neg text-danger-ink' : ''}">{value}</span>
+  </Card>
+{/snippet}
 
 {#if $currentUser?.isAdmin}
 <div>
   {#if loading}
-    <p class="loading"><LoadingCat /></p>
+    <LoadingCat />
   {:else}
     <!-- Dashboard: Наличка + Переводы = На руках − Долги = Баланс -->
-    <div class="dash">
-      <div class="card"><span class="card-lbl">{$t.budget.dash.cash}</span><span class="card-val">{formatEUR(totals.cash, $lang)}</span></div>
-      <span class="op">+</span>
-      <div class="card"><span class="card-lbl">{$t.budget.dash.transfer}</span><span class="card-val">{formatEUR(totals.transfer, $lang)}</span></div>
-      <span class="op">=</span>
-      <div class="card accent"><span class="card-lbl">{$t.budget.dash.onHand}</span><span class="card-val">{formatEUR(totals.onHand, $lang)}</span></div>
-      <span class="op">−</span>
-      <div class="card"><span class="card-lbl">{$t.budget.dash.debts}</span><span class="card-val neg">{formatEUR(totals.debts, $lang)}</span></div>
-      <span class="op">=</span>
-      <div class="card accent"><span class="card-lbl">{$t.budget.dash.balance}</span><span class="card-val" class:neg={totals.balance < 0}>{formatEUR(totals.balance, $lang)}</span></div>
+    <div class="dash mb-5 flex flex-wrap items-center gap-2">
+      {@render stat($t.budget.dash.cash, formatEUR(totals.cash, $lang))}
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">+</span>
+      {@render stat($t.budget.dash.transfer, formatEUR(totals.transfer, $lang))}
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">=</span>
+      {@render stat($t.budget.dash.onHand, formatEUR(totals.onHand, $lang), true)}
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">−</span>
+      {@render stat($t.budget.dash.debts, formatEUR(totals.debts, $lang), false, true)}
+      <span class="op shrink-0 text-title font-bold text-muted-foreground">=</span>
+      {@render stat($t.budget.dash.balance, formatEUR(totals.balance, $lang), true, totals.balance < 0)}
     </div>
 
     <!-- Add buttons -->
-    <div class="toolbar">
-      <button class="btn-add income" onclick={() => openAdd('income')}>{$t.budget.addIncome}</button>
-      <button class="btn-add expense" onclick={() => openAdd('expense')}>{$t.budget.addExpense}</button>
-      <button class="btn-add debt" onclick={() => openAdd('debt')}>{$t.budget.addDebt}</button>
+    <div class="toolbar mb-3.5 flex flex-wrap items-center gap-2">
+      <Button variant="outline" class="btn-add income flex-auto border-l-4 border-l-success-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('income')}>{$t.budget.addIncome}</Button>
+      <Button variant="outline" class="btn-add expense flex-auto border-l-4 border-l-danger-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('expense')}>{$t.budget.addExpense}</Button>
+      <Button variant="outline" class="btn-add debt flex-auto border-l-4 border-l-warning-ink px-3.5 text-body font-semibold" onclick={() => bs().openAdd('debt')}>{$t.budget.addDebt}</Button>
     </div>
 
     <!-- Entries -->
-    {#if visible.length === 0}
-      <p class="empty">{$t.budget.empty}</p>
+    {#if entries.length === 0}
+      <Empty.Root class="empty mb-7 border">
+        <Empty.Header><Empty.Description>{$t.budget.empty}</Empty.Description></Empty.Header>
+      </Empty.Root>
     {:else}
-      <div class="rows">
-        {#each visible as e (e.id)}
-          <div class="row" class:paid={e.kind === 'debt' && e.paid}>
-            <div class="row-main">
-              <span class="badge {e.kind}">{$t.budget.kind[e.kind]}</span>
-              <span class="row-amount" class:pos={e.kind === 'income'} class:neg={e.kind === 'expense'} class:debt={e.kind === 'debt'}>
-                {e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}{formatEUR(e.amount, $lang)}
-              </span>
-              <span class="row-who">
-                {#if e.kind === 'income'}{e.person || '—'}
-                {:else if e.kind === 'expense'}{e.description || e.spentBy || '—'}
-                {:else}{e.creditor || '—'}{/if}
-              </span>
-              {#if (e.kind === 'income' || e.kind === 'expense')}
-                <span class="chip">{e.method === 'cash' ? $t.budget.methodCash : $t.budget.methodTransfer}</span>
-              {/if}
-            </div>
-            <div class="row-meta">
-              <span>{fmtDate(e.date)}</span>
-              {#if setlistName(e.setlistId)}<span>· {setlistName(e.setlistId)}</span>{/if}
-              {#if e.comment}<span>· {e.comment}</span>{/if}
-            </div>
-            <div class="row-actions">
-              {#if e.kind === 'expense' && e.receiptKey}
-                <button class="icon-btn" onclick={() => openReceipt(e)} title={$t.budget.viewReceipt}>🧾</button>
-              {/if}
-              {#if e.kind === 'debt'}
-                <button class="icon-btn" onclick={() => togglePaid(e)} title={$t.budget.markPaid}>{e.paid ? '✕' : '✓'}</button>
-              {/if}
-              <button class="icon-btn" onclick={() => openEdit(e)} title={$t.budget.edit}>✏️</button>
-              <button class="icon-btn danger" onclick={() => handleDelete(e)}>🗑</button>
-            </div>
-          </div>
-        {/each}
+      <div class="mb-7">
+        <DataTableView
+          {table}
+          class="rows table-stack"
+          rowClass={row => `row max-mid:flex max-mid:flex-wrap max-mid:items-center max-mid:gap-x-3 max-mid:px-3 max-mid:py-2 ${row.original.kind === 'debt' && row.original.paid ? 'paid opacity-55' : ''}`}
+          cellClass="max-mid:not-last:border-r-0 max-mid:p-0"
+          headProps={header => ({ 'aria-sort': header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined })}
+        >
+          {#snippet head(header)}
+            {#if header.column.getCanSort()}
+              <button type="button" class="inline-flex cursor-pointer items-center gap-1 font-[inherit] uppercase tracking-[inherit] hover:text-foreground" onclick={header.column.getToggleSortingHandler()}>
+                <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+                <span aria-hidden="true">{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : ''}</span>
+              </button>
+            {:else}
+              <FlexRender content={header.column.columnDef.header} context={header.getContext()} />
+            {/if}
+          {/snippet}
+        </DataTableView>
       </div>
     {/if}
 
     <!-- Report -->
-    <div class="report">
-      <div class="report-head">
-        <h2>{$t.budget.report}</h2>
-        <button class="btn-secondary" onclick={generateReport}>{$t.budget.generateReport}</button>
+    <div class="report border-t pt-4">
+      <div class="report-head mb-3 flex items-center justify-between gap-2.5">
+        <h2 class="text-title-sm">{$t.budget.report}</h2>
+        <Button variant="outline" class="px-4.5 text-body" onclick={generateReport}>{$t.budget.generateReport}</Button>
       </div>
-      {#if reportText}
-        <pre>{reportText}</pre>
-        <button class="btn-primary" onclick={copyReport}>{copied ? $t.budget.copied : $t.budget.copy}</button>
+      {#if $reportText}
+        <Card class="mb-3 gap-0 rounded-soft p-3.5"><pre class="whitespace-pre-wrap font-[inherit] text-body-lg">{$reportText}</pre></Card>
+        <Button class="px-4.5 text-body font-semibold" onclick={copyReport}>{$copied ? $t.budget.copied : $t.budget.copy}</Button>
       {/if}
     </div>
   {/if}
 </div>
 
-{#if modalKind}
-  <BudgetEntryModal kind={modalKind} entry={editEntry} {setlists} onclose={closeModal} onsaved={onSaved} />
+{#if $modalKind}
+  <BudgetEntryModal />
 {/if}
 
+<ConfirmDialog
+  open={$deleteTarget !== null}
+  description={$t.budget.deleteConfirm}
+  confirmLabel={$t.budget.delete}
+  onopenchange={open => { if (!open) bs().setDeleteTarget(null); }}
+  onconfirm={handleDelete}
+/>
+
 {/if}
 
-<style>
-  .loading, .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-
-  .dash { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-  .card { flex: 1 1 110px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-  .card.accent { border-color: var(--accent); background: var(--chip-bg); }
-  .card-lbl { font-size: 0.78rem; color: var(--text-muted); }
-  .card-val { font-size: 1.1rem; font-weight: 700; }
-  .card-val.neg { color: #e05252; }
-  .op { flex: 0 0 auto; font-size: 1.2rem; font-weight: 700; color: var(--text-muted); }
-
-  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .btn-add { flex: 1 1 auto; padding: 8px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem; border-left-width: 4px; }
-  .btn-add.income { border-left-color: #3a9e5c; }
-  .btn-add.expense { border-left-color: #e05252; }
-  .btn-add.debt { border-left-color: #d98a1f; }
-
-  .rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
-  .row { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; }
-  .row.paid { opacity: 0.55; }
-  .row-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .badge { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 6px; color: #fff; }
-  .badge.income { background: #3a9e5c; }
-  .badge.expense { background: #e05252; }
-  .badge.debt { background: #d98a1f; }
-  .row-amount { font-weight: 700; font-size: 1rem; }
-  .row-amount.pos { color: #3a9e5c; }
-  .row-amount.neg { color: #e05252; }
-  .row-amount.debt { color: #d98a1f; }
-  .row-who { color: var(--text); }
-  .chip { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: var(--chip-bg); color: var(--text-muted); }
-  .row-meta { font-size: 0.78rem; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; }
-  .row-actions { display: flex; gap: 4px; position: absolute; top: 8px; right: 8px; }
-  .icon-btn { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 2px 4px; line-height: 1; }
-  .icon-btn.danger { filter: grayscale(0.2); }
-
-  .report { border-top: 1px solid var(--border); padding-top: 16px; }
-  .report-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-  .report-head h2 { font-size: 1.1rem; }
-  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; white-space: pre-wrap; font-family: inherit; font-size: 0.9rem; margin-bottom: 12px; }
-
-  .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
-  .btn-secondary { padding: 8px 18px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
-</style>
+{#snippet dateCell(e: BudgetEntry)}{fmtDate(e.date)}{/snippet}
+{#snippet kindCell(e: BudgetEntry)}
+  <Badge class="badge {e.kind} {kindColor[e.kind]} h-auto rounded-md px-1.75 py-0.5 text-micro font-bold uppercase tracking-[0.03em]">{$t.budget.kind[e.kind]}</Badge>
+{/snippet}
+{#snippet whoCell(e: BudgetEntry)}<span class="row-who">{who(e)}</span>{/snippet}
+{#snippet whatCell(e: BudgetEntry)}
+  <span class="block">{e.kind === 'expense' ? e.description || '' : ''}</span>
+  <span class="row-meta block text-small text-muted-foreground">
+    {#if setlistName(e.setlistId)}{setlistName(e.setlistId)}{/if}{#if setlistName(e.setlistId) && e.comment} · {/if}{#if e.comment}{e.comment}{/if}
+  </span>
+{/snippet}
+{#snippet methodCell(e: BudgetEntry)}
+  {#if e.kind === 'income' || e.kind === 'expense'}
+    <Badge variant="secondary" class="chip h-auto px-2 py-0.5 text-tiny font-normal text-muted-foreground">{e.method === 'cash' ? $t.budget.methodCash : $t.budget.methodTransfer}</Badge>
+  {/if}
+{/snippet}
+{#snippet amountCell(e: BudgetEntry)}
+  <span class="row-amount text-base font-bold {e.kind === 'income' ? 'pos text-success-ink' : e.kind === 'expense' ? 'neg text-danger-ink' : 'debt text-warning-ink'}">
+    {e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}{formatEUR(e.amount, $lang)}
+  </span>
+{/snippet}
+{#snippet paidCell(e: BudgetEntry)}
+  {#if e.kind === 'debt' && e.paid}
+    <Badge variant="secondary" class="bg-success-soft text-success-ink">{$t.budget.paid}</Badge>
+  {/if}
+{/snippet}
+{#snippet actionsCell(e: BudgetEntry)}
+  <RowActions inline actions={rowActions(e)} />
+{/snippet}

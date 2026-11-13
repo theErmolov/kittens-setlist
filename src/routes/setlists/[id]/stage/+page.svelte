@@ -1,65 +1,42 @@
 <script lang="ts">
+  import NotFound from '$components/shared/NotFound.svelte';
+  import { browser } from '$app/environment';
   import LoadingCat from '$components/shared/LoadingCat.svelte';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import { base } from '$app/paths';
-  import StageView from '$components/stage/StageView.svelte';
-  import { getSetlist, getMusicians } from '$lib/api';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import SetlistStage from '$components/stage/SetlistStage.svelte';
   import { t } from '$lib/i18n';
   import { currentUser, authLoading } from '$lib/auth';
-  import type { Setlist, BandMusician } from '$lib/types';
+  import { musiciansQuery } from '$lib/query/queries';
+  import { stageIsApproved } from '$lib/store/stage';
+  import { keys } from '$lib/query/queries';
+  import { stageSetlistQuery } from '$lib/query/stage';
 
-  let id = $derived(page.params.id);
-  let setlist = $state<Setlist | undefined>(undefined);
-  let musicians = $state<BandMusician[]>([]);
-  let loading = $state(true);
-
-  let canMark = $derived($currentUser?.isAdmin === true || ($currentUser?.status === 'approved' && $currentUser?.role === 'writer'));
-  // admin/writer: 2s, reader: 10s, anonymous: 30s
-  let pollInterval = $derived(
-    canMark ? 2000 : $currentUser?.status === 'approved' ? 10000 : 30000
-  );
+  const qc = useQueryClient();
+  let id = $derived(page.params.id ?? '');
+  const setlistQ = createQuery(() => ({ ...stageSetlistQuery(id), enabled: !!id }));
+  const musiciansQ = createQuery(() => ({ ...musiciansQuery(), enabled: $stageIsApproved }));
+  // One version of the page: wait for the session and the band roster (the musician columns depend on both) before drawing anything.
+  const loading = $derived(!browser || setlistQ.isPending || $authLoading || ($stageIsApproved && musiciansQ.isPending));
 
   afterNavigate(() => { window.scrollTo(0, 0); });
 
+  // Personal comments depend on the viewer: reload when the user changes.
+  let seen = false;
+  let lastUserId: string | undefined;
   $effect(() => {
-    const authorId = $currentUser?.id;
-    const targetId = id;
-    if (!targetId) return;
-    loading = true;
-    getSetlist(targetId).then(s => {
-      if (id !== targetId || $currentUser?.id !== authorId) return;
-      setlist = s;
-      loading = false;
-    }).catch(() => {
-      if (id === targetId) {
-        setlist = undefined;
-        loading = false;
-      }
-    });
-  });
-
-  // Load musicians once auth resolves (in case auth finished after mount)
-  $effect(() => {
-    if ($authLoading || !$currentUser || $currentUser.status !== 'approved') return;
-    if (musicians.length === 0) {
-      getMusicians().then(m => { musicians = m; }).catch(() => {});
-    }
+    const userId = $currentUser?.id;
+    if (seen && userId !== lastUserId && id) qc.invalidateQueries({ queryKey: keys.setlist(id) });
+    lastUserId = userId;
+    seen = true;
   });
 </script>
 
 {#if loading}
-  <div class="not-found"><p><LoadingCat /></p></div>
-{:else if setlist}
-  <StageView {setlist} {musicians} {canMark} {pollInterval} />
+  <LoadingCat />
+{:else if setlistQ.data}
+  <SetlistStage setlistId={id} />
 {:else}
-  <div class="not-found">
-    <p>{$t.notFound.message}</p>
-    <a href="{base}/setlists">{$t.notFound.back}</a>
-  </div>
+  <NotFound backLabel={$t.notFound.back} />
 {/if}
-
-<style>
-  .not-found { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-  .not-found a { color: var(--accent); text-decoration: none; }
-</style>

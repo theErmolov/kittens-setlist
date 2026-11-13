@@ -1,3 +1,28 @@
+import { clsx, type ClassValue } from 'clsx';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+/** tailwind-merge that knows the app's custom type scale (`--text-*`) and radius (`--radius-soft`) from app.css, so `text-small` and `text-muted-foreground` are not mistaken for each other. */
+const twMerge = extendTailwindMerge({ extend: { classGroups: { 'font-size': [{ text: ['micro', 'tiny', 'caption', 'small', 'body', 'body-lg', 'lead', 'title-sm', 'title', 'glyph'] }], rounded: [{ rounded: ['soft'] }], leading: [{ leading: ['compact'] }] } } });
+
+/** Strips a leading emoji / drag-handle glyph and whitespace from a label ("🎛️ Filters" → "Filters"). */
+export const stripLeadingEmoji = (text: string) => text.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D⠿\s]+/u, '');
+
+/** ISO date (YYYY-MM-DD) from numeric year, 1-based month and day. */
+export const isoDate = (year: number, month: number, day: number) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+/** Class-name helper used by the shadcn-svelte components. */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Type helpers used by the shadcn-svelte components (src/components/ui).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChild<T> = T extends { child?: any } ? Omit<T, 'child'> : T;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, 'children'> : T;
+export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
+export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
+
 import type { Instrument, LearningStage, MusicianRole, BudgetEntry, Setlist } from '$lib/types';
 
 export const STAGE_PCT: Record<LearningStage, number> = {
@@ -15,27 +40,28 @@ export function progressPct(
   return Math.round(total / active.length);
 }
 
-/** Inline CSS style string for a progress percentage bubble. */
-export function pctBubbleStyle(pct: number): string {
-  if (pct === 100) return 'border: 1px solid #16a34a; color: #16a34a; background: transparent';
-  if (pct >= 75)   return 'background: rgba(255,220,0,0.2); color: #ca8a04';
-  if (pct > 0)     return 'background: rgba(255,0,0,0.2); color: #dc2626';
-  return                  'background: rgba(128,128,128,0.2); color: #6b7280';
+/** Classes for a progress percentage bubble: 100 = green outline, >=75 = yellow, >0 = red, 0 = gray (the `--pct-*` tokens). */
+export function pctBubbleClass(pct: number): string {
+  return pct === 100 ? 'border-pct-full-border bg-pct-full-bg text-pct-full-ink'
+    : pct >= 75 ? 'border-pct-high-border bg-pct-high-bg text-pct-high-ink'
+    : pct > 0 ? 'border-pct-low-border bg-pct-low-bg text-pct-low-ink'
+    : 'border-pct-none-border bg-pct-none-bg text-pct-none-ink';
 }
 
 export const INSTRUMENT_ORDER: Instrument[] = ['vocals', 'guitar', 'bass', 'keys', 'violin', 'saxophone', 'trumpet', 'drums', 'cajon', 'percussion'];
 
-export const INSTRUMENT_ICONS: Record<Instrument, string> = {
+const KNOWN_INSTRUMENT_ICONS: Record<Instrument, string> = {
   guitar: '🎸', bass: '🪕', drums: '🥁', keys: '🎹',
   cajon: '🪘', violin: '🎻', saxophone: '🎷', trumpet: '🎺', percussion: '🪇', vocals: '🎤',
 };
 
-export function formatAuditSummary(summary: string): string {
-  return summary.replace(
-    /\b(guitar|bass|drums|keys|cajon|violin|saxophone|trumpet|percussion|vocals)\b/g,
-    (m) => INSTRUMENT_ICONS[m as Instrument] ?? m,
-  );
-}
+/** Instrument → emoji. Unknown/legacy instrument values fall back to 🎵 so an icon is always shown. */
+export const INSTRUMENT_ICONS: Record<Instrument, string> = new Proxy(KNOWN_INSTRUMENT_ICONS, {
+  get: (target, key) => target[key as Instrument] ?? '🎵',
+});
+
+/** Minutes an entry takes in a setlist: a break's length, a song's length (5 when unknown). */
+export const entryMinutes = (e: { breakMinutes?: number; song?: { lengthMinutes?: number } }): number => e.breakMinutes ?? e.song?.lengthMinutes ?? 5;
 
 export function sortInstruments(instruments: Instrument[]): Instrument[] {
   return [...instruments].sort((a, b) => INSTRUMENT_ORDER.indexOf(a) - INSTRUMENT_ORDER.indexOf(b));
@@ -91,18 +117,23 @@ export function addMinutes(time: string, minutes: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-export function isEventLongOver(date?: string, startTime?: string): boolean {
-  if (!date) return false;
+/** Milliseconds from now until the event starts (negative once it has started); null without a valid date. */
+function msUntilStart(date?: string, startTime?: string): number | null {
+  if (!date) return null;
   const start = new Date(`${date}T${startTime ?? '00:00'}`);
-  if (isNaN(start.getTime())) return false;
-  return Date.now() - start.getTime() > 24 * 60 * 60 * 1000;
+  return isNaN(start.getTime()) ? null : start.getTime() - Date.now();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function isEventLongOver(date?: string, startTime?: string): boolean {
+  const ms = msUntilStart(date, startTime);
+  return ms !== null && -ms > DAY_MS;
 }
 
 export function isEventFarFuture(date?: string, startTime?: string): boolean {
-  if (!date) return false;
-  const start = new Date(`${date}T${startTime ?? '00:00'}`);
-  if (isNaN(start.getTime())) return false;
-  return start.getTime() - Date.now() > 24 * 60 * 60 * 1000;
+  const ms = msUntilStart(date, startTime);
+  return ms !== null && ms > DAY_MS;
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────
@@ -227,4 +258,12 @@ export function orderMusicianNames(names: string[], roster: { name: string }[]):
     if (remaining.delete(musician.name)) ordered.push(musician.name);
   }
   return [...ordered, ...remaining];
+}
+
+/** Clock-face emoji showing `date`'s time rounded to the nearest half hour (🕐 = 1:00 … 🕛 = 12:00, 🕜 = 1:30 … 🕧 = 12:30). */
+export function clockEmoji(date: Date): string {
+  const half = Math.round((date.getHours() * 60 + date.getMinutes()) / 30) % 48; // 0..47 half-hours
+  const hour12 = Math.floor(half / 2) % 12 === 0 ? 12 : Math.floor(half / 2) % 12;
+  const isHalf = half % 2 === 1;
+  return String.fromCodePoint((isHalf ? 0x1f55b : 0x1f54f) + hour12);
 }

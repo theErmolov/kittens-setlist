@@ -1,55 +1,41 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { createQuery } from '@tanstack/svelte-query';
   import SongTable from '$components/backlog/SongTable.svelte';
   import SongEditModal from '$components/backlog/SongEditModal.svelte';
-  import type { Song, Setlist, BandMusician } from '$lib/types';
-  import { getSongs, addSong, updatePersonalSongComment, getSetlists, getMusicians } from '$lib/api';
-  import { startPolling } from '$lib/poller';
+  import type { Song } from '$lib/types';
+  import { musiciansQuery } from '$lib/query/queries';
+  import { backlogPoll, useAddBacklogSong } from '$lib/query/backlog';
+  import { useStore } from '$lib/store/bridge';
+  import { backlogStore } from '$lib/store/backlog';
   import { PresenceController, BACKLOG_ROOM } from '$lib/presence';
-  import { canWrite, currentUser } from '$lib/auth';
+  import { canWrite } from '$lib/auth';
 
-  let songs = $state<Song[]>([]);
-  let setlists = $state<Setlist[]>([]);
-  let musicians = $state<BandMusician[]>([]);
-  let showAddModal = $state(false);
-  let loading = $state(true);
+  const musiciansQ = createQuery(() => musiciansQuery());
+  const addSong = useAddBacklogSong();
+  const showAddModal = useStore(backlogStore, s => s.showAddModal);
+  const actions = backlogStore.getState();
 
   onMount(() => {
-    Promise.all([getSongs(), getSetlists(), getMusicians()]).then(([s, sl, m]) => {
-      songs = s; setlists = sl; musicians = m; loading = false;
-    });
-    const interval = ($currentUser?.isAdmin || $currentUser?.role === 'writer') ? 10000 : 50000;
     const presence = new PresenceController(BACKLOG_ROOM, 'backlog');
     presence.start();
-    const stop = startPolling(async () => { songs = await getSongs(); }, interval, () => presence.isPaused());
-    return () => { stop(); presence.stop(); };
+    backlogPoll.isPaused = () => presence.isPaused();
+    return () => { backlogPoll.isPaused = () => false; presence.stop(); };
   });
 
   async function handleAdd(song: Song) {
-    const { id: _, ...rest } = song;
-    const created = await addSong(rest);
-    if (song.personalComment) {
-      await updatePersonalSongComment(created.id, song.personalComment);
-      created.personalComment = song.personalComment;
-    }
-    songs = [...songs, created];
-    showAddModal = false;
+    await addSong.mutateAsync(song);
+    actions.setShowAddModal(false);
   }
 </script>
 
-<SongTable
-  {songs}
-  {setlists}
-  {musicians}
-  {loading}
-  onadd={() => { showAddModal = true; }}
-/>
+<SongTable />
 
-{#if showAddModal && $canWrite}
+{#if $showAddModal && $canWrite}
   <SongEditModal
     song={null}
-    {musicians}
-    onclose={() => { showAddModal = false; }}
+    musicians={musiciansQ.data ?? []}
+    onclose={() => actions.setShowAddModal(false)}
     onsave={handleAdd}
   />
 {/if}

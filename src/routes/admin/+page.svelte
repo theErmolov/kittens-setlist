@@ -4,35 +4,23 @@
   import { base } from '$app/paths';
   import PeopleManager from '$components/admin/PeopleManager.svelte';
   import { currentUser, authLoading } from '$lib/auth';
-  import { getUsers } from '$lib/api';
-  import type { User } from '$lib/types';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { usersQuery } from '$lib/query/queries';
 
-  let users = $state<User[]>([]);
-  let loading = $state(true);
-  let dataLoaded = $state(false);
+  const users = createQuery(() => ({ ...usersQuery(), enabled: $currentUser?.isAdmin === true }));
 
   $effect(() => {
-    if ($authLoading || dataLoaded) return;
-    if (!$currentUser?.isAdmin) { goto(`${base}/backlog`); return; }
-    dataLoaded = true;
-    getUsers().then(loadedUsers => {
-      users = loadedUsers;
-      loading = false;
-    });
+    if ($authLoading) return;
+    if (!$currentUser?.isAdmin) goto(`${base}/backlog`);
   });
-
 </script>
 
 {#if $currentUser?.isAdmin}
 <div>
-  {#if loading}
-    <p class="loading"><LoadingCat /></p>
+  {#if users.isPending}
+    <LoadingCat />
   {:else}
-    <PeopleManager bind:users />
+    <PeopleManager />
   {/if}
 </div>
 {/if}
-
-<style>
-  .loading { padding: 40px 20px; }
-</style>

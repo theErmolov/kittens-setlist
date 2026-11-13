@@ -1,4 +1,5 @@
 import type { Category, Instrument, Setlist, Song } from './types';
+import { playsInSong } from './musicianStats.ts';
 
 /** Setlists stay available for additions until 24 hours after their local start. */
 export function isSetlistOpen(sl: Setlist, now = Date.now()): boolean {
@@ -20,8 +21,7 @@ export function matchesBacklogFilters(
   if (q && !song.artist.toLowerCase().includes(q) && !song.title.toLowerCase().includes(q)) return false;
   if (categories.size > 0 && !categories.has(song.category)) return false;
   for (const name of musicians) {
-    const role = song.musicians[name];
-    if (!role || role.instruments.length === 0) return false;
+    if (!playsInSong(song, name)) return false;
   }
   if (instruments.size > 0) {
     const roles = musicians.size > 0

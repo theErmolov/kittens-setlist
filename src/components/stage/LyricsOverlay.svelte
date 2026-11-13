@@ -3,9 +3,17 @@
   import { packLyricsColumns, type LyricsPair } from '$lib/lyricsLayout';
   import { browser } from '$app/environment';
   import type { Song } from '$lib/types';
-  import { updateSong } from '$lib/api';
   import { canWrite } from '$lib/auth';
   import { t } from '$lib/i18n';
+  import { useStore } from '$lib/store/bridge';
+  import { lyricsStore } from '$lib/store/stage';
+  import { useSaveSongTranspose } from '$lib/query/stage';
+  import { Button } from '$components/ui/button';
+  import { pressedOn } from '../setlist/classes';
+  import IconButton from '$components/shared/IconButton.svelte';
+  import { Slider } from '$components/ui/slider';
+  import * as Dialog from '$components/ui/dialog';
+  import * as DropdownMenu from '$components/ui/dropdown-menu';
 
   let { song, onclose, onsongupdate, onsavetranspose }: {
     song: Song;
@@ -29,18 +37,22 @@
   const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const FLAT_TO_SHARP: Record<string, string> = { Db:'C#', Eb:'D#', Gb:'F#', Ab:'G#', Bb:'A#' };
 
+
   // ── State ──────────────────────────────────────────────────────────────────
 
-  let hideChords = $state(browser && localStorage.getItem('lyrics_hide_chords') === 'true');
-  let transpose = $state(song.transpose ?? 0);
-  let userFontSize = $state<number | null>(null);
-  let dropdownOpen = $state(false);
-  let autoFontSize = $state(MIN_FONT);
-  let columns = $state(1);
-  let renderedColumns = $state<LyricsPair[][]>([[]]);
+  const hideChords = useStore(lyricsStore, s => s.hideChords);
+  const transpose = useStore(lyricsStore, s => s.transpose);
+  const userFontSize = useStore(lyricsStore, s => s.userFontSize);
+  const dropdownOpen = useStore(lyricsStore, s => s.dropdownOpen);
+  const autoFontSize = useStore(lyricsStore, s => s.autoFontSize);
+  const columns = useStore(lyricsStore, s => s.columns);
+  const renderedColumns = useStore(lyricsStore, s => s.renderedColumns);
+  const currentPage = useStore(lyricsStore, s => s.currentPage);
+  const hasPagination = useStore(lyricsStore, s => s.hasPagination);
+  const set = lyricsStore.setState;
+  const saveSongMut = useSaveSongTranspose();
+  // DOM element handle (not UI state): needed by the layout effects
   let lyricsBodyEl = $state<HTMLDivElement | null>(null);
-  let currentPage = $state(0);
-  let hasPagination = $state(false);
 
   // ── Chord logic ────────────────────────────────────────────────────────────
 
@@ -101,10 +113,10 @@
   let rawLines = $derived((song.lyrics ?? '').split('\n'));
 
   let transposedLines = $derived(
-    rawLines.map(l => isChordLine(l) ? transposeChordLine(l, transpose) : l)
+    rawLines.map(l => isChordLine(l) ? transposeChordLine(l, $transpose) : l)
   );
 
-  let displayLines = $derived(hideChords ? withoutChords(rawLines) : transposedLines);
+  let displayLines = $derived($hideChords ? withoutChords(rawLines) : transposedLines);
 
   let originalKey = $derived.by((): string => {
     for (const line of rawLines) {
@@ -115,17 +127,17 @@
     return '';
   });
 
-  let targetKey = $derived(originalKey ? transposeChord(originalKey, transpose) : '');
+  let targetKey = $derived(originalKey ? transposeChord(originalKey, $transpose) : '');
 
   let maxKeyLength = $derived.by(() => {
     if (!originalKey) return 0;
     return Math.max(...Array.from({ length: 12 }, (_, i) => transposeChord(originalKey, i).length));
   });
 
-  let effectiveFontSize = $derived(userFontSize ?? autoFontSize);
+  let effectiveFontSize = $derived($userFontSize ?? $autoFontSize);
 
-  let totalPages = $derived(Math.max(1, Math.ceil(renderedColumns.length / columns)));
-  let visibleColumns = $derived(renderedColumns.slice(currentPage * columns, (currentPage + 1) * columns));
+  let totalPages = $derived(Math.max(1, Math.ceil($renderedColumns.length / $columns)));
+  let visibleColumns = $derived($renderedColumns.slice($currentPage * $columns, ($currentPage + 1) * $columns));
 
   // ── Measurement ────────────────────────────────────────────────────────────
 
@@ -236,7 +248,7 @@
     if (clientW <= 0 || availH <= 0) return;
 
     const lines = displayLines;
-    const uf = userFontSize;
+    const uf = lyricsStore.getState().userFontSize;
 
     function computeAt(avail: number) {
       if (avail <= 0) return null;
@@ -285,27 +297,17 @@
       if (r2) { result = r2; withButtons = true; }
     }
 
-    if (uf === null) autoFontSize = result.fontSize;
-    columns = result.cols;
-    renderedColumns = result.packed;
-    hasPagination = withButtons;
-    if (!hasPagination || currentPage >= result.pages) currentPage = 0;
+    const cur = lyricsStore.getState();
+    set({
+      ...(uf === null ? { autoFontSize: result.fontSize } : {}),
+      columns: result.cols,
+      renderedColumns: result.packed,
+      hasPagination: withButtons,
+      ...(!withButtons || cur.currentPage >= result.pages ? { currentPage: 0 } : {}),
+    });
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
-
-  $effect(() => {
-    if (!browser) return;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  });
-
-  $effect(() => {
-    if (!browser) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onclose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  });
 
   // ResizeObserver — fires on container size change
   $effect(() => {
@@ -319,44 +321,37 @@
   // Re-run when lyrics content or manual font size changes
   $effect(() => {
     displayLines; // track
-    userFontSize;    // track
+    $userFontSize;   // track
     recompute();
   });
 
   // ── Pagination ────────────────────────────────────────────────────────────
 
-  function prevPage() { currentPage = Math.max(0, currentPage - 1); }
-  function nextPage() { currentPage = Math.min(totalPages - 1, currentPage + 1); }
+  function prevPage() { set(s => ({ currentPage: Math.max(0, s.currentPage - 1) })); }
+  function nextPage() { set(s => ({ currentPage: Math.min(totalPages - 1, s.currentPage + 1) })); }
 
-  $effect(() => { song; currentPage = 0; });
-  $effect(() => { song; transpose = song.transpose ?? 0; });
+  $effect(() => { song; set({ currentPage: 0, dropdownOpen: false }); });
+  $effect(() => { song; set({ transpose: song.transpose ?? 0 }); });
   $effect(() => {
     void song.id;
     if (!browser) return;
     const stored = localStorage.getItem(`lyrics_zoom_${song.id}`);
-    userFontSize = stored !== null ? Number(stored) : null;
+    set({ userFontSize: stored !== null ? Number(stored) : null });
   });
 
   function toggleChords() {
-    hideChords = !hideChords;
-    dropdownOpen = false;
-    currentPage = 0;
-    if (browser) localStorage.setItem('lyrics_hide_chords', String(hideChords));
+    set(s => ({ hideChords: !s.hideChords, dropdownOpen: false, currentPage: 0 }));
   }
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
 
-  function zoomIn() {
-    const next = Math.min((userFontSize ?? autoFontSize) + 1, 96);
-    userFontSize = next;
+  function setZoom(size: number) {
+    const next = Math.min(96, Math.max(MIN_FONT, Math.round(size)));
+    set({ userFontSize: next });
     if (browser) localStorage.setItem(`lyrics_zoom_${song.id}`, String(next));
   }
-
-  function zoomOut() {
-    const next = Math.max((userFontSize ?? autoFontSize) - 1, MIN_FONT);
-    userFontSize = next;
-    if (browser) localStorage.setItem(`lyrics_zoom_${song.id}`, String(next));
-  }
+  const zoomIn = () => setZoom(effectiveFontSize + 1);
+  const zoomOut = () => setZoom(effectiveFontSize - 1);
 
   // ── Transpose ─────────────────────────────────────────────────────────────
 
@@ -369,7 +364,7 @@
       const changed = { ...song, transpose: value };
       const updated = onsavetranspose
         ? await onsavetranspose(changed)
-        : await updateSong(changed, true);
+        : await saveSongMut.mutateAsync(changed);
       onsongupdate?.(updated);
     }, 1500);
   }
@@ -377,388 +372,109 @@
   $effect(() => () => { if (_saveTimer) clearTimeout(_saveTimer); });
 
   function transposeUp() {
-    transpose = (transpose + 1) % 12;
-    scheduleSaveTranspose(transpose);
+    const next = (lyricsStore.getState().transpose + 1) % 12;
+    set({ transpose: next });
+    scheduleSaveTranspose(next);
   }
 
   function transposeDown() {
-    transpose = (transpose + 11) % 12;
-    scheduleSaveTranspose(transpose);
+    const next = (lyricsStore.getState().transpose + 11) % 12;
+    set({ transpose: next });
+    scheduleSaveTranspose(next);
   }
 </script>
 
-<div class="overlay">
-  <div class="overlay-header">
-    <button class="close-btn" onclick={onclose}>✕</button>
-    <div class="song-info">
-      <span class="song-title">{song.title}</span>
-      <span class="song-artist">{song.artist}</span>
-    </div>
-    {#if hasPagination}
-      <span class="page-counter">{currentPage + 1} / {totalPages}</span>
-    {/if}
-    <div class="header-controls">
-      {#if originalKey}
-        <button
-          class="chords-toggle"
-          aria-pressed={hideChords}
-          onclick={toggleChords}
-        >{hideChords ? $t.stage.showChords : $t.stage.hideChords}</button>
-      {/if}
-      <div class="zoom-buttons">
-        <button class="zoom-btn" onclick={zoomOut} title={$t.stage.zoomOut}>A−</button>
-        <button class="zoom-btn" onclick={zoomIn} title={$t.stage.zoomIn}>A+</button>
+<Dialog.Root open onOpenChange={(o) => { if (!o) onclose(); }}>
+  <Dialog.Content
+    showCloseButton={false}
+    interactOutsideBehavior="ignore"
+    class="top-0 left-0 z-200 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-background p-0 ring-0 mid:max-w-none"
+  >
+    <div class="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-4 py-3 mid:flex-nowrap mid:gap-3">
+      <IconButton icon="✕" label={$t.common.close} onclick={onclose} />
+      <div class="flex min-w-0 flex-1 items-baseline gap-2">
+        <Dialog.Title class="truncate text-base font-bold">{song.title}</Dialog.Title>
+        <Dialog.Description class="truncate text-body text-muted-foreground">{song.artist}</Dialog.Description>
       </div>
-      {#if originalKey && !hideChords}
-        <div class="transpose-wrap">
-          <div class="transpose-controls">
-            <button class="step-btn" onclick={transposeDown} title={$t.stage.semitoneDown}>▼</button>
-            <button
-              class="transpose-btn"
-              class:active={dropdownOpen}
-              onclick={() => { dropdownOpen = !dropdownOpen; }}
-              title={$t.stage.transpose}
-            >
-              <span class="key-label" style:min-width="{maxKeyLength}ch">{targetKey}</span>
-              <span class="offset-label" style:visibility={transpose === 0 ? 'hidden' : 'visible'}>{transpose > 0 ? `+${transpose}` : transpose}</span>
-            </button>
-            <button class="step-btn" onclick={transposeUp} title={$t.stage.semitoneUp}>▲</button>
+      {#if $hasPagination}
+        <span class="shrink-0 whitespace-nowrap text-body text-muted-foreground">{$currentPage + 1} / {totalPages}</span>
+      {/if}
+      <div class="flex shrink-0 items-center gap-2 max-mid:w-full max-mid:flex-wrap max-mid:justify-end">
+        {#if originalKey}
+          <IconButton icon="🚫" label={$hideChords ? $t.stage.showChords : $t.stage.hideChords} class={pressedOn} pressed={$hideChords} onpressedchange={() => toggleChords()} />
+        {/if}
+        <div class="flex items-center gap-2">
+          <IconButton icon="A−" label={$t.stage.zoomOut} class="font-semibold" onclick={zoomOut} />
+          <Slider
+            type="single"
+            class="w-24 [&_[data-slot=slider-thumb]]:size-5"
+            min={MIN_FONT}
+            max={96}
+            step={1}
+            value={Math.min(96, Math.max(MIN_FONT, effectiveFontSize))}
+            onValueChange={setZoom}
+            aria-label={$t.stage.zoomIn}
+          />
+          <IconButton icon="A+" label={$t.stage.zoomIn} class="font-semibold" onclick={zoomIn} />
+        </div>
+        {#if originalKey && !$hideChords}
+          <div class="flex items-center gap-2">
+            <IconButton icon="▼" label={$t.stage.semitoneDown} class="text-muted-foreground" onclick={transposeDown} />
+            <DropdownMenu.Root open={$dropdownOpen} onOpenChange={(o) => set({ dropdownOpen: o })}>
+              <DropdownMenu.Trigger>
+                {#snippet child({ props })}
+                  <Button {...props} variant="outline" class="gap-1.5 font-bold" title={$t.stage.transpose} aria-label={$t.stage.transpose}>
+                    <span class="font-mono" style:min-width="{maxKeyLength}ch">{targetKey}</span>
+                    <span class="min-w-[3ch] font-mono text-lead font-normal tabular-nums text-muted-foreground" class:invisible={$transpose === 0}>{$transpose > 0 ? `+${$transpose}` : $transpose}</span>
+                  </Button>
+                {/snippet}
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end" class="z-300 w-auto min-w-47.5 p-0">
+                {#each Array.from({ length: 12 }, (_, i) => i) as offset}
+                  <DropdownMenu.Item
+                    class="gap-2.5 rounded-none border-b px-3 py-1.75 text-body last:border-b-0 {offset === $transpose ? 'bg-muted' : ''}"
+                    onSelect={() => { set({ transpose: offset, dropdownOpen: false }); scheduleSaveTranspose(offset); }}
+                  >
+                    <span class="min-w-7 font-bold tabular-nums {offset === $transpose ? 'text-primary-ink' : 'text-muted-foreground'}">{offset > 0 ? `+${offset}` : offset}</span>
+                    <span class="font-mono">{transposeChord(originalKey, offset)}</span>
+                  </DropdownMenu.Item>
+                {/each}
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+            <IconButton icon="▲" label={$t.stage.semitoneUp} class="text-muted-foreground" onclick={transposeUp} />
           </div>
-          {#if dropdownOpen}
-            <div
-              class="dropdown-backdrop"
-              role="button"
-              tabindex="-1"
-              onclick={() => { dropdownOpen = false; }}
-              onkeydown={() => { dropdownOpen = false; }}
-            ></div>
-            <div class="dropdown-panel">
-              {#each Array.from({ length: 12 }, (_, i) => i) as offset}
-                <button
-                  class="dropdown-row"
-                  class:selected={offset === transpose}
-                  onclick={() => { transpose = offset; dropdownOpen = false; scheduleSaveTranspose(offset); }}
-                >
-                  <span class="d-offset">{offset > 0 ? `+${offset}` : offset}</span>
-                  <span class="d-keys">{transposeChord(originalKey, offset)}</span>
-                </button>
-              {/each}
-            </div>
-          {/if}
+        {/if}
+      </div>
+    </div>
+
+    <div class="relative flex-1 overflow-x-hidden overflow-y-auto py-4 pl-5" bind:this={lyricsBodyEl} style:padding-right="{$hasPagination ? PAGE_BTN_WIDTH : BODY_PAD_R}px">
+      <div
+        class="grid items-start gap-x-8 leading-[1.6]"
+        class:grid-cols-1={$columns <= 1}
+        class:grid-cols-2={$columns > 1}
+        style:font-family={FONT_FAMILY}
+        style:font-size="{effectiveFontSize}px"
+      >
+        {#each visibleColumns as column}
+          <div class="min-w-0">
+            {#each column as pair}
+              <div class="break-inside-avoid">
+                {#if pair.chordLine !== null}
+                  <span class="block min-h-[1.6em] font-bold whitespace-pre text-lyrics-chord">{pair.chordLine || ' '}</span>
+                {/if}
+                <span class="block min-h-[1.6em] whitespace-pre text-lyrics-text">{pair.lyricLine || ' '}</span>
+              </div>
+            {/each}
+          </div>
+        {/each}
+      </div>
+      {#if $hasPagination}
+        <!-- As on main: a full-height strip of two big purple buttons. -->
+        <div class="absolute top-0 right-0 bottom-0 z-10 flex w-24 flex-col">
+          <button type="button" aria-label={$t.stage.prevPage} class="flex flex-1 items-center justify-center border-b border-lyrics-pager-divider bg-lyrics-pager text-[2.5rem] leading-none text-lyrics-pager-ink transition-colors hover:not-disabled:bg-lyrics-pager-hover disabled:cursor-default disabled:opacity-25" onclick={prevPage} disabled={$currentPage === 0}>←</button>
+          <button type="button" aria-label={$t.stage.nextPage} class="flex flex-1 items-center justify-center bg-lyrics-pager text-[2.5rem] leading-none text-lyrics-pager-ink transition-colors hover:not-disabled:bg-lyrics-pager-hover disabled:cursor-default disabled:opacity-25" onclick={nextPage} disabled={$currentPage >= totalPages - 1}>→</button>
         </div>
       {/if}
     </div>
-  </div>
-
-  <div class="lyrics-body" bind:this={lyricsBodyEl} style:padding-right="{hasPagination ? PAGE_BTN_WIDTH : BODY_PAD_R}px">
-    <div
-      class="lyrics-content"
-      style:font-size="{effectiveFontSize}px"
-      style:grid-template-columns={columns > 1 ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)'}
-    >
-      {#each visibleColumns as column}
-        <div class="lyrics-column">
-          {#each column as pair}
-            <div class="pair">
-              {#if pair.chordLine !== null}
-                <span class="chord-line">{pair.chordLine || ' '}</span>
-              {/if}
-              <span class="lyric-line">{pair.lyricLine || ' '}</span>
-            </div>
-          {/each}
-        </div>
-      {/each}
-    </div>
-    {#if hasPagination}
-      <div class="page-nav">
-        <button class="page-btn" onclick={prevPage} disabled={currentPage === 0}>←</button>
-        <button class="page-btn" onclick={nextPage} disabled={currentPage >= totalPages - 1}>→</button>
-      </div>
-    {/if}
-  </div>
-</div>
-
-<style>
-  .overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    background: var(--bg);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .overlay-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1.65rem;
-    color: var(--text-muted);
-    padding: 6px 12px;
-    flex-shrink: 0;
-    line-height: 1;
-  }
-  .close-btn:hover { color: var(--text); }
-
-  .song-info {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-  }
-  .song-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .song-artist {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .header-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .chords-toggle {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 10px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--text);
-  }
-  .chords-toggle:hover,
-  .chords-toggle[aria-pressed="true"] { background: var(--chip-bg); }
-
-  @media (max-width: 600px) {
-    .overlay-header { flex-wrap: wrap; gap: 8px; }
-    .header-controls { flex-wrap: wrap; justify-content: flex-end; width: 100%; }
-  }
-
-  .zoom-buttons {
-    display: flex;
-    gap: 4px;
-  }
-
-  .zoom-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 1.275rem;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1;
-    transition: background 0.15s;
-  }
-  .zoom-btn:hover { background: var(--chip-bg); }
-
-  .transpose-wrap {
-    position: relative;
-  }
-
-  .transpose-controls {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .step-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 14px;
-    cursor: pointer;
-    font-size: 1.275rem;
-    color: var(--text-muted);
-    line-height: 1;
-    transition: background 0.15s, color 0.15s;
-  }
-  .step-btn:hover { background: var(--chip-bg); color: var(--text); }
-
-  .transpose-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 15px;
-    cursor: pointer;
-    font-size: 1.275rem;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .transpose-btn:hover,
-  .transpose-btn.active { background: var(--chip-bg); border-color: var(--accent); }
-
-  .key-label {
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-  }
-
-  .offset-label {
-    font-size: 1.05rem;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-    min-width: 3ch;
-  }
-
-  .dropdown-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 298;
-    cursor: default;
-  }
-
-  .dropdown-panel {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-    z-index: 299;
-    min-width: 190px;
-    overflow: hidden;
-  }
-
-  .dropdown-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 7px 12px;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    font-size: 0.88rem;
-    color: var(--text);
-    text-align: left;
-    transition: background 0.1s;
-  }
-  .dropdown-row:last-child { border-bottom: none; }
-  .dropdown-row:hover { background: var(--row-hover); }
-  .dropdown-row.selected { background: var(--chip-bg); }
-
-  .d-offset {
-    min-width: 28px;
-    font-weight: 700;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-  .dropdown-row.selected .d-offset { color: var(--accent); }
-
-  .d-keys {
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-  }
-
-  .lyrics-body {
-    position: relative;
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px 20px;
-  }
-
-  .lyrics-content {
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-    line-height: 1.6;
-    display: grid;
-    column-gap: 32px;
-    align-items: start;
-  }
-
-  .lyrics-column { min-width: 0; }
-
-  .pair {
-    break-inside: avoid;
-  }
-
-  .chord-line {
-    display: block;
-    white-space: pre;
-    color: #60a5fa;
-    font-weight: bold;
-    min-height: 1.6em;
-  }
-
-  .lyric-line {
-    display: block;
-    white-space: pre;
-    color: #ffffff;
-    min-height: 1.6em;
-  }
-
-  :global([data-theme="light"]) .chord-line {
-    color: #e8305a;
-  }
-
-  :global([data-theme="light"]) .lyric-line {
-    color: #000000;
-  }
-
-  .page-counter {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .page-nav {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 96px;
-    display: flex;
-    flex-direction: column;
-    z-index: 10;
-  }
-
-  .page-btn {
-    flex: 1;
-    background: #7c3aed;
-    border: none;
-    color: #ffffff;
-    font-size: 2.5rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-    line-height: 1;
-  }
-  .page-btn:first-child { border-bottom: 1px solid rgba(255,255,255,0.2); }
-  .page-btn:hover:not(:disabled) { background: #6d28d9; }
-  .page-btn:disabled { opacity: 0.25; cursor: default; }
-</style>
+  </Dialog.Content>
+</Dialog.Root>

@@ -1,147 +1,140 @@
 <script lang="ts">
   import RehearsalSelection from './RehearsalSelection.svelte';
-  import { mergeRehearsalSongs, plannedRehearsalAttendees, rehearsalCoverage } from '$lib/rehearsals';
-  import { untrack } from 'svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { mergeRehearsalSongs, closestUpcomingSetlist, upcomingSetlists } from '$lib/rehearsals';
   import { lang } from '$lib/i18n';
   import { formatDate } from '$lib/utils';
-  import { modalDialog } from '$lib/modalDialog';
-  import type { RehearsalDraft, Setlist, BandMusician, Song, RehearsalSong } from '$lib/types';
+  import * as Dialog from '$components/ui/dialog';
+  import * as Popover from '$components/ui/popover';
+  import * as Select from '$components/ui/select';
+  import { Button } from '$components/ui/button';
+  import { Input } from '$components/ui/input';
+  import { Textarea } from '$components/ui/textarea';
+  import * as Field from '$components/ui/field';
+  import { Alert, AlertDescription } from '$components/ui/alert';
+  import { Calendar } from '$components/ui/calendar';
+  import { parseDate, type DateValue } from '@internationalized/date';
+  import type { RehearsalDraft } from '$lib/types';
   import { rehearsalText as rt } from '$lib/rehearsalI18n';
-  import { localDate, closestUpcomingSetlist, upcomingSetlists } from '$lib/rehearsals';
-  let { initial = {}, title, setlists, musicians, catalog, onsubmit, onclose }: {
-    initial?: Partial<RehearsalDraft>; title?: string; setlists: Setlist[]; musicians: BandMusician[]; catalog: Song[];
+  import { setlistsQuery } from '$lib/query/queries';
+  import { useStore } from '$lib/store/bridge';
+  import { rehearsalFormStore as form, formatInputDate, parseInputDate, selectAttendees, sameList } from '$lib/store/rehearsals';
+  let { initial = {}, title, onsubmit, onclose }: {
+    initial?: Partial<RehearsalDraft>; title?: string;
     onsubmit: (draft: RehearsalDraft) => Promise<void>; onclose: () => void;
   } = $props();
-  const seed = untrack(() => initial);
-  const formatInputDate = (iso: string) => iso.split('-').reverse().join('.');
-  let dateText = $state(formatInputDate(seed.date ?? localDate()));
-  const date = $derived(dateText.split('.').reverse().join('-'));
-  let startTime = $state(seed.startTime ?? '19:00');
-  const timeZone = seed.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  let location = $state(seed.location ?? '');
-  let note = $state(seed.note ?? '');
-  let autoSelect = $state(seed.setlistId === undefined && seed.attendees === undefined && seed.songs === undefined);
-  let setlistId = $state(seed.setlistId ?? untrack(() => autoSelect ? closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '' : ''));
+  const setlistsQ = createQuery(() => setlistsQuery());
+  const setlists = $derived(setlistsQ.data ?? []);
+  form.getState().init(initial, setlistsQ.data ?? []);
+  const { patch } = form.getState();
+  const dateText = useStore(form, s => s.dateText);
+  const startTime = useStore(form, s => s.startTime);
+  const location = useStore(form, s => s.location);
+  const note = useStore(form, s => s.note);
+  const autoSelect = useStore(form, s => s.autoSelect);
+  const setlistId = useStore(form, s => s.setlistId);
+  const datePickerOpen = useStore(form, s => s.datePickerOpen);
+  const busy = useStore(form, s => s.busy);
+  const error = useStore(form, s => s.error);
+  const attendees = useStore(form, selectAttendees, sameList);
+  const date = $derived(parseInputDate($dateText));
   const sortedSetlists = $derived(upcomingSetlists(setlists));
-  let songs = $state<RehearsalSong[]>(seed.songs ? [...seed.songs] : []);
-  let attendanceOverrides = $state<Record<string, boolean>>(untrack(() => {
-    if (!seed.attendees) return {};
-    const needed = new Set((seed.songs ?? []).flatMap(item => rehearsalCoverage(item.song, []).needed));
-    return Object.fromEntries([
-      ...[...needed].filter(name => !seed.attendees!.includes(name)).map(name => [name, false]),
-      ...seed.attendees.filter(name => !needed.has(name)).map(name => [name, true]),
-    ]);
-  }));
-  const attendees = $derived(seed.cancelled ? seed.attendees ?? [] : plannedRehearsalAttendees(songs, attendanceOverrides));
-  let busy = $state(false);
-  let error = $state('');
   $effect(() => {
-    if (!autoSelect || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-    const next = closestUpcomingSetlist(upcomingSetlists(setlists), date, startTime)?.id ?? '';
-    untrack(() => {
-      if (setlistId === next) return;
-      setlistId = next;
-    });
+    if (!$autoSelect || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const next = closestUpcomingSetlist(upcomingSetlists(setlists), date, $startTime)?.id ?? '';
+    if (form.getState().setlistId !== next) patch({ setlistId: next });
   });
+  const NONE = '__none__';
+  const toCalendarValue = (iso: string): DateValue | undefined => { try { return parseDate(iso); } catch { return undefined; } };
+  const calendarValue = $derived(toCalendarValue(date));
+  const currentSetlist = $derived(setlists.find(s => s.id === $setlistId));
+  const setlistLabel = (s: { name: string; date?: string }) => `${s.name}${s.date ? ` · ${formatDate(s.date, $lang)}` : ''}`;
+  const setlistTriggerText = $derived(!$setlistId ? $rt.noSetlist : currentSetlist ? setlistLabel(currentSetlist) : $rt.unavailableSetlist);
+  // Same look as the song edit modal: muted uppercase labels, 1rem app-font controls on the page background.
+  const labelClass = 'text-small font-semibold uppercase tracking-[.04em] text-muted-foreground leading-normal';
+  const field = 'rounded-md bg-background px-2.25 text-base mid:text-base font-normal normal-case tracking-normal';
   async function save(event: SubmitEvent) {
-    event.preventDefault(); if (busy) return;
-    error = '';
+    event.preventDefault();
+    const s = form.getState();
+    if (s.busy) return;
+    patch({ error: '' });
     const parsed = new Date(`${date}T12:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { error = $rt.invalidDate; return; }
-    busy = true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { patch({ error: $rt.invalidDate }); return; }
+    patch({ busy: true });
     try {
-      await onsubmit({ date, startTime, endTime: undefined, timeZone, location: location.trim() || undefined, note: note.trim() || undefined, setlistId: setlistId || undefined, attendees, songs: mergeRehearsalSongs(seed.songs ?? [], songs), cancelled: seed.cancelled ?? false });
-    } catch (e) { error = String(e).includes('409') ? $rt.conflict : $rt.saveError; }
-    finally { busy = false; }
+      await onsubmit({ date, startTime: s.startTime, endTime: undefined, timeZone: s.timeZone, location: s.location.trim() || undefined, note: s.note.trim() || undefined, setlistId: s.setlistId || undefined, attendees: selectAttendees(s), songs: mergeRehearsalSongs(s.seed.songs ?? [], s.songs), cancelled: s.seed.cancelled ?? false });
+    } catch (e) { patch({ error: String(e).includes('409') ? $rt.conflict : $rt.saveError }); }
+    finally { patch({ busy: false }); }
   }
 </script>
 
-<div class="overlay">
-  <dialog class="modal" aria-labelledby="rehearsal-form-title" use:modalDialog={() => { if (!busy) onclose(); }}>
-    <h2 id="rehearsal-form-title" tabindex="-1" autofocus>{title ?? $rt.new}</h2>
-    <form onsubmit={save}>
-      <fieldset class="form-body" disabled={busy}>
+<Dialog.Root open={true} onOpenChange={value => { if (!value && !$busy) onclose(); }}>
+  <Dialog.Content
+    aria-describedby={undefined}
+    onOpenAutoFocus={event => event.preventDefault()}
+    class="rehearsal-dialog flex h-[min(820px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden rounded-2xl bg-card p-5.5 mid:max-w-[min(1100px,calc(100%-2rem))] max-mid:top-0 max-mid:left-0 max-mid:h-dvh max-mid:max-h-none max-mid:w-dvw max-mid:max-w-none max-mid:translate-x-0 max-mid:translate-y-0 max-mid:rounded-none max-mid:p-4"
+  >
+    <Dialog.Title class="mb-5 shrink-0 text-title font-bold leading-normal">{title ?? $rt.new}</Dialog.Title>
+    <form onsubmit={save} class="flex min-h-0 flex-1 flex-col">
         {#snippet details()}
-          <div class="details-fields">
-            <div class="times">
-              <div class="date-control">
-                <label for="rehearsal-date">{$rt.date}</label>
-                <div class="date-input">
-                  <input id="rehearsal-date" type="text" inputmode="decimal" bind:value={dateText} placeholder="08.10.2026" pattern={'[0-9]{2}[.][0-9]{2}[.][0-9]{4}'} maxlength="10" required />
-                  <span class="calendar-picker">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 11h18M8 3v4M16 3v4" /></svg>
-                    <input class="native-date" type="date" value={date} aria-label={$rt.chooseDate} oninput={event => { if (event.currentTarget.value) dateText = formatInputDate(event.currentTarget.value); }} />
-                  </span>
+          <Field.Group class="min-w-0 gap-3.5">
+            <div class="flex flex-wrap gap-2.5">
+              <Field.Field class="flex-[1_1_160px] gap-1.5">
+                <Field.Label for="rehearsal-date" class={labelClass}>{$rt.date}</Field.Label>
+                <div class="relative">
+                  <Input id="rehearsal-date" type="text" inputmode="decimal" value={$dateText} oninput={event => patch({ dateText: event.currentTarget.value })} placeholder="08.10.2026" pattern={'[0-9]{2}[.][0-9]{2}[.][0-9]{4}'} maxlength={10} required class="{field} pr-11" />
+                  <Popover.Root open={$datePickerOpen} onOpenChange={value => patch({ datePickerOpen: value })}>
+                    <Popover.Trigger>
+                      {#snippet child({ props })}
+                        <Button {...props} variant="ghost" size="icon" class="absolute top-0 right-0" aria-label={$rt.chooseDate}>📅</Button>
+                      {/snippet}
+                    </Popover.Trigger>
+                    <Popover.Content class="w-auto p-0" align="start">
+                      <Calendar type="single" value={calendarValue} locale={$lang === 'ru' ? 'ru-RU' : 'en-GB'} weekStartsOn={1} prevLabel={$rt.previous} nextLabel={$rt.next} onValueChange={value => { if (value) patch({ dateText: formatInputDate(value.toString()), datePickerOpen: false }); }} />
+                    </Popover.Content>
+                  </Popover.Root>
                 </div>
-              </div>
-              <label>{$rt.start}<input type="time" bind:value={startTime} required /></label>
+              </Field.Field>
+              <Field.Field class="flex-[1_1_110px] gap-1.5">
+                <Field.Label for="rehearsal-start" class={labelClass}>{$rt.start}</Field.Label>
+                <Input id="rehearsal-start" type="time" value={$startTime} oninput={event => patch({ startTime: event.currentTarget.value })} required class={field} />
+              </Field.Field>
             </div>
-            <label>{$rt.location}<input bind:value={location} maxlength="500" /></label>
-            <label>{$rt.setlist}
-              <select bind:value={setlistId} onchange={() => { autoSelect = false; }}>
-                <option value="">{$rt.noSetlist}</option>
-                {#if setlistId && !sortedSetlists.some(s => s.id === setlistId)}
-                  {@const current = setlists.find(s => s.id === setlistId)}
-                  <option value={setlistId} disabled>{current ? `${current.name}${current.date ? ` · ${formatDate(current.date, $lang)}` : ''}` : $rt.unavailableSetlist}</option>
-                {/if}
-                {#each sortedSetlists as setlist}<option value={setlist.id}>{setlist.name}{setlist.date ? ` · ${formatDate(setlist.date, $lang)}` : ''}</option>{/each}
-              </select>
-            </label>
-            <label>{$rt.note}<textarea bind:value={note} rows="3" maxlength="4000"></textarea></label>
-          </div>
+            <Field.Field class="gap-1.5">
+              <Field.Label for="rehearsal-location" class={labelClass}>{$rt.location}</Field.Label>
+              <Input id="rehearsal-location" value={$location} oninput={event => patch({ location: event.currentTarget.value })} maxlength={500} class={field} />
+            </Field.Field>
+            <Field.Field class="gap-1.5">
+              <Field.Label for="rehearsal-setlist" class={labelClass}>{$rt.setlist}</Field.Label>
+              <Select.Root type="single" value={$setlistId || NONE} onValueChange={value => patch({ setlistId: value === NONE ? '' : value, autoSelect: false })}>
+                <Select.Trigger id="rehearsal-setlist" class="{field} w-full min-w-0">
+                  <span class="truncate">{setlistTriggerText}</span>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value={NONE} label={$rt.noSetlist} />
+                  {#if $setlistId && !sortedSetlists.some(s => s.id === $setlistId)}
+                    <Select.Item value={$setlistId} label={setlistTriggerText} disabled />
+                  {/if}
+                  {#each sortedSetlists as setlist (setlist.id)}<Select.Item value={setlist.id} label={setlistLabel(setlist)} />{/each}
+                </Select.Content>
+              </Select.Root>
+            </Field.Field>
+            <Field.Field class="gap-1.5">
+              <Field.Label for="rehearsal-note" class={labelClass}>{$rt.note}</Field.Label>
+              <Textarea id="rehearsal-note" value={$note} oninput={event => patch({ note: event.currentTarget.value })} rows={6} maxlength={4000} class="{field} field-sizing-fixed min-h-36 resize-none py-2.25" />
+            </Field.Field>
+          </Field.Group>
         {/snippet}
-        <RehearsalSelection {details} disabled={seed.cancelled} setlist={setlists.find(s => s.id === setlistId)} {catalog} {musicians} {attendees} bind:attendanceOverrides bind:selected={songs} />
-      </fieldset>
-      <div class="form-footer">
-        {#if error}<p class="error" role="alert">{error}</p>{/if}
-        <div class="actions"><button type="button" onclick={onclose} disabled={busy}>{$rt.cancel}</button><button class="primary" disabled={busy}>{busy ? $rt.pending : $rt.save}</button></div>
-      </div>
+      <Field.Set class="m-0 min-h-0 min-w-0 flex-1 gap-0 overflow-hidden border-0 p-0 [@media(max-height:550px)]:overflow-y-auto max-mid:overflow-y-auto max-mid:overscroll-contain" disabled={$busy}>
+        <RehearsalSelection {details} />
+      </Field.Set>
+      <Dialog.Footer class="m-0 mt-3 shrink-0 flex-col gap-2 rounded-none border-t bg-transparent p-0 pt-3 mid:flex-col">
+        {#if $error}<Alert variant="destructive" class="py-1.5"><AlertDescription>{$error}</AlertDescription></Alert>{/if}
+        <div class="flex justify-end gap-2">
+          <Button type="button" variant="outline" onclick={onclose} disabled={$busy}>{$rt.cancel}</Button>
+          <Button type="submit" class="font-semibold" disabled={$busy}>{$busy ? $rt.pending : $rt.save}</Button>
+        </div>
+      </Dialog.Footer>
     </form>
-  </dialog>
-</div>
-<style>
-  .overlay { position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .modal { margin: auto; box-sizing: border-box; width: min(1100px, 100%); height: min(820px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; display: flex; flex-direction: column; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
-  .modal::backdrop { background: #0008; }
-  h2 { flex-shrink: 0; font-size: 1.2rem; margin: 0 0 20px; }
-  form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .form-body { border: 0; padding: 0; margin: 0; min-width: 0; min-height: 0; flex: 1; overflow: hidden; }
-  .form-footer { flex-shrink: 0; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; background: var(--surface); }
-  .details-fields { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  label { display: flex; flex-direction: column; gap: 6px; font-size: .82rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
-  input, select, textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 7px; padding: 9px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 1rem; font-weight: 400; letter-spacing: normal; line-height: normal; text-transform: none; }
-  .times { display: flex; flex-wrap: wrap; gap: 10px; }
-  .times > label { flex: 1 1 110px; }
-  .date-control { flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px; }
-  .date-input { position: relative; }
-  .date-input > input { padding-right: 44px; }
-  .calendar-picker { position: absolute; right: 0; top: 0; bottom: 0; width: 40px; display: grid; place-items: center; color: var(--text-muted); }
-  .calendar-picker:focus-within { outline: 2px solid var(--accent); border-radius: 7px; }
-  .native-date { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; padding: 0; cursor: pointer; }
-  .native-date::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
-  button { font: inherit; border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; background: var(--bg); color: var(--text); cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-  .primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; }
-  .error { color: #dc2626; font-size: .85rem; }
-  @media(max-width: 700px), (max-height: 550px) { .form-body { overflow-y: auto; overscroll-behavior: contain; } }
-  @media(max-width: 600px) { input, select, textarea { font-size: 16px; } .modal { padding: 16px; } }
-  @media(max-width: 700px), (max-height: 550px) {
-    .overlay { padding: 0; align-items: stretch; }
-    .modal {
-      position: fixed;
-      inset: 0;
-      margin: 0;
-      width: 100vw;
-      width: 100dvw;
-      max-width: none;
-      height: 100vh;
-      height: 100dvh;
-      max-height: none;
-      border: 0;
-      border-radius: 0;
-      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    }
-    .form-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  }
-</style>
+  </Dialog.Content>
+</Dialog.Root>

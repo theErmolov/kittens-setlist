@@ -1,8 +1,19 @@
 <script lang="ts">
   import type { Song, Category } from '$lib/types';
   import FilterChips from '$components/shared/FilterChips.svelte';
+  import { Label } from '$components/ui/label';
   import CategoryBadge from '$components/shared/CategoryBadge.svelte';
+  import * as Dialog from '$components/ui/dialog';
+  import { Button } from '$components/ui/button';
+  import { Input } from '$components/ui/input';
+  import { Checkbox } from '$components/ui/checkbox';
+  import { ScrollArea } from '$components/ui/scroll-area';
+  import * as Item from '$components/ui/item';
+  import * as Empty from '$components/ui/empty';
+  import { mobileFullscreen } from './dialogClasses';
   import { t } from '$lib/i18n';
+  import { useStore } from '$lib/store/bridge';
+  import { addSongsStore } from '$lib/store/stage';
 
   let {
     songs,
@@ -18,109 +29,64 @@
     onaddnew?: () => void;
   } = $props();
 
-  let search = $state('');
-  let categoryFilter = $state(new Set<Category>());
-  let selected = $state(new Map<string, Song>());
+  addSongsStore.getState().reset();
+  const search = useStore(addSongsStore, s => s.search);
+  const categoryFilter = useStore(addSongsStore, s => s.categoryFilter);
+  const selected = useStore(addSongsStore, s => s.selected);
+  const { setSearch, setCategoryFilter, toggle } = addSongsStore.getState();
 
   let filtered = $derived(songs
     .filter(s => {
       if (existingIds.has(s.id)) return false;
       if (s.archived) return false;
-      if (categoryFilter.size > 0 && !categoryFilter.has(s.category)) return false;
-      const q = search.toLowerCase();
+      if ($categoryFilter.size > 0 && !$categoryFilter.has(s.category)) return false;
+      const q = $search.toLowerCase();
       return !q || s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q);
     })
     .sort((a, b) => a.artist.localeCompare(b.artist, undefined, { sensitivity: 'base' })));
 
-  function toggle(song: Song) {
-    const next = new Map(selected);
-    if (next.has(song.id)) next.delete(song.id); else next.set(song.id, song);
-    selected = next;
-  }
+  function handleAdd() { onadd([...$selected.values()]); }
 
-  function handleAdd() { onadd([...selected.values()]); }
-
-  let dragStartedInModal = false;
-
-  function handleBackdropMousedown(e: MouseEvent) {
-    dragStartedInModal = !(e.target as HTMLElement).classList.contains('modal-backdrop');
-  }
-
-  function handleBackdrop(e: MouseEvent) {
-    if (dragStartedInModal) { dragStartedInModal = false; return; }
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) onclose();
-  }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onmousedown={handleBackdropMousedown} onclick={handleBackdrop}>
-  <div class="modal">
-    <div class="modal-header">
-      <h2>{$t.addSongs.title}</h2>
-      <button class="close-btn" onclick={onclose}>✕</button>
+<Dialog.Root open onOpenChange={o => { if (!o) onclose(); }}>
+  <Dialog.Content showCloseButton class="flex max-h-[80vh] flex-col gap-0 overflow-hidden p-0 mid:max-w-120 {mobileFullscreen}">
+    <Dialog.Header class="shrink-0 border-b px-4.5 py-3.5">
+      <Dialog.Title class="text-lead font-bold">{$t.addSongs.title}</Dialog.Title>
+    </Dialog.Header>
+    <div class="shrink-0 border-b px-4.5 py-2.5">
+      <Input class="bg-background" value={$search} oninput={e => setSearch(e.currentTarget.value)} placeholder={$t.addSongs.search} aria-label={$t.addSongs.search} />
     </div>
-    <div class="search-bar">
-      <input bind:value={search} placeholder={$t.addSongs.search} />
+    <div class="shrink-0 border-b px-4.5 py-2">
+      <FilterChips selected={$categoryFilter} onchange={setCategoryFilter} />
     </div>
-    <div class="filter-bar">
-      <FilterChips selected={categoryFilter} onchange={v => { categoryFilter = v; }} />
-    </div>
-    <div class="song-list">
+    <ScrollArea class="min-h-60 flex-1 basis-0 py-2">
       {#each filtered as song (song.id)}
-        <label class="song-item" class:selected={selected.has(song.id)}>
-          <input type="checkbox" checked={selected.has(song.id)} onchange={() => toggle(song)} />
-          <span class="song-info">
-            <CategoryBadge category={song.category} iconOnly />
-            <span class="song-title">{song.artist} – {song.title}</span>
-          </span>
-        </label>
+        <Item.Root class="rounded-none border-0 p-0 hover:bg-(--row-hover) {$selected.has(song.id) ? 'bg-(--row-hover)' : ''}">
+          <Label for="add-song-{song.id}" class="w-full cursor-pointer gap-2.5 px-4.5 py-2.25 font-normal">
+            <Checkbox id="add-song-{song.id}" checked={$selected.has(song.id)} onCheckedChange={() => toggle(song)} />
+            <Item.Content class="flex-row items-center gap-1.5">
+              <CategoryBadge category={song.category} iconOnly />
+              <Item.Title class="text-body font-normal">{song.artist} – {song.title}</Item.Title>
+            </Item.Content>
+          </Label>
+        </Item.Root>
       {/each}
       {#if filtered.length === 0}
-        <p class="empty">{$t.addSongs.empty}</p>
+        <Empty.Root class="border-0 p-6">
+          <Empty.Header><Empty.Title class="text-sm font-normal text-muted-foreground">{$t.addSongs.empty}</Empty.Title></Empty.Header>
+        </Empty.Root>
       {/if}
-    </div>
-    <div class="modal-footer">
+    </ScrollArea>
+    <Dialog.Footer class="m-0 shrink-0 flex-row flex-wrap items-center gap-2 px-4.5 py-3">
       {#if onaddnew}
-        <button class="btn-new" onclick={onaddnew}>{$t.editor.addSetlistOnly}</button>
+        <Button variant="outline" class="w-full justify-start mid:hidden" onclick={onaddnew}>{$t.editor.addSetlistOnly}</Button>
       {/if}
-      <span class="sel-count">{$t.addSongs.selected(selected.size)}</span>
-      <button class="btn-secondary" onclick={onclose}>{$t.addSongs.cancel}</button>
-      <button class="btn-primary" onclick={handleAdd} disabled={selected.size === 0}>
-        {$t.addSongs.addBtn(selected.size)}
-      </button>
-    </div>
-  </div>
-</div>
-
-<style>
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-  .modal { background: var(--surface); border-radius: 12px; width: 100%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-  .modal-header h2 { margin: 0; font-size: 1.05rem; }
-  .close-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); }
-  .search-bar { padding: 10px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-  .search-bar input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.88rem; box-sizing: border-box; }
-  .filter-bar { padding: 8px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
-  .song-list { flex: 1; overflow-y: auto; padding: 8px 0; min-height: 240px; }
-  .song-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; transition: background 0.12s; }
-  .song-item:hover, .song-item.selected { background: var(--row-hover); }
-  .song-info { display: flex; align-items: center; gap: 6px; flex: 1; }
-  .song-title { font-size: 0.88rem; }
-  .empty { text-align: center; color: var(--text-muted); padding: 24px; }
-  .modal-footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
-  .sel-count { flex: 1; font-size: 0.82rem; color: var(--text-muted); }
-  .btn-new { display: none; }
-  .btn-primary { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-  .btn-primary:disabled { opacity: 0.4; cursor: default; }
-  .btn-secondary { padding: 8px 18px; background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text); }
-
-  @media (max-width: 700px) {
-    .modal-footer { flex-wrap: wrap; }
-    .btn-new {
-      display: block; width: 100%; padding: 9px 12px;
-      background: transparent; border: 1px solid var(--border); border-radius: 6px;
-      color: var(--text); cursor: pointer; text-align: left;
-    }
-  }
-</style>
+      <span class="flex-1 text-small text-muted-foreground">{$t.addSongs.selected($selected.size)}</span>
+      <Button variant="outline" onclick={onclose}>{$t.addSongs.cancel}</Button>
+      <Button class="font-semibold" onclick={handleAdd} disabled={$selected.size === 0}>
+        {$t.addSongs.addBtn($selected.size)}
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>

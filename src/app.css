@@ -1,0 +1,539 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * ── COLOUR SYSTEM ────────────────────────────────────────────────────────────────────────────
+ * Components never contain a colour literal (a test guards it): they use Tailwind utilities
+ * generated from the tokens below (`bg-success-soft text-success-ink`, `bg-vibe-on-bg`, `tint-break-bg` …).
+ * Every token is defined for BOTH themes — `:root, [data-theme="light"]` and `[data-theme="dark"]`
+ * (a value that is the same in both lives in the shared block between them). The app switches theme with
+ * `data-theme="dark"` on <html> (see AppShell). A new colour = a new context token in both blocks + its
+ * `--color-*` line in `@theme inline`.
+ *
+ * LAYER 0 — surfaces (app chrome):  --bg  --surface  --border  --text  --text-muted  --row-hover  --chip-bg
+ *
+ * LAYER 1 — PALETTE, named by role. Each role has five values:
+ *   solid       a strong fill                         on-solid   text/icons on it
+ *   soft        a tinted background                   ink        text on `soft` / as text
+ *   border      a hairline in the role's hue
+ *   --palette-primary-*    the brand purple (#6c63ff); the shadcn `--primary` derives from it
+ *   --palette-secondary-*  the translucent purple of the secondary buttons (📝 🤫 …)
+ *   --palette-success-*    green   --palette-warning-*  yellow/orange   --palette-danger-*  red   --palette-info-*  blue
+ *   --palette-neutral-*    gray    --palette-violet-*   violet: sets, vibe, lyrics pager, "Середняк"
+ *   The generic palette is for ordinary UI (badges, amounts, alerts, statuses): in DARK its `soft` is a tint of the hue over the surface and its `ink`
+ *   a light shade (all text >= 4.5:1). Learning-stage / readiness / category colours are NOT the palette: they keep main's exact values (context tokens).
+ *   extras: --palette-{success,warning,neutral}-bright (hues used for dark tints), --palette-danger-strong (#dc2626), --palette-violet-bright (#a78bfa)
+ *
+ * LAYER 2 — CONTEXT tokens, which reference the palette (or hold a literal when a context has its own value):
+ *   vibe          --vibe-on-bg/-ink  --vibe-off-bg/-ink
+ *   stage         --stage-{queue,structure,mastering,ready}-{bg,ink,solid}   learning stages (cells, badges, progress segments)
+ *   pct           --pct-{full,high,low,none}-{bg,ink,border}                 readiness percent badges
+ *   category      --category-{top,mid,low}-{bg,ink,border,active-bg,active-ink,active-border}
+ *   sets          --set-accent  --set-header-bg/-hover-bg/-active-bg  --set-member-bg/-hover-bg
+ *   breaks        --break-bg  --break-hover-bg
+ *   tables        --table-song-bg  --table-people-bg  --table-zebra-bg  --table-head-bg  --table-selected-bg  --table-ink
+ *   bars          --bar-bg  --overlay-bg (behind dialogs)  --control-bg (outline buttons / selects sitting on the page: a card in light, the page colour in dark)
+ *   stage view    --stage-person-bg/-ink  --stage-person-hi/-hi-ink  --stage-item-bg  --stage-cell-ink
+ *   lyrics        --lyrics-chord  --lyrics-text  --lyrics-pager/-hover/-ink/-divider
+ *   presence      --presence-online  --presence-alone
+ *   feedback      --add-flash-bg/-ink
+ *   icon tints    --icon-on-primary-hi/-lo  --icon-on-secondary-hi/-lo   (SVG filters in AppShell)
+ *
+ * Tints: `tint-<token>` (e.g. `tint-set-header-bg`, `tint-stage-ready-bg`, `tint-break-bg`) paints a translucent token over the card
+ * surface; add `tint-on-bg` when it sits on the page background. Combine with `hover:`/`min-mid:` like any utility.
+ */
+
+/* The app switches themes with [data-theme="dark"] on <html> (see AppShell). */
+@custom-variant dark (&:is([data-theme="dark"] *));
+/* shadcn-svelte's Base UI-style `data-open:` / `data-checked:` ... variants, mapped to bits-ui's `data-state` attributes. */
+@custom-variant data-open (&:is([data-open], [data-state="open"]));
+@custom-variant data-closed (&:is([data-closed], [data-state="closed"]));
+@custom-variant data-checked (&:is([data-checked], [data-state="checked"]));
+@custom-variant data-unchecked (&:is([data-unchecked], [data-state="unchecked"]));
+@custom-variant data-active (&:is([data-active], [data-state="active"]));
+@custom-variant data-horizontal (&:is([data-horizontal], [data-orientation="horizontal"]));
+@custom-variant data-vertical (&:is([data-vertical], [data-orientation="vertical"]));
+/* Draggable rows (`draggable="true"`). */
+@custom-variant draggable (&[draggable="true"]);
+/* Pressed toggles / chips (bits-ui `data-state="on"`). */
+@custom-variant on (&:is([data-state="on"]));
+/* Learning-progress picker (LearningProgress.svelte): `over-<stage>:` applies to every segment of a [data-stage-group] while the pointer is on its enabled segment of that stage (the hover preview). */
+@custom-variant over-structure (&:is(:where([data-stage-group]):has([data-stage="structure"]:hover:not(:disabled)) *));
+@custom-variant over-mastering (&:is(:where([data-stage-group]):has([data-stage="mastering"]:hover:not(:disabled)) *));
+@custom-variant over-ready (&:is(:where([data-stage-group]):has([data-stage="ready"]:hover:not(:disabled)) *));
+
+/*
+ * Screen tiers (single source of truth; Tailwind variants `max-mid:` / `mid:` / `max-big:` / `big:` and JS via $lib/breakpoints):
+ *   small  < mid   (phones, iPads in portrait)
+ *   mid    mid .. < big  (iPads in landscape, small laptops)
+ *   big    >= big  (desktop)
+ */
+@theme static {
+  --breakpoint-mid: 1025px;
+  --breakpoint-big: 1367px;
+  /* The app's own type scale (no line-height, like the arbitrary sizes they replace): `text-micro` … `text-title`. */
+  --text-micro: 0.65rem;
+  --text-tiny: 0.72rem;
+  --text-caption: 0.75rem;
+  --text-small: 0.8rem;
+  --text-body: 0.875rem;
+  --text-body-lg: 0.92rem;
+  --text-lead: 1.05rem;
+  --text-title-sm: 1.1rem;
+  --text-title: 1.2rem;
+  --text-glyph: 1.7rem; /* the big emoji of icon buttons and flashes */
+  --leading-compact: 1.15; /* tight multi-line text (brand lines, stage names) */
+  --radius-soft: 10px; /* cards, panels, chips */
+  --shadow-bar: 0 2px 6px rgb(0 0 0 / 0.06); /* the page-controls bar under the nav */
+}
+
+/* Small screens, or very short ones (landscape phones): used by dialogs that stack their columns. */
+@custom-variant compact {
+  @media (width < theme(--breakpoint-mid)), (height < 550px) {
+    @slot;
+  }
+}
+
+/* Note text is clamped to one line on small screens. */
+@media (width < theme(--breakpoint-mid)) {
+  .clamp-small { display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+}
+
+/* The fixed action bars of the small view: 52px (or 4rem) of content above the device's bottom inset. */
+@utility safe-bar {
+  height: calc(--spacing(13) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility safe-bar-lg {
+  height: calc(--spacing(16) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* Admin tables turn into stacked cards on small screens: hide the header, give the rows a 3px gap. */
+@utility table-stack {
+  @media (width < theme(--breakpoint-mid)) {
+    & thead { display: none; }
+    & tbody { display: grid; gap: --spacing(0.75); }
+  }
+}
+
+/* ── Tint: a translucent colour token over the card surface (or, with `tint-on-bg`, over the page background). ── */
+@utility tint-* {
+  background: linear-gradient(--value(--color-*), --value(--color-*)), var(--tint-base, var(--surface));
+}
+@utility tint-on-bg {
+  --tint-base: var(--bg);
+}
+
+/*
+ * shadcn tokens + the Tailwind colour names, all derived from the palette / context tokens below.
+ * The shadcn "accent" (hover surface) is mapped to --row-hover; the brand purple is `primary`.
+ */
+:root {
+  --radius: 0.5rem;
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--palette-primary-solid);
+  --primary-foreground: var(--palette-primary-on-solid);
+  --primary-ink: var(--palette-primary-ink); /* the brand colour as TEXT/borders on cards (the pastel is only a fill) */
+  --secondary: var(--palette-secondary-solid);
+  --secondary-foreground: var(--palette-secondary-on-solid);
+  --muted: var(--chip-bg);
+  --muted-foreground: var(--text-muted);
+  --shadcn-accent: var(--row-hover);
+  --shadcn-accent-foreground: var(--text);
+  --destructive: var(--palette-danger-solid);
+  --input: var(--border);
+  --ring: color-mix(in srgb, var(--palette-primary-ink) 45%, var(--palette-primary-solid)); /* soft accent focus ring */
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--palette-primary-soft);
+  --color-primary-border: var(--palette-primary-border);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--shadcn-accent);
+  --color-accent-foreground: var(--shadcn-accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Palette: `bg-success` (solid) `text-success-on-solid`, `bg-success-soft text-success-ink`, `border-success-border` — same for warning, danger, info, neutral, violet. */
+  --color-success: var(--palette-success-solid);
+  --color-success-on-solid: var(--palette-success-on-solid);
+  --color-success-soft: var(--palette-success-soft);
+  --color-success-ink: var(--palette-success-ink);
+  --color-success-border: var(--palette-success-border);
+  --color-warning: var(--palette-warning-solid);
+  --color-warning-on-solid: var(--palette-warning-on-solid);
+  --color-warning-soft: var(--palette-warning-soft);
+  --color-warning-ink: var(--palette-warning-ink);
+  --color-warning-border: var(--palette-warning-border);
+  --color-danger: var(--palette-danger-solid);
+  --color-danger-on-solid: var(--palette-danger-on-solid);
+  --color-danger-soft: var(--palette-danger-soft);
+  --color-danger-ink: var(--palette-danger-ink);
+  --color-danger-border: var(--palette-danger-border);
+  --color-danger-strong: var(--palette-danger-strong);
+  --color-info: var(--palette-info-solid);
+  --color-info-on-solid: var(--palette-info-on-solid);
+  --color-info-soft: var(--palette-info-soft);
+  --color-info-ink: var(--palette-info-ink);
+  --color-info-border: var(--palette-info-border);
+  --color-neutral: var(--palette-neutral-solid);
+  --color-neutral-on-solid: var(--palette-neutral-on-solid);
+  --color-neutral-soft: var(--palette-neutral-soft);
+  --color-neutral-ink: var(--palette-neutral-ink);
+  --color-neutral-border: var(--palette-neutral-border);
+  --color-violet: var(--palette-violet-solid);
+  --color-violet-on-solid: var(--palette-violet-on-solid);
+  --color-violet-soft: var(--palette-violet-soft);
+  --color-violet-ink: var(--palette-violet-ink);
+  --color-violet-border: var(--palette-violet-border);
+  --color-violet-bright: var(--palette-violet-bright);
+
+  /* Context tokens. */
+  --color-vibe-on-bg: var(--vibe-on-bg);
+  --color-vibe-on-ink: var(--vibe-on-ink);
+  --color-vibe-off-bg: var(--vibe-off-bg);
+  --color-vibe-off-ink: var(--vibe-off-ink);
+  --color-stage-queue-bg: var(--stage-queue-bg);
+  --color-stage-queue-ink: var(--stage-queue-ink);
+  --color-stage-queue-solid: var(--stage-queue-solid);
+  --color-stage-structure-bg: var(--stage-structure-bg);
+  --color-stage-structure-ink: var(--stage-structure-ink);
+  --color-stage-structure-solid: var(--stage-structure-solid);
+  --color-stage-mastering-bg: var(--stage-mastering-bg);
+  --color-stage-mastering-ink: var(--stage-mastering-ink);
+  --color-stage-mastering-solid: var(--stage-mastering-solid);
+  --color-stage-ready-bg: var(--stage-ready-bg);
+  --color-stage-ready-ink: var(--stage-ready-ink);
+  --color-stage-ready-solid: var(--stage-ready-solid);
+  --color-pct-full-bg: var(--pct-full-bg);
+  --color-pct-full-ink: var(--pct-full-ink);
+  --color-pct-full-border: var(--pct-full-border);
+  --color-pct-high-bg: var(--pct-high-bg);
+  --color-pct-high-ink: var(--pct-high-ink);
+  --color-pct-high-border: var(--pct-high-border);
+  --color-pct-low-bg: var(--pct-low-bg);
+  --color-pct-low-ink: var(--pct-low-ink);
+  --color-pct-low-border: var(--pct-low-border);
+  --color-pct-none-bg: var(--pct-none-bg);
+  --color-pct-none-ink: var(--pct-none-ink);
+  --color-pct-none-border: var(--pct-none-border);
+  --color-category-top-bg: var(--category-top-bg);
+  --color-category-top-ink: var(--category-top-ink);
+  --color-category-top-border: var(--category-top-border);
+  --color-category-top-active-bg: var(--category-top-active-bg);
+  --color-category-top-active-ink: var(--category-top-active-ink);
+  --color-category-top-active-border: var(--category-top-active-border);
+  --color-category-mid-bg: var(--category-mid-bg);
+  --color-category-mid-ink: var(--category-mid-ink);
+  --color-category-mid-border: var(--category-mid-border);
+  --color-category-mid-active-bg: var(--category-mid-active-bg);
+  --color-category-mid-active-ink: var(--category-mid-active-ink);
+  --color-category-mid-active-border: var(--category-mid-active-border);
+  --color-category-low-bg: var(--category-low-bg);
+  --color-category-low-ink: var(--category-low-ink);
+  --color-category-low-border: var(--category-low-border);
+  --color-category-low-active-bg: var(--category-low-active-bg);
+  --color-category-low-active-ink: var(--category-low-active-ink);
+  --color-category-low-active-border: var(--category-low-active-border);
+  --color-set-accent: var(--set-accent);
+  --color-set-header-bg: var(--set-header-bg);
+  --color-set-header-hover-bg: var(--set-header-hover-bg);
+  --color-set-header-active-bg: var(--set-header-active-bg);
+  --color-set-member-bg: var(--set-member-bg);
+  --color-set-member-hover-bg: var(--set-member-hover-bg);
+  --color-break-bg: var(--break-bg);
+  --color-break-hover-bg: var(--break-hover-bg);
+  --color-table-song-bg: var(--table-song-bg);
+  --color-table-people-bg: var(--table-people-bg);
+  --color-table-zebra-bg: var(--table-zebra-bg);
+  --color-table-head-bg: var(--table-head-bg);
+  --color-table-selected-bg: var(--table-selected-bg);
+  --color-table-ink: var(--table-ink);
+  --color-bar-bg: var(--bar-bg);
+  --color-overlay: var(--overlay-bg);
+  --color-control-bg: var(--control-bg);
+  --color-stage-person-bg: var(--stage-person-bg);
+  --color-stage-person-ink: var(--stage-person-ink);
+  --color-stage-person-hi: var(--stage-person-hi);
+  --color-stage-person-hi-ink: var(--stage-person-hi-ink);
+  --color-stage-item-bg: var(--stage-item-bg);
+  --color-stage-cell-ink: var(--stage-cell-ink);
+  --color-lyrics-chord: var(--lyrics-chord);
+  --color-lyrics-text: var(--lyrics-text);
+  --color-lyrics-pager: var(--lyrics-pager);
+  --color-lyrics-pager-hover: var(--lyrics-pager-hover);
+  --color-lyrics-pager-ink: var(--lyrics-pager-ink);
+  --color-lyrics-pager-divider: var(--lyrics-pager-divider);
+  --color-presence-online: var(--presence-online);
+  --color-presence-alone: var(--presence-alone);
+  --color-add-flash-bg: var(--add-flash-bg);
+  --color-add-flash-ink: var(--add-flash-ink);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+}
+
+/* Keep the app's pre-Tailwind base look: Tailwind's reset zeroes heading weight and sets html line-height to 1.5. */
+@layer base {
+  html { line-height: normal; }
+  h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+}
+
+/* ══ Theme values: LIGHT ══ */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  /* surfaces */
+  --bg: #f5f4f8;
+  --surface: #ffffff;
+  --border: #e2e0ea;
+  --text: #1a1830;
+  --text-muted: #7a7890;
+  --row-hover: #f0effe;
+  --chip-bg: #eceaf8;
+
+  /* palette (values that differ by theme) */
+  --palette-primary-soft: color-mix(in srgb, var(--palette-primary-solid) 45%, var(--surface)); /* hovers, badges, highlights */
+  --palette-primary-ink: #4f46e5;
+  --palette-success-soft: rgb(0 200 0 / 0.2);     --palette-success-ink: #005909;
+  --palette-warning-soft: rgb(255 220 0 / 0.2);   --palette-warning-ink: #856100;
+  --palette-danger-soft: rgb(255 0 0 / 0.2);      --palette-danger-ink: #8a000a;
+  --palette-neutral-soft: rgb(128 128 128 / 0.2); --palette-neutral-ink: #424242;
+  --palette-info-soft: #e8f1ff;
+  --palette-info-ink: #1d4ed8;
+  --palette-violet-soft: #ede9fe;
+  --palette-violet-ink: #6d28d9;
+  --palette-violet-border: #ddd6fe;
+
+  /* categories */
+  --category-top-bg: #fee2e2;  --category-top-ink: #b91c1c;  --category-top-border: #fecaca;
+  --category-mid-bg: var(--palette-violet-soft);  --category-mid-ink: var(--palette-violet-ink);  --category-mid-border: var(--palette-violet-border);
+  --category-low-bg: #dcfce7;  --category-low-ink: #15803d;  --category-low-border: #bbf7d0;
+
+  /* tables, bars, stage view */
+  --table-zebra-bg: #edeaf8;
+  --table-selected-bg: #f3f3ff;
+  --table-ink: #1f1d3a;
+  --bar-bg: var(--surface);
+  --control-bg: var(--surface);
+  --stage-person-bg: #fdf1d6;
+  --stage-person-ink: var(--text-muted);
+  --stage-person-hi: #f6a623;
+  --stage-person-hi-ink: #1f1d3a;
+  --stage-item-bg: #ffffff;
+
+  /* lyrics */
+  --lyrics-chord: #e8305a;
+  --lyrics-text: #000000;
+
+}
+
+/* ══ Theme values: DARK (the base palette is main's dark theme) ══ */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1117;
+  --surface: #1a1d26;
+  --border: #2a2d3a;
+  --text: #e8eaf0;
+  --text-muted: #7a7d90;
+  --row-hover: #1f2230;
+  --chip-bg: #23263a;
+
+  --palette-primary-soft: var(--chip-bg);
+  --palette-primary-ink: #a8a3ff;
+  /* dark: a tint of the hue over the surface + a light ink (all >= 4.5:1, WCAG AA) */
+  --palette-success-soft: color-mix(in srgb, var(--palette-success-bright) 16%, var(--surface));  --palette-success-ink: #86efac;
+  --palette-warning-soft: color-mix(in srgb, var(--palette-warning-bright) 16%, var(--surface));  --palette-warning-ink: #fdba74;
+  --palette-danger-soft: color-mix(in srgb, var(--palette-danger-solid) 18%, var(--surface));     --palette-danger-ink: #fca5a5;
+  --palette-neutral-soft: color-mix(in srgb, var(--palette-neutral-bright) 16%, var(--surface));  --palette-neutral-ink: #d4d4d8;
+  --palette-info-soft: color-mix(in srgb, var(--palette-info-solid) 32%, var(--surface));
+  --palette-info-ink: #93c5fd;
+  --palette-violet-soft: #a78bfa20;
+  --palette-violet-ink: #c4b5fd;
+  --palette-violet-border: #a78bfa40;
+
+  --category-top-bg: #ef444420;  --category-top-ink: #f87171;  --category-top-border: #ef444440;
+  --category-mid-bg: var(--palette-violet-soft);  --category-mid-ink: var(--palette-violet-ink);  --category-mid-border: var(--palette-violet-border);
+  --category-low-bg: #22c55e20;  --category-low-ink: #4ade80;  --category-low-border: #22c55e40;
+
+  --table-zebra-bg: #1e2133;
+  --table-selected-bg: color-mix(in srgb, var(--palette-primary-solid) 22%, var(--surface));
+  --table-ink: var(--text);
+  --bar-bg: var(--bg);
+  --control-bg: var(--bg);
+  --stage-person-bg: #78350f;
+  --stage-person-ink: #d1d5db;
+  --stage-person-hi: #d97706;
+  --stage-person-hi-ink: #ffffff;
+  --stage-item-bg: var(--card);
+
+  --lyrics-chord: #60a5fa;
+  --lyrics-text: #ffffff;
+
+}
+
+/* ══ Theme values: the same in LIGHT and DARK (as on main: learning-stage tints, readiness badges, category chips, …) ══ */
+:root, [data-theme="light"], [data-theme="dark"] {
+  /* palette */
+  --palette-primary-solid: #6c63ff;     --palette-primary-on-solid: #ffffff;    --palette-primary-border: var(--palette-primary-solid);
+  --palette-secondary-solid: #6c63ffc0; --palette-secondary-on-solid: #ffffff;  --palette-secondary-soft: var(--palette-primary-soft); --palette-secondary-ink: var(--palette-primary-ink); --palette-secondary-border: var(--palette-primary-border);
+  --palette-success-solid: #16a34a;     --palette-success-on-solid: #ffffff;    --palette-success-bright: #22c55e;
+  --palette-warning-solid: #ca8a04;     --palette-warning-on-solid: #ffffff;    --palette-warning-bright: #f59e0b;
+  --palette-danger-solid: #ef4444;      --palette-danger-on-solid: #ffffff;     --palette-danger-strong: #dc2626;
+  --palette-info-solid: #3b82f6;        --palette-info-on-solid: #ffffff;
+  --palette-neutral-solid: #6b7280;     --palette-neutral-on-solid: #ffffff;    --palette-neutral-bright: #9ca3af;
+  --palette-success-border: color-mix(in srgb, var(--palette-success-ink) 40%, transparent);
+  --palette-warning-border: color-mix(in srgb, var(--palette-warning-ink) 40%, transparent);
+  --palette-danger-border: color-mix(in srgb, var(--palette-danger-ink) 40%, transparent);
+  --palette-info-border: color-mix(in srgb, var(--palette-info-ink) 40%, transparent);
+  --palette-neutral-border: color-mix(in srgb, var(--palette-neutral-ink) 40%, transparent);
+  --palette-violet-solid: #7c3aed;      --palette-violet-on-solid: #ffffff;     --palette-violet-bright: #a78bfa;
+
+  /* vibe badge */
+  --vibe-on-bg: var(--palette-violet-solid);    --vibe-on-ink: var(--palette-violet-on-solid);
+  --vibe-off-bg: var(--palette-danger-strong);  --vibe-off-ink: var(--palette-danger-on-solid);
+
+  /* learning stages: main's exact colours in both themes (translucent fill + dark ink) — NOT the generic palette, which is readable in dark; `solid` = the full-strength segment of the progress picker */
+  --stage-queue-bg: rgb(128 128 128 / 0.2);  --stage-queue-ink: #424242;  --stage-queue-solid: var(--stage-queue-ink);
+  --stage-structure-bg: rgb(255 0 0 / 0.2);  --stage-structure-ink: #8a000a;  --stage-structure-solid: var(--stage-structure-ink);
+  --stage-mastering-bg: rgb(255 220 0 / 0.2);  --stage-mastering-ink: #856100;  --stage-mastering-solid: var(--stage-mastering-ink);
+  --stage-ready-bg: rgb(0 200 0 / 0.2);  --stage-ready-ink: #005909;  --stage-ready-solid: var(--stage-ready-ink);
+
+  /* readiness percent badges (main's colours in both themes) */
+  --pct-full-bg: transparent;                         --pct-full-ink: var(--palette-success-solid);  --pct-full-border: var(--palette-success-solid);
+  --pct-high-bg: var(--stage-mastering-bg);           --pct-high-ink: var(--palette-warning-solid);  --pct-high-border: transparent;
+  --pct-low-bg: var(--stage-structure-bg);            --pct-low-ink: var(--palette-danger-strong);   --pct-low-border: transparent;
+  --pct-none-bg: var(--stage-queue-bg);               --pct-none-ink: var(--palette-neutral-solid);  --pct-none-border: transparent;
+
+  /* categories: the selected chip */
+  --category-top-active-bg: #b91c1c;                      --category-top-active-ink: var(--palette-danger-on-solid);   --category-top-active-border: var(--palette-danger-solid);
+  --category-mid-active-bg: var(--palette-violet-solid);  --category-mid-active-ink: var(--palette-violet-on-solid);   --category-mid-active-border: var(--palette-violet-bright);
+  --category-low-active-bg: #15803d;                      --category-low-active-ink: var(--palette-success-on-solid);  --category-low-active-border: var(--palette-success-bright);
+
+  /* setlist sets and breaks (translucent: use through `tint-*`) */
+  --set-accent: var(--palette-violet-solid);
+  --set-header-bg: color-mix(in srgb, var(--set-accent) 12%, transparent);
+  --set-header-hover-bg: color-mix(in srgb, var(--set-accent) 18%, transparent);
+  --set-header-active-bg: color-mix(in srgb, var(--set-accent) 24%, transparent);
+  --set-member-bg: color-mix(in srgb, var(--set-accent) 5%, transparent);
+  --set-member-hover-bg: color-mix(in srgb, var(--set-accent) 10%, transparent);
+  --break-bg: color-mix(in srgb, var(--palette-info-solid) 9%, transparent);
+  --break-hover-bg: color-mix(in srgb, var(--palette-info-solid) 16%, transparent);
+
+  /* tables: as on main, body cells, toolbars and the setlist header sit on the page background; only the catalog header is a card */
+  --table-song-bg: var(--bg);
+  --table-people-bg: var(--bg);
+  --table-head-bg: var(--bg);
+
+  --overlay-bg: #0008; /* the dim layer behind dialogs */
+  --stage-cell-ink: #e5e7eb; /* text on a stage-coloured musician badge in the dark theme */
+
+  /* lyrics pager */
+  --lyrics-pager: var(--palette-violet-solid);  --lyrics-pager-hover: #6d28d9;  --lyrics-pager-ink: var(--palette-violet-on-solid);  --lyrics-pager-divider: rgb(255 255 255 / 0.2);
+
+  /* nav dots */
+  --presence-online: var(--palette-success-bright);
+  --presence-alone: #eab308;
+
+  /* the green ✓ flash after adding a song to a setlist */
+  --add-flash-bg: rgb(0 200 0 / 0.28);
+  --add-flash-ink: var(--stage-ready-ink);
+
+  /* icons on the accent fill (SVG filters in AppShell): light / dark end of the duotone */
+  --icon-on-primary-hi: #ffffff;    --icon-on-primary-lo: #c9c5ff;
+  --icon-on-secondary-hi: #f4f2ff;  --icon-on-secondary-lo: #c9c4ff;
+}
+
+/* Margin/padding/box-sizing reset comes from Tailwind preflight; an unlayered `*` reset would beat every utility class. */
+
+/* Prevent automatic small zoom on focus in iOS Safari by forcing font-size to be at least 16px on mobile */
+@media (width < theme(--breakpoint-mid)) {
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+    font-size: 16px;
+  }
+}
+
+img.emoji {
+  /* Tailwind's `img { max-width: 100% }` squeezes emoji to ~0px inside shrink-to-fit badges: keep their own size. */
+  max-width: none;
+  flex-shrink: 0;
+  height: 1em;
+  width: 1em;
+  vertical-align: -0.1em;
+  display: inline-block;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: background 0.2s, color 0.2s;
+}
+
+.page-shell { max-width: 1000px; margin: 0 auto; padding: 24px 16px 16px; }
+@media (width < theme(--breakpoint-mid)) {
+  .page-shell { padding: 18px 10px 16px; }
+}
+
+/* Nav dots: pending-approval (red) and presence (green = others here, yellow = alone) */
+@keyframes pending-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--palette-danger-solid) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes presence-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--presence-online) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes presence-pulse-alone {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--presence-alone) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Plain emoji keep their native colours; only icons on accent fills get a light tint (filters defined in AppShell). */
+/* The lyrics 📝, personal-note 🤫 and stage 🎤 buttons, and the ⏭ of the set headers, show their natural emoji colours. */
+.no-tint img.emoji { filter: none; }
+/* Tinted icons on a secondary (accent-filled) button: the light tint, the accent one would vanish. */
+.bg-secondary:not(.no-tint) img.emoji,
+[data-state=on][class*="on:bg-secondary"]:not(.no-tint) img.emoji { filter: url(#tint-on-primary); }
+/* Only the selected first tab (🎵): its dark note would vanish on the accent fill, so it gets a lighter tint. Every other icon keeps the normal tint. */
+[data-active][class*="data-active:bg-primary"] img.emoji[alt="🎵"] { filter: url(#tint-on-primary); }
+/* The ➕ of the add buttons (solid accent fill) is drawn light so it reads clearly. */
+.bg-primary:not([style]) img.emoji[alt="➕"] { filter: url(#tint-on-primary); }
+
+/* Tailwind's reset makes buttons use the arrow cursor: every enabled button-like control gets the hand pointer. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="tab"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+}
