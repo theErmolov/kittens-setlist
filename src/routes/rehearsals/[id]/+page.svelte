@@ -182,11 +182,11 @@
   }
   async function togglePlayed(item: RehearsalSong) {
     if (!rehearsal || busy || rehearsal.cancelled) return;
-    // Use the visible order, including the optional readiness sort, as stage view does.
-    const through = new Set(displayedSongs.slice(0, displayedSongs.indexOf(item) + 1).map(rehearsalSongKey));
-    await persist({ songs: rehearsal.songs.map(song => item.played
-      ? rehearsalSongKey(song) === rehearsalSongKey(item) ? { ...song, played: false } : song
-      : through.has(rehearsalSongKey(song)) ? { ...song, played: true } : song) }, true).catch(() => {});
+    const key = rehearsalSongKey(item);
+    const songs = rehearsal.songs.map(song =>
+      rehearsalSongKey(song) === key ? { ...song, played: !song.played } : song
+    );
+    await persist({ songs }, true).catch(() => {});
   }
   function action(patch: Partial<Rehearsal>) { return persist(patch).catch(() => {}); }
   async function saveForm(draft: RehearsalDraft) {
